@@ -79,14 +79,28 @@ public class MySqlDatabase {
 		// establish a connection
 		String url = "jdbc:mysql://" + server + "/" + databaseName ;
 		
-		if (userName != null && !userName.equals("")) 
-			url = url + "?user=" + userName ; 
+		boolean argsStarted = false ;
 		
-		if (password != null && !password.equals(""))
-			url = url + "?password=" + password ;
+		if (userName != null && !userName.equals("")) { 
+			url = url + "?user=" + userName ; 
+			argsStarted = true ;
+		}
+		
+		if (password != null && !password.equals("")) {
+			if (argsStarted)
+				url = url + "&password=" + password ;
+			else
+				url = url + "?password=" + password ;
+			
+			argsStarted = true ;
+		}
 		 
-		if (encoding != null && !encoding.equals(""))
-			url = url + "&characterEncoding=" + encoding ;
+		if (encoding != null && !encoding.equals("")) {
+			if (argsStarted)
+				url = url + "&characterEncoding=" + encoding ;
+			else
+				url = url + "?characterEncoding=" + encoding ;	
+		}
 		
 		connection = DriverManager.getConnection(url) ; 
 	}
