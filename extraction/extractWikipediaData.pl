@@ -776,85 +776,110 @@
 	
 	sub extractAnchorSummary() {
 		if ($progress < 4) {
-			summarise_anchors() ;
+			summarise_anchors(2) ;
 			$progress = 4 ;
 			save_progress() ;
 		}
 	}
 	
-	sub summarise_anchors() {
+	sub summarise_anchors($) {
 	
 		print "summarizing anchors for quick caching\n" ;
 	
-		my %anchors = () ; #ngram-> reference to array of "id:count" strings of senses for anchor
-
-		open(ANCHOR, "$data_dir/anchor.csv") or die "cannot find '$data_dir/anchor.csv'. You must run extractCoreTables.pl first\n" ;
-		binmode(ANCHOR, ":utf8") ;
-
-		my $start_time = time  ;
-		my $parts_total = -s "$data_dir/anchor.csv" ; 
-		my $parts_done = 0 ;
-
-		my $total_anchors = 0 ;
-
-		while (defined (my $line = <ANCHOR>)) {
-    	$parts_done = $parts_done + length $line ;    
-    	chomp($line) ;
-
-    	if ($line =~ m/^\"(.+)\",(\d+),(\d+)$/) {
-				my $ngram = $1 ;
-				my @sense = ($2,$3) ;
-	
-				my $ref = $anchors{$ngram} ;
-				my @array ;
-				if (defined $ref) {
-	    		@array = @{$ref} ;
-				}else {
-	    		@array = () ;
-	    		$total_anchors++ ; 
-				}
-	 
-				push (@array, \@sense) ;
-				$anchors{$ngram} = \@array ;
-    	}
-    	print_progress(" - reorganizing anchors", $start_time, $parts_done, $parts_total) ;    
-		}
-
-		print_progress(" - reorganizing anchors", $start_time, $parts_total, $parts_total) ;  
-		print("\n") ;
-
-		close(ANCHOR) ;
 		
 		open(ANCHOR_SUMMARY, "> $data_dir/anchor_summary.csv") or die "'$data_dir' is not writable/\n" ;
 		binmode(ANCHOR_SUMMARY, ":utf8") ;
 		
-		$start_time = time ;
-		$parts_total = $total_anchors ;
-		$parts_done = 0 ;
+		# split data into seperate passes, since we have issues trying to fit all of the anchors into memory
+		my $passes = shift ;
+		my $pass = 0 ;
+		
+		while ($pass < $passes) {	
+		
+			my %anchors = () ; #ngram-> reference to array of "id:count" strings of senses for anchor
+
+			open(ANCHOR, "$data_dir/anchor.csv") 
+				or die "cannot find '$data_dir/anchor.csv'. You must run extractCoreTables.pl first\n" ;
+			
+			binmode(ANCHOR, ":utf8") ;
+			
+			my $start_time = time  ;
+			my $parts_total = -s "$data_dir/anchor.csv" ; 
+			
+			my $anchor_count = 0 ;
+			my $parts_done = 0 ;
+
+			while (defined (my $line = <ANCHOR>)) {
+    		$parts_done = $parts_done + length $line ;  
+    		  
+    		chomp($line) ;
+    		if ($line =~ m/^\"(.+)\",(\d+),(\d+)$/) {
+    			    		
+					my $ngram = $1 ;
+					
+					
+					#generate a very simple hash for this ngram
+					my $hash = 0 ;
+					foreach (unpack("C*",$ngram)) {
+          	$hash = $hash + int($_);
+      		}
+						
+					#naively split the data on this hash value, and hope they are evenly spread enough to fit in memory.
+					if ($hash % $passes == $pass) {
+						
+						my @sense = map(int,($2,$3)) ;
+			
+						my $ref = $anchors{$ngram} ;
+						my @array ;
+					
+						if (defined $ref) {
+	    				@array = @{$ref} ;
+						}else {
+	    				@array = () ;
+	    				$anchor_count++ ; 
+						}
+	 
+						push (@array, \@sense) ;
+						$anchors{$ngram} = \@array ;
+    			}
+    			print_progress(" - reorganizing anchors (pass ".($pass+1)." of $passes)", $start_time, $parts_done, $parts_total) ;    
+				}
+			}
+
+			print_progress(" - reorganizing anchors (pass ".($pass+1)." of $passes)", $start_time, $parts_total, $parts_total) ;    
+			print("\n") ;
+
+			close(ANCHOR) ;
+		
+			$start_time = time ;
+			$parts_total = $anchor_count ;
+			$parts_done = 0 ;
 				
-		while ((my $anchor, my $ref) = each %anchors) {
-			$parts_done ++ ;
+			while ((my $anchor, my $ref) = each %anchors) {
+				$parts_done ++ ;
 
-		 	my $line = "" ;
-    	my @senses = @{$ref} ;
-    	@senses = reverse sort { @{$a}[1] <=> @{$b}[1] } @senses ; 
+		 		my $line = "" ;
+    		my @senses = @{$ref} ;
+    		@senses = reverse sort { @{$a}[1] <=> @{$b}[1] } @senses ; 
 
-    	for my $sense (@senses) {
-				my @s = @{$sense} ;
-				$line = $line."$s[0]:$s[1];" ;
-    	}
+    		for my $sense (@senses) {
+					my @s = @{$sense} ;
+					$line = $line."$s[0]:$s[1];" ;
+    		}
     	
-    	undef @{$anchors{$anchor}} ;
+    		undef @{$anchors{$anchor}} ;
     	
-    	print ANCHOR_SUMMARY "\"$anchor\",\"".substr($line,0,length($line)-1)."\"\n" ;
-    	print_progress(" - saving anchor summary", $start_time, $parts_done, $parts_total) ;
+    		print ANCHOR_SUMMARY "\"$anchor\",\"".substr($line,0,length($line)-1)."\"\n" ;
+    		print_progress(" - saving anchor summary (pass ".($pass+1)." of $passes)", $start_time, $parts_done, $parts_total) ;
+			}
+		
+			print_progress(" - saving anchor summary (pass ".($pass+1)." of $passes)", $start_time, $parts_total, $parts_total) ;
+			print "\n" ;
+		
+			undef %anchors ;
+			$pass++ ;
 		}
 		
-		print_progress(" - saving anchor summary", $start_time, $parts_total, $parts_total) ;
-		print "\n" ;
-		
-		undef %anchors ;
-
 		close ANCHOR_SUMMARY ;
 	}
 	
@@ -1194,12 +1219,15 @@
 	sub summarize_linksIn($) {
 	
 		print "summarizing links in to each page\n" ;
+		
+		open(LINKSIN, "> $data_dir/pagelink_in.csv") ;
 	
 		my $passes = shift ;
 	
 		#get link counts, so we can initialize arrays to correct size
-
+		
 		my %link_count = () ; #id-> count of links in (may be a bit more than we need, because there are duplucates)
+		my $total_ids = 0 ;
 
 		open(LINKCOUNT, "$data_dir/linkcount.csv") ;
 
@@ -1212,10 +1240,11 @@
     	chomp($line) ;
 
     	if ($line =~ m/^(\d+),(\d+),(\d+)$/) {
-				my $lc_id = scalar $1 ;
-				my $lc_in = scalar $2 ;
+				my $lc_id = int $1 ;
+				my $lc_in = int $2 ;
 	
 				$link_count{$lc_id} = $lc_in ;
+				$total_ids ++ ;
     	}
     	print_progress(" - calculating space requirements", $start_time, $parts_done, $parts_total) ;    
 		}
@@ -1225,25 +1254,49 @@
 
 		close(LINKCOUNT) ;
 		
-		open(LINKSIN, "> $data_dir/pagelink_in.csv") ;
+		#pen(LINKSIN, "> $data_dir/pagelink_in.csv") ;
 
 		#get pagelinks, but split into passes that we can fit into memory
 
 		for (my $pass=0 ; $pass<$passes ; $pass++) {
-
+		
     	print " - pass ".($pass + 1)." of $passes\n" ;
 
     	my $start_time = time  ;
-    	my $parts_total = -s "$data_dir/pagelink.csv" ; 
+    	my $parts_total = $total_ids ; 
     	my $parts_done = 0 ;
+    	
+    	# allocate space needed to to do this step first, so we can fail fast if we have to. 
 
-    	my %links_in = () ;    #id -> reference to array of unique ids linking to the page, in ascending order ;
+    	my %links_in = () ;  #id -> reference to array of unique ids linking to the page, in ascending order ;
                            #first element in array specifies the "size" of array; the index at last id was placed. 
-                           
-      my $count = 0 ;
+      
+      my $keys = 0 ;
+      
+      while ((my $lc_id, my $lc_in) = each %link_count) {
+ 				$parts_done ++;
+      	
+      	if ($lc_id % $passes == $pass) {
+      		my @array = @{initialize_array($lc_in+1)} ;
+		
+					$links_in{$lc_id} = \@array ;
+					$keys++ ;
+				}
+				
+				print_progress("   - allocating space", $start_time, $parts_done, $parts_total) ;
+    	}
 
+    	print_progress("   - allocating space", $start_time, $parts_total, $parts_total) ;
+    	print "\n" ;
+ 
+ 			# populate links_in 
+    	
     	open(PAGELINK, "$data_dir/pagelink.csv") ;
-
+    	
+    	$start_time = time  ;
+    	$parts_total = -s "$data_dir/pagelink.csv" ;
+    	$parts_done = 0 ;
+    	
     	while (defined (my $line = <PAGELINK>)) {
 				$parts_done = $parts_done + length $line ;    
 				chomp($line) ;
@@ -1257,49 +1310,37 @@
 						if ($pl_from != $pl_to) {
 
 		    			my $ref = $links_in{$pl_to} ;
-		    
-		    			if (defined $ref) {
-								my @array = @{$ref} ;
+		    			my @array = @{$ref} ;
 
-								my $size = int $array[0] ;			 
-								my $last_id = int $array[$size] or die "array not large enough for $pl_to:$size\n";
-		      
-								if ($last_id != $pl_from) {
+							my $size = int $array[0] ;	#number of links we have already stored for this $pl_to		 
+							
+							if ($size >= @array) {
+								die "array not large enough for $pl_to:$size\n";
+							}
+															
+							if ($array[$size]!= $pl_from) {
 			    
-			    				$size ++ ;
-			    				$links_in{$pl_to}[0] = $size ;
-			    				$links_in{$pl_to}[$size] = $pl_from ;
+			    			$size ++ ;
+			    			$links_in{$pl_to}[0] = $size ;
+			    			$links_in{$pl_to}[$size] = $pl_from ;
 
-			    				#print "array appended to for $pl_to\n" ;
-								}
-		   				} else {
-		   					$count++ ;
-								my $arraySize = $link_count{$pl_to} ;
-
-								if (defined $arraySize) {
-				    			my @array = @{initialize_array($arraySize)} ;
-
-				    			$array[0] = 1 ;  # 'size' of array
-				    			$array[1] = $pl_from ;
-				
-				    			$links_in{$pl_to} = \@array ;
-								} else {
-				    			print "ERROR: Could not get count of links in for $pl_to\n" ;
-								}
-		    			}   
+			    			#print "array appended to for $pl_to\n" ;
+							}
 						}
-	    		}
+					}
 				}
 				print_progress("   - gathering links", $start_time, $parts_done, $parts_total) ;
     	}
-
+    	
     	print_progress("   - gathering links", $start_time, $parts_total, $parts_total) ;
     	print "\n" ;
-
+    	
     	close PAGELINK ;
-
+    	
+    	#save stored links to file
+    	
     	$start_time = time ;
-    	$parts_total = $count ;
+    	$parts_total = $keys ;
     	$parts_done = 0 ;
     	
     	while ((my $pl_to, my $ref) = each %links_in) {
@@ -1324,7 +1365,7 @@
     	print "\n" ;
 		}
 		
-		close LINKSIN ;   
+		close LINKSIN ;
 	}
 
 	sub initialize_array{
@@ -1334,7 +1375,7 @@
     $#array = $size ;
     
     for (my $i=0 ; $i<$size ; $i++) {
-			$array[$i] = 0 ;
+			$array[$i] = int 0 ;
     }
        
     return \@array ;
@@ -1383,14 +1424,15 @@
 		print "\n" ;
 
 		close CONTENT ;
-	}
-	
-	
+	}	
 	
 	if ($progress < 8) {
-		extractPageSummary() ;
-		extractRedirectSummary() ;
-		extractCoreSummaries() ;
+		if ($progress < 4) {
+			extractPageSummary() ;
+			extractRedirectSummary() ;
+			extractCoreSummaries() ;
+		}
+		
 		extractAnchorSummary() ;
 		extractGenerality() ;
 		extractLinkCountSummary() ;
@@ -1450,7 +1492,7 @@
 	}
 	
 	
-
+	
 	# displaying progress ============================================================================================================
 
 	my $msg ;
