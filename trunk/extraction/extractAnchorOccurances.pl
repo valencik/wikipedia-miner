@@ -8,6 +8,7 @@
 	my $data_dir = shift(@ARGV) or die "You must specify a writable data directory containing a single split file, and the anchor.csv file produced by extractWikipediaData\n" ;
 	
 	my $max_ngram_length = 10 ;
+	my $report_rate = 0.001;
 	
 	# logging===================================================================================================================
 	
@@ -234,10 +235,12 @@
     return $text ;
 	}
 	
+	
 	# displaying progress ============================================================================================================
 
 	my $msg ;
-
+	my $last_report_time ;
+	
 	sub format_percent {
     return sprintf("%.2f",($_[0] * 100))."%" ;
 	}
@@ -253,20 +256,35 @@
 	}
 
 	sub print_progress {
+	
     my $message = shift ;
     my $start_time = shift ;
     my $parts_done = shift ;
     my $parts_total = shift ;
+    
+    if (not defined $last_report_time) {
+    	$last_report_time = $start_time
+    }
+    
+    if (time == $last_report_time && $parts_done < $parts_total) {
+			#do not report if we reported less than a second ago, unless we have finished.
+			return ;
+		}
 
-    my $work_done = $parts_done/$parts_total ;
+    my $work_done = $parts_done/$parts_total ;    
     my $time_elapsed = time - $start_time ;
     my $time_expected = (1/$work_done) * $time_elapsed ;
     my $time_remaining = $time_expected - $time_elapsed ;
+    $last_report_time = time ;
 
+		#clear 
     if (defined $msg) {
 			$msg =~ s/./\b/g ;
 			print $msg ;
     }
+    
+    #flush output, so we definitely see this message
+    $| = 1 ;
     
     if ($parts_done >= $parts_total) {
     	$msg = $message.": done in ".format_time($time_elapsed)."                          " ;
