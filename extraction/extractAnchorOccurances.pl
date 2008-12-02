@@ -95,7 +95,7 @@
 			while($content =~ m/(.*?)\n/gi) {	
 
 		    my $line = $1 ;
-		    print LOG "LINE: $line\n" ;
+		    #print LOG "LINE: $line\n" ;
 		    
 		    get_ngrams($line, %ngrams_seen) ;	
 			}
@@ -151,7 +151,7 @@
 	    
 	    		if (defined $freq) {
 						$anchorFreq{$ngram} = $freq + 1 ;
-						print LOG "$ngram,$freq\n" ;
+						#print LOG "$ngram,$freq\n" ;
 	    		}
 	    		$ngrams_seen{$ngram} = 1 ;
 	    	}
