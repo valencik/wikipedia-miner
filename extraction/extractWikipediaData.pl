@@ -8,19 +8,30 @@
 
 	binmode(STDOUT, ':utf8');
 
+  # gather arguments
+
 	my $data_dir = shift(@ARGV) or die "You must specify a writable data directory containing a single WikiMedia dump file\n" ;
 	
-	my $flag = shift(@ARGV) ;
+	
+	my $args = join(' ',@ARGV);
 	my $contentFlag = 1 ;
-	if (defined $flag) {
-		$contentFlag = not(shift(@ARGV) =~ m\nocontent\i);
+	
+	if ($args =~ m/-nocontent/i) {
+	 $contentFlag = 0 ;
 	}
 	
+	 	
+	my $passes = 2 ; 
+	if ($args =~ m/-passes[\s\=]*(\d+)/i) {
+	 $passes = $1 ;
+	}	
+	
 	if ($contentFlag) {
-		print "page content will be extracted\n" ;
+		print "page content will be extracted.\n" ;
 	} else {
-		print "page content will not be extracted\n" ;
+		print "page content will not be extracted.\n" ;
 	}
+	print "data will be split into $passes passes for memory-intesive operations. Try using more passes if you run into problems.\n" ;
 	
 	# tweaking for different versions of wikipedia ==================================================================================
 	
@@ -776,13 +787,13 @@
 	
 	sub extractAnchorSummary() {
 		if ($progress < 4) {
-			summarise_anchors(2) ;
+			summarise_anchors() ;
 			$progress = 4 ;
 			save_progress() ;
 		}
 	}
 	
-	sub summarise_anchors($) {
+	sub summarise_anchors() {
 	
 		print "summarizing anchors for quick caching\n" ;
 	
@@ -791,7 +802,6 @@
 		binmode(ANCHOR_SUMMARY, ":utf8") ;
 		
 		# split data into seperate passes, since we have issues trying to fit all of the anchors into memory
-		my $passes = shift ;
 		my $pass = 0 ;
 		
 		while ($pass < $passes) {	
@@ -1206,24 +1216,20 @@
 	
 	# links in summary ==============================================================================================================
 	
-	sub extractLinksInSummary($) {
-		my $passes = shift ;
-	
+	sub extractLinksInSummary() {
 		if ($progress < 8) {
-			summarize_linksIn($passes) ;
+			summarize_linksIn() ;
 			$progress = 8 ;
 			save_progress() ;
 		}
 	}
 	
-	sub summarize_linksIn($) {
+	sub summarize_linksIn() {
 	
 		print "summarizing links in to each page\n" ;
 		
 		open(LINKSIN, "> $data_dir/pagelink_in.csv") ;
-	
-		my $passes = shift ;
-	
+		
 		#get link counts, so we can initialize arrays to correct size
 		
 		my %link_count = () ; #id-> count of links in (may be a bit more than we need, because there are duplucates)
@@ -1437,7 +1443,7 @@
 		extractGenerality() ;
 		extractLinkCountSummary() ;
 		extractLinksOutSummary() ;
-		extractLinksInSummary(2) ;
+		extractLinksInSummary() ;
 	}
 		
 	if ($contentFlag) {
