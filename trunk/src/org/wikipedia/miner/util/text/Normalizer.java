@@ -30,7 +30,7 @@ import java.util.TreeSet;
 
 
 /**
- * This class provides very agressive morphology. This involves cleaning the text using a TextCleaner,
+ * This class provides very aggressive morphology. This involves cleaning the text using a TextCleaner,
  * removing all stopwords, stemming individual terms using porter's stemmer, and ordering the remaining
  * terms alphabetically.
  */	
@@ -93,16 +93,14 @@ public class Normalizer extends TextProcessor {
 		}
 		String t2 = "" ;
 		
-		Iterator i = orderedTerms.iterator() ;
-		while (i.hasNext()) {
-			String term = (String) i.next() ;
+		for (String term:orderedTerms)
 			t2 = t2 + " " + term ; 
-		}
+		
 		t2 = t2.trim();
 		
-		if (t2.equals("")) {
+		if (t2.equals("")) 
 			return t;
-		}
+		
 		return t2;
 	}
 
