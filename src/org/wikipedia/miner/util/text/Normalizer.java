@@ -17,7 +17,7 @@
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-package org.wikipedia.miner.util.morphology;
+package org.wikipedia.miner.util.text;
 
 import java.io.BufferedReader;
 import java.io.File ;
@@ -34,7 +34,7 @@ import java.util.TreeSet;
  * removing all stopwords, stemming individual terms using porter's stemmer, and ordering the remaining
  * terms alphabetically.
  */	
-public class Normalizer extends MorphologicalProcessor {
+public class Normalizer extends TextProcessor {
 
 	HashSet<String> stopwords ;
 	PorterStemmer stemmer ;

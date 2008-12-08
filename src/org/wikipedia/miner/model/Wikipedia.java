@@ -26,7 +26,7 @@ import java.util.*;
 
 import org.wikipedia.miner.model.Article.AnchorText;
 import org.wikipedia.miner.util.*;
-import org.wikipedia.miner.util.morphology.*;
+import org.wikipedia.miner.util.text.*;
 
 
 /**
@@ -166,17 +166,17 @@ public class Wikipedia {
 	 * retrieved (eg via stemming or casefolding) 
 	 * 
 	 * @param term	the term to obtain articles for
-	 * @param mp	an optional morphologicalProcessor to modify how the term is searched for. 
+	 * @param mp	an optional TextProcessor to modify how the term is searched for. 
 	 * 
 	 * @return the most likely sense of the given term.
 	 * 
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public Article getMostLikelyArticle(String term, MorphologicalProcessor mp) throws SQLException{
+	public Article getMostLikelyArticle(String term, TextProcessor tp) throws SQLException{
 
-		//wikipediaDatabase.checkMorphologicalProcessor(mp) ;
+		//wikipediaDatabase.checkMorphologicalProcessor(tp) ;
 
-		Anchor anch = new Anchor(term, mp, wikipediaDatabase) ;
+		Anchor anch = new Anchor(term, tp, wikipediaDatabase) ;
 
 		if (anch == null) 
 			return null ;
@@ -207,15 +207,15 @@ public class Wikipedia {
 	 * are retrieved (e.g. via stemming or casefolding) 
 	 * 
 	 * @param term	the term to obtain articles for
-	 * @param mp	the morphologicalProcessor by which the term is compared to wikipedia anchors.
+	 * @param tp	the TextProcessor by which the term is compared to wikipedia anchors.
 	 * 
 	 * @return the SortedVector of all relevant Articles, ordered by commoness of the link being made.
 	 * 
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public SortedVector<Article> getWeightedArticles(String term, MorphologicalProcessor mp) throws SQLException{
+	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp) throws SQLException{
 
-		Anchor anch = new Anchor(term, mp, wikipediaDatabase) ;
+		Anchor anch = new Anchor(term, tp, wikipediaDatabase) ;
 
 		if (anch == null) 
 			return null ;
@@ -246,16 +246,16 @@ public class Wikipedia {
 	 * are retrieved (e.g. via stemming or casefolding) 
 	 * 
 	 * @param term	the term to obtain articles for
-	 * @param mp	the morphologicalProcessor by which the term is compared to wikipedia anchors.
+	 * @param tp	the TextProcessor by which the term is compared to wikipedia anchors.
 	 * @param contextArticles	a collection of articles that relate to the intended meaning of the term.
 	 * 
 	 * @return the SortedVector of all relevant Articles, ordered how well-known they are and how they relate to context articles.
 	 * 
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public SortedVector<Article> getWeightedArticles(String term, MorphologicalProcessor mp, Collection<Article> contextArticles) throws SQLException{
+	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp, Collection<Article> contextArticles) throws SQLException{
 
-		Anchor anch = new Anchor(term, mp, wikipediaDatabase) ;
+		Anchor anch = new Anchor(term, tp, wikipediaDatabase) ;
 		SortedVector<Anchor.Sense> senses = anch.getSenses() ;
 
 		SortedVector<Article> articles = new SortedVector<Article>() ;
@@ -299,27 +299,27 @@ public class Wikipedia {
 	 * (eg via stemming or casefolding) 
 	 * 
 	 * @param term	the term to obtain articles for
-	 * @param mp	the morphologicalProcessor by which the term is compared to wikipedia anchors.
+	 * @param tp	the TextProcessor by which the term is compared to wikipedia anchors.
 	 * @param contextTerms	an array of phrases or terms that relate to the intended meaning of the term.
 	 * 
 	 * @return the SortedVector of all relevant Articles, ordered by commoness of the link being made and relatedness to context articles.
 	 * 
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public SortedVector<Article> getWeightedArticles(String term, MorphologicalProcessor mp, String[] contextTerms) throws SQLException{
+	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp, String[] contextTerms) throws SQLException{
 		System.out.print(" - context: " ) ;
 		Vector<Article> contextArticles = new Vector<Article>() ;
 
 		for (String ct: contextTerms) {
 			System.out.print(ct + " ");
-			Article ca = getMostLikelyArticle(ct, mp) ;
+			Article ca = getMostLikelyArticle(ct, tp) ;
 			if (ca != null){
 				contextArticles.add(ca) ;
 			}
 
 		}
 		System.out.println() ;
-		return getWeightedArticles(term, mp, contextArticles) ;
+		return getWeightedArticles(term, tp, contextArticles) ;
 	}
 	
 	/**

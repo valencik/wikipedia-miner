@@ -17,7 +17,7 @@
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-package org.wikipedia.miner.util.morphology;
+package org.wikipedia.miner.util.text;
 
 
 /**
@@ -28,7 +28,7 @@ package org.wikipedia.miner.util.morphology;
  * lowercase, and discarding whitespace and disambiguation information (the text found within
  * parentheses in many wikipedia titles).
  */	
-public class Cleaner extends MorphologicalProcessor{
+public class Cleaner extends TextProcessor{
 	
 	private boolean disallowInternalPeriods = false ;
 		

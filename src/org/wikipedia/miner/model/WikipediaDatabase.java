@@ -26,7 +26,7 @@ import java.util.* ;
 import gnu.trove.* ;
 
 import org.wikipedia.miner.util.*;
-import org.wikipedia.miner.util.morphology.*;
+import org.wikipedia.miner.util.text.*;
 
 /**
  * This class loads, provides access to and maintains the Wikipedia database. It most cases it 
@@ -56,7 +56,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 	protected TIntObjectHashMap<int[][]> cachedOutLinks = null ;
 	protected TIntIntHashMap cachedGenerality = null ; 
 	
-	private MorphologicalProcessor cachedProcessor = null ;
+	private TextProcessor cachedProcessor = null ;
 		
 	/**
 	 * Initializes a newly created WikipediaDatabase and attempts to make a connection to the mysql
@@ -191,17 +191,17 @@ public class WikipediaDatabase extends MySqlDatabase {
 		stmt.close() ;		
 	}
 	
-	public void prepareForMorphologicalProcessor(MorphologicalProcessor mp) throws SQLException{
-		prepareAnchorsForMorphologicalProcessor(mp) ;
+	public void prepareForMorphologicalProcessor(TextProcessor tp) throws SQLException{
+		prepareAnchorsForMorphologicalProcessor(tp) ;
 		
 		if (tableExists("anchor_occurance"))
-			prepareAnchorOccurancesForMorphologicalProcessor(mp) ;
+			prepareAnchorOccurancesForMorphologicalProcessor(tp) ;
 	}
 	
-	private void prepareAnchorsForMorphologicalProcessor(MorphologicalProcessor mp) throws SQLException {
+	private void prepareAnchorsForMorphologicalProcessor(TextProcessor tp) throws SQLException {
 		
-		System.out.println("Preparing anchors for " + mp.getName()) ;
-		String tableName = "anchor_" + mp.getName() ;
+		System.out.println("Preparing anchors for " + tp.getName()) ;
+		String tableName = "anchor_" + tp.getName() ;
 		
 		int rows = this.getRowCountExact("anchor") ;
 		ProgressDisplayer pd = new ProgressDisplayer("Gathering and processing anchors", rows) ;
@@ -241,7 +241,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 					long an_to = rs.getLong(2) ;
 					int an_count = rs.getInt(3) ;
 					
-					an_text = mp.processText(an_text) ;
+					an_text = tp.processText(an_text) ;
 					
 					//System.out.println(an_text + "," + an_to + "," + an_count) ;
 					
@@ -309,10 +309,10 @@ public class WikipediaDatabase extends MySqlDatabase {
 		}
 	}
 	
-	private void prepareAnchorOccurancesForMorphologicalProcessor(MorphologicalProcessor mp) throws SQLException {
+	private void prepareAnchorOccurancesForMorphologicalProcessor(TextProcessor tp) throws SQLException {
 		
-		System.out.println("Preparing anchor occurances for " + mp.getName()) ;
-		String tableName = "anchor_occurance_" + mp.getName() ;
+		System.out.println("Preparing anchor occurances for " + tp.getName()) ;
+		String tableName = "anchor_occurance_" + tp.getName() ;
 		
 		int rows = this.getRowCountExact("anchor") ;
 		ProgressDisplayer pd = new ProgressDisplayer("Gathering and processing anchor occurances", rows) ;
@@ -350,7 +350,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 					int ao_linkCount = rs.getInt(2) ;
 					int ao_occCount = rs.getInt(3) ;
 					
-					ao_text = mp.processText(ao_text) ;					
+					ao_text = tp.processText(ao_text) ;					
 					Integer[] stats = occuranceStats.get(ao_text) ;
 					
 					if (stats != null) {
@@ -706,17 +706,17 @@ public class WikipediaDatabase extends MySqlDatabase {
 	/**
 	 * Checks if the database has been prepared for use with a particular morphological processor
 	 * 
-	 * @param morphologicalProcessor the morphologicalProcessor to be checked.
-	 * @throws SQLException if the data has not been prepared for this morphologicalProcessor.
+	 * @param TextProcessor the TextProcessor to be checked.
+	 * @throws SQLException if the data has not been prepared for this TextProcessor.
 	 */
-	public void checkMorphologicalProcessor(MorphologicalProcessor morphologicalProcessor) throws SQLException {
+	public void checkMorphologicalProcessor(TextProcessor TextProcessor) throws SQLException {
 			
-		if (!tableExists("anchor_" + morphologicalProcessor.getName()))
-			throw new SQLException("anchors have not been prepared for the morphological processor \"" + morphologicalProcessor.getName() + "\"") ;
+		if (!tableExists("anchor_" + TextProcessor.getName()))
+			throw new SQLException("anchors have not been prepared for the morphological processor \"" + TextProcessor.getName() + "\"") ;
 		
 		if (!tableExists("ngram")) {
-			if (!tableExists("ngram_" + morphologicalProcessor.getName()))
-				throw new SQLException("ngrams have not been prepared for the morphological processor \"" + morphologicalProcessor.getName() + "\"") ;
+			if (!tableExists("ngram_" + TextProcessor.getName()))
+				throw new SQLException("ngrams have not been prepared for the morphological processor \"" + TextProcessor.getName() + "\"") ;
 		}
 	}
 
@@ -767,7 +767,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 		return maxPageDepth ;
 	}
 	
-	public void cacheAnchors(File dir, MorphologicalProcessor mp) throws IOException{
+	public void cacheAnchors(File dir, TextProcessor tp) throws IOException{
 		
 		File occuranceFile = new File(dir.getPath() + File.separatorChar + "anchor_occurance.csv") ;
 		File anchorFile = new File(dir.getPath() + File.separatorChar + "anchor_summary.csv") ;
@@ -796,8 +796,8 @@ public class WikipediaDatabase extends MySqlDatabase {
 				int linkCount = new Integer(line.substring(sep1+1, sep2)) ;
 				int occCount = new Integer(line.substring(sep2+1)) ;
 				
-				if (mp != null) 
-					ngram = mp.processText(ngram) ;
+				if (tp != null) 
+					ngram = tp.processText(ngram) ;
 				
 				// if we are doing morphological processing, then we need to resolve collisions
 				CachedAnchor ca = cachedAnchors.get(ngram) ;
@@ -848,8 +848,8 @@ public class WikipediaDatabase extends MySqlDatabase {
 				i++ ;
 			}
 			
-			if (mp != null) 
-				anchor = mp.processText(anchor) ;
+			if (tp != null) 
+				anchor = tp.processText(anchor) ;
 			
 			CachedAnchor ca = cachedAnchors.get(anchor) ;
 			if (ca == null) {
@@ -865,7 +865,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 			}
 		}	
 		
-		this.cachedProcessor = mp ;
+		this.cachedProcessor = tp ;
 	}
 	
 	public void cachePages(File dir) throws IOException {
@@ -1033,7 +1033,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 		return !(cachedPages == null) ;
 	}
 	
-	public boolean areAnchorsCached(MorphologicalProcessor mp) {
+	public boolean areAnchorsCached(TextProcessor tp) {
 		
 		if (cachedAnchors == null)
 			return false ;
@@ -1042,7 +1042,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 		if (cachedProcessor != null) nameA = cachedProcessor.getName() ;
 		
 		String nameB = "null" ;
-		if (mp != null) nameB = mp.getName() ;
+		if (tp != null) nameB = tp.getName() ;
 		
 		if (!nameA.equals(nameB))
 			return false ;

@@ -20,7 +20,7 @@
 
 package org.wikipedia.miner.model;
 
-import org.wikipedia.miner.util.morphology.*;
+import org.wikipedia.miner.util.text.*;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.model.WikipediaDatabase.CachedAnchor ;
 
@@ -39,7 +39,7 @@ import java.io.* ;
 public class Anchor implements Comparable{
 	
 	private WikipediaDatabase database ;
-	private MorphologicalProcessor mp ;
+	private TextProcessor tp ;
 	
 	private String text ;
 	
@@ -48,14 +48,14 @@ public class Anchor implements Comparable{
 	
 	private SortedVector<Sense> senses ;
 	
-	public Anchor(String text, MorphologicalProcessor mp, WikipediaDatabase wd) throws SQLException {
+	public Anchor(String text, TextProcessor tp, WikipediaDatabase wd) throws SQLException {
 
 		this.database = wd ;
-		this.mp = mp ;
+		this.tp = tp ;
 		
 		this.text = text ;
 		
-		if (wd.areAnchorsCached(mp))
+		if (wd.areAnchorsCached(tp))
 			initializeFromCache() ;
 		else
 			initializeFromDatabase() ;		
@@ -65,8 +65,8 @@ public class Anchor implements Comparable{
 	private void initializeFromCache() throws SQLException{
 		
 		String t = text ;
-		if (mp != null)
-			t = mp.processText(t) ;
+		if (tp != null)
+			t = tp.processText(t) ;
 		
 		CachedAnchor ca = database.cachedAnchors.get(t) ;
 		
@@ -91,10 +91,10 @@ public class Anchor implements Comparable{
 			linkCount = 0 ;
 			//	will leave loading of senses for when getSenses() is called
 
-			if (mp==null) 
+			if (tp==null) 
 				rs = stmt.executeQuery("SELECT ao_linkCount, ao_occCount FROM anchor_occurance WHERE ao_text=\"" + database.addEscapes(text) + "\"") ;
 			else 
-				rs = stmt.executeQuery("SELECT ao_linkCount, ao_occCount FROM anchor_occurance_" + mp.getName() + " WHERE ao_text=\"" + database.addEscapes(mp.processText(text)) + "\"") ;
+				rs = stmt.executeQuery("SELECT ao_linkCount, ao_occCount FROM anchor_occurance_" + tp.getName() + " WHERE ao_text=\"" + database.addEscapes(tp.processText(text)) + "\"") ;
 			
 			if (rs.first()) {
 				linkCount = rs.getInt(1) ;
@@ -107,10 +107,10 @@ public class Anchor implements Comparable{
 			//we have to iterate though all senses to get link count, so lets load them up now
 			senses = new SortedVector<Sense>() ;
 			
-			if (mp==null)
+			if (tp==null)
 				rs = stmt.executeQuery("SELECT an_to, an_count FROM anchor WHERE an_text=\"" + text + "\" ORDER BY an_count DESC, an_to") ;
 			else 
-				rs = stmt.executeQuery("SELECT an_to, an_count FROM anchor_" + mp.getName() + " WHERE an_text=\"" + mp.processText(text) + "\" ORDER BY an_count DESC, an_to") ;
+				rs = stmt.executeQuery("SELECT an_to, an_count FROM anchor_" + tp.getName() + " WHERE an_text=\"" + tp.processText(text) + "\" ORDER BY an_count DESC, an_to") ;
 			
 			while (rs.next()) {
 				int an_to = rs.getInt(1) ;
@@ -205,13 +205,13 @@ public class Anchor implements Comparable{
 		if (senses != null) 
 			return senses ;		
 			
-		if (database.areAnchorsCached(mp)) {
+		if (database.areAnchorsCached(tp)) {
 			//load senses from cache. Dont save them to this.senses, because then we would have two copies in memory
 			SortedVector<Sense> senses = new SortedVector<Sense>() ;
 			
 			String t = text ;
-			if (mp != null)
-				t = mp.processText(t) ;
+			if (tp != null)
+				t = tp.processText(t) ;
 			
 			CachedAnchor ca = database.cachedAnchors.get(t) ;
 			
@@ -234,10 +234,10 @@ public class Anchor implements Comparable{
 			Statement stmt = database.createStatement() ;
 			ResultSet rs ;
 			
-			if (mp == null)
+			if (tp == null)
 				rs = stmt.executeQuery("SELECT an_to, an_count FROM anchor WHERE an_text=\"" + database.addEscapes(text) + "\" ORDER BY an_count DESC") ;
 			else
-				rs = stmt.executeQuery("SELECT an_to, an_count FROM anchor_" + mp.getName() + " WHERE an_text=\"" + database.addEscapes(mp.processText(text)) + "\" ORDER BY an_count DESC") ;
+				rs = stmt.executeQuery("SELECT an_to, an_count FROM anchor_" + tp.getName() + " WHERE an_text=\"" + database.addEscapes(tp.processText(text)) + "\" ORDER BY an_count DESC") ;
 			
 			while (rs.next()) {
 				int an_to = rs.getInt(1) ;
@@ -362,7 +362,7 @@ public class Anchor implements Comparable{
 
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );			
 
-		MorphologicalProcessor mp = new Cleaner() ;
+		TextProcessor tp = new Cleaner() ;
 
 		while (true) {
 			System.out.println("Enter a term (or press ENTER to quit): ") ;
@@ -374,7 +374,7 @@ public class Anchor implements Comparable{
 			System.out.println("Enter second term (or ENTER to just lookup \"" + termA + "\")") ;
 			String termB = in.readLine() ;
 
-			Anchor anA = new Anchor(termA, mp, wikipedia.getDatabase()) ;
+			Anchor anA = new Anchor(termA, tp, wikipedia.getDatabase()) ;
 			
 			System.out.println("\"" + anA.getText() + "\"") ;
 			System.out.println(" - occurs in " + anA.getLinkCount() + " documents as links") ;
@@ -388,7 +388,7 @@ public class Anchor implements Comparable{
 
 			if (termB != null && !termB.equals("")) {
 				
-				Anchor anB = new Anchor(termB, mp, wikipedia.getDatabase()) ;
+				Anchor anB = new Anchor(termB, tp, wikipedia.getDatabase()) ;
 
 				System.out.println("\"" + anB.getText() + "\"") ;
 				System.out.println(" - occurs in " + anB.getLinkCount() + " documents as links") ;
