@@ -932,8 +932,10 @@ public class WikipediaDatabase extends MySqlDatabase {
 			
 			int i = 0 ;
 			for (String t:temp) {
-				links[i] = new Integer(t) ;
-				i++ ;
+				if (!t.equals("")) {
+					links[i] = new Integer(t) ;
+					i++ ;
+				}
 			}
 			
 			cachedInLinks.put(id, links) ;
@@ -1158,21 +1160,11 @@ public class WikipediaDatabase extends MySqlDatabase {
 		try {
 			Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
 			
-			File dataDirectory = new File("/research/wikipedia/data/en/20071120/") ;
+			File dataDirectory = new File("/research/wikipediaminer/data/en/20080727/") ;
 			wikipedia.getDatabase().loadData(dataDirectory, false) ;
 			
-			/*
-			long memStart = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() ;
-			
-			wikipedia.getDatabase().cacheInLinks(new File("/research/wikipedia/data/en/20071120")) ;
-			//wikipedia.getDatabase().cacheOutLinks(new File("/research/wikipedia/data/en/20071120")) ;
-			
-			long memEnd = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() ;
-			
-			System.out.println((memEnd-memStart) + " memory used") ;
-			*/
-			//self.prepareForMorphologicalProcessor(new Cleaner()) ;
-			//self.prepareForMorphologicalProcessor(new SimpleStemmer()) ;
+			wikipedia.getDatabase().prepareForMorphologicalProcessor(new Cleaner()) ;
+			wikipedia.getDatabase().prepareForMorphologicalProcessor(new PorterStemmer()) ;
 			
 		} catch (Exception e) {
 			e.printStackTrace() ;
