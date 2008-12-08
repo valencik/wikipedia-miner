@@ -1,4 +1,4 @@
-package org.wikipedia.miner.util.morphology;
+package org.wikipedia.miner.util.text;
 
 /*
  
@@ -40,7 +40,7 @@ import java.io.*;
  * An implementation of the Porter Stemming Algorithm. 
  * This transforms a word into its root form. 
  */
-public class PorterStemmer extends MorphologicalProcessor {  
+public class PorterStemmer extends TextProcessor {  
 	private char[] b;
 	private int i ;     /* offset into b */
 	private int j, k;

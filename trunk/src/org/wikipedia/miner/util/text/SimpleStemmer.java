@@ -17,7 +17,7 @@
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-package org.wikipedia.miner.util.morphology;
+package org.wikipedia.miner.util.text;
 
 /**
  * A basic stemmer that only performs the first step of the 
@@ -25,7 +25,7 @@ package org.wikipedia.miner.util.morphology;
  * @author olena
  *
  */
-public class SimpleStemmer extends MorphologicalProcessor{
+public class SimpleStemmer extends TextProcessor{
 	
 	Cleaner cleaner = new Cleaner() ;
 	

@@ -17,7 +17,7 @@
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-package org.wikipedia.miner.util.morphology;
+package org.wikipedia.miner.util.text;
 
 import java.io.*;
 import java.util.*;
@@ -27,7 +27,7 @@ import java.util.*;
  * This class provides moderate morphology. This involves cleaning the text using a TextCleaner then
  * removing all stopwords.
  */	
-public class StopwordRemover extends MorphologicalProcessor {
+public class StopwordRemover extends TextProcessor {
 	
 	HashSet<String> stopwords ;
 	Cleaner cleaner = new Cleaner() ;
