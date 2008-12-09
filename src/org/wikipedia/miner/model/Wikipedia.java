@@ -37,7 +37,7 @@ import org.wikipedia.miner.util.text.*;
  */
 public class Wikipedia {
 
-	private WikipediaDatabase wikipediaDatabase ;
+	private WikipediaDatabase database ;
 
 	/**
 	 * Initializes a newly created Wikipedia and attempts to make a connection to the mysql
@@ -50,7 +50,7 @@ public class Wikipedia {
 	 * @param password	the users password (null if anonymous)
 	 */
 	public Wikipedia(String databaseServer, String databaseName, String userName, String password) throws Exception{
-		wikipediaDatabase = new WikipediaDatabase(databaseServer, databaseName, userName, password) ;
+		database = new WikipediaDatabase(databaseServer, databaseName, userName, password) ;
 	}
 
 	/**
@@ -58,7 +58,7 @@ public class Wikipedia {
 	 * @return the wikipedia database
 	 */
 	public WikipediaDatabase getDatabase() {
-		return wikipediaDatabase ;
+		return database ;
 	}
 
 	/**
@@ -69,7 +69,7 @@ public class Wikipedia {
 	 * @throws SQLException
 	 */
 	public Category getFundamentalCategory() throws SQLException {
-		return new Category(wikipediaDatabase, "Fundamental") ;
+		return new Category(database, "Fundamental") ;
 	}
 
 	/**
@@ -85,7 +85,7 @@ public class Wikipedia {
 		String title = null ;
 		int type = 0 ;
 
-		Statement stmt = wikipediaDatabase.createStatement() ;
+		Statement stmt = database.createStatement() ;
 		ResultSet rs = stmt.executeQuery("SELECT page_title, page_type FROM page WHERE page_id=" + id) ;
 
 		if (rs.first()) {
@@ -101,13 +101,13 @@ public class Wikipedia {
 
 		switch (type) {
 		case Page.ARTICLE: 
-			return new Article(wikipediaDatabase, id, title) ;
+			return new Article(database, id, title) ;
 		case Page.REDIRECT: 
-			return new Redirect(wikipediaDatabase, id, title) ;
+			return new Redirect(database, id, title) ;
 		case Page.CATEGORY: 
-			return new Category(wikipediaDatabase, id, title) ;
+			return new Category(database, id, title) ;
 		case Page.DISAMBIGUATION: 
-			return new Disambiguation(wikipediaDatabase, id, title) ;
+			return new Disambiguation(database, id, title) ;
 		}
 
 		return null ;
@@ -127,11 +127,11 @@ public class Wikipedia {
 	public Article getArticleByTitle(String title) throws SQLException {
 		
 		try {
-			return new Article(wikipediaDatabase, title) ;			
+			return new Article(database, title) ;			
 		} catch (Exception e) {};
 		
 		try {
-			Redirect r = new Redirect(wikipediaDatabase, title) ;
+			Redirect r = new Redirect(database, title) ;
 			return r.getTarget() ;			
 		} catch (Exception e) {};
 		
@@ -150,7 +150,7 @@ public class Wikipedia {
 	public Category getCategoryByTitle(String title) throws SQLException {
 		
 		try {
-			return new Category(wikipediaDatabase, title) ;			
+			return new Category(database, title) ;			
 		} catch (Exception e) {};
 				
 		return null ;
@@ -174,9 +174,9 @@ public class Wikipedia {
 	 */
 	public Article getMostLikelyArticle(String term, TextProcessor tp) throws SQLException{
 
-		//wikipediaDatabase.checkMorphologicalProcessor(tp) ;
+		//database.checkMorphologicalProcessor(tp) ;
 
-		Anchor anch = new Anchor(term, tp, wikipediaDatabase) ;
+		Anchor anch = new Anchor(term, tp, database) ;
 
 		if (anch == null) 
 			return null ;
@@ -185,7 +185,7 @@ public class Wikipedia {
 
 		for (Page sense:anch.getSenses()) {
 			if (sense.getType() == Page.ARTICLE) {
-				article = new Article(wikipediaDatabase, sense.getId(), sense.getTitle()) ;
+				article = new Article(database, sense.getId(), sense.getTitle()) ;
 				break ;
 			}
 		}
@@ -215,7 +215,7 @@ public class Wikipedia {
 	 */
 	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp) throws SQLException{
 
-		Anchor anch = new Anchor(term, tp, wikipediaDatabase) ;
+		Anchor anch = new Anchor(term, tp, database) ;
 
 		if (anch == null) 
 			return null ;
@@ -224,7 +224,7 @@ public class Wikipedia {
 
 		for (Anchor.Sense sense:anch.getSenses()) {
 			if (sense.getType() == Page.ARTICLE) {
-				Article article = new Article(wikipediaDatabase, sense.getId(), sense.getTitle()) ;
+				Article article = new Article(database, sense.getId(), sense.getTitle()) ;
 				article.setWeight(sense.getProbability()) ;
 				articles.add(article, true) ;
 			}
@@ -255,7 +255,7 @@ public class Wikipedia {
 	 */
 	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp, Collection<Article> contextArticles) throws SQLException{
 
-		Anchor anch = new Anchor(term, tp, wikipediaDatabase) ;
+		Anchor anch = new Anchor(term, tp, database) ;
 		SortedVector<Anchor.Sense> senses = anch.getSenses() ;
 
 		SortedVector<Article> articles = new SortedVector<Article>() ;
@@ -265,14 +265,14 @@ public class Wikipedia {
 
 		if (senses.size() == 1){
 			Anchor.Sense sense = senses.first() ;
-			articles.add(new Article(wikipediaDatabase, sense.getId(), sense.getTitle()), true) ;
+			articles.add(new Article(database, sense.getId(), sense.getTitle()), true) ;
 			return articles ;
 		}
 
 		for (Anchor.Sense sense: anch.getSenses()) {
 
 			//if (sense.getType() == Page.ARTICLE) {
-			Article candidate = new Article(wikipediaDatabase, sense.getId(), sense.getTitle()) ;
+			Article candidate = new Article(database, sense.getId(), sense.getTitle()) ;
 
 			double relatedness = 0 ;
 			double obviousness = sense.getProbability() ;
@@ -320,6 +320,31 @@ public class Wikipedia {
 		}
 		System.out.println() ;
 		return getWeightedArticles(term, tp, contextArticles) ;
+	}
+	
+	public boolean isAnchor(String text, TextProcessor tp) throws SQLException {
+		
+		if (database.areAnchorsCached(tp)) {
+			return database.cachedAnchors.containsKey(tp.processText(text)) ;
+		} else {
+			Statement stmt = database.createStatement() ;
+			ResultSet rs ;
+			
+			boolean isAnchor = false ;
+			
+			if (tp==null)
+				rs = stmt.executeQuery("SELECT an_to FROM anchor WHERE an_text=\"" + text + "\" LIMIT 1") ;
+			else 
+				rs = stmt.executeQuery("SELECT an_to FROM anchor_" + tp.getName() + " WHERE an_text=\"" + tp.processText(text) + "\" LIMIT 1") ;
+			
+			if (rs.first()) 
+				isAnchor = true ;
+			
+			rs.close() ;
+			stmt.close() ;
+			
+			return isAnchor ;			
+		}
 	}
 	
 	/**
@@ -377,7 +402,10 @@ public class Wikipedia {
 				context.add(contextTerm) ;
 			}
 			
-			Cleaner cleaner = new Cleaner() ;
+			Cleaner cleaner = null ;
+			
+			System.out.println("isAnchor: " + self.isAnchor(term, cleaner)) ;
+			
 
 			System.out.println("All articles for \"" + term + "\":") ;
 			SortedVector<Article> articles = self.getWeightedArticles(term, cleaner) ;
