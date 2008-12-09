@@ -322,6 +322,15 @@ public class Wikipedia {
 		return getWeightedArticles(term, tp, contextArticles) ;
 	}
 	
+	/**
+	 * A convenience method for quickly finding out if the given text is ever used as an anchor
+	 * in Wikipedia. If this returns false, then all of the getArticle methods will return null or empty sets. 
+	 * 
+	 * @param text the text to search for
+	 * @param tp an optional TextProcessor (may be null)
+	 * @return true if there is an anchor corresponding to the given text, otherwise false
+	 * @throws SQLException if there is a problem with the Wikipedia database
+	 */
 	public boolean isAnchor(String text, TextProcessor tp) throws SQLException {
 		
 		if (database.areAnchorsCached(tp)) {
@@ -402,65 +411,61 @@ public class Wikipedia {
 				context.add(contextTerm) ;
 			}
 			
-			Cleaner cleaner = null ;
+			TextProcessor tp = null ;
 			
-			System.out.println("isAnchor: " + self.isAnchor(term, cleaner)) ;
-			
-
-			System.out.println("All articles for \"" + term + "\":") ;
-			SortedVector<Article> articles = self.getWeightedArticles(term, cleaner) ;
-
-			if (articles.size() == 0) {
-				System.out.println(" - no articles found") ;
-				return ;
-			}
-
-			for (Article article: articles) 
-				System.out.println(" - " + article) ;
-
-			String cs = "" ;
-			String[] ca = new String[context.size()] ;
-			
-			if (context.size() > 0) {
-				int index = 0 ;
-				for (String ct:context) {
-					cs = cs + ct + ", " ;
-					ca[index] = ct ;
-					index ++ ;
-				}
-				cs = cs.substring(0, cs.length() - 2) ;
-			}
-
-			System.out.println("\nBest article for \"" + term + "\" given {" + cs + "} as context: ") ;
-			
-			Article bestArticle = (Article)self.getWeightedArticles(term, cleaner, ca).first() ;
-			System.out.println(" - " + bestArticle) ;
-
-			System.out.println("\nDetails for Article " + bestArticle) ;
-
-			System.out.println(" - Anchors:") ;
-			for (AnchorText at:bestArticle.getAnchorTexts()) {
-				System.out.println("   - " + at.getText() + " (used " + at.getCount() + " times)") ;
-			}
-
-			System.out.println(" - Redirects:") ;
-			for (Redirect r: bestArticle.getRedirects()) 
-				System.out.println("   - " + r) ;
-
-			System.out.println(" - Translations:") ;
-			HashMap<String,String> translations = bestArticle.getTranslations() ;
-			for (String lang:translations.keySet()){
-				System.out.println("   - " + lang + ", " + translations.get(lang)) ;
-			}
-
-			System.out.println(" - Parent categories:") ;
-			for (Category c: bestArticle.getParentCategories()) 
-				System.out.println("   - " + c) ;
-
-			System.out.println(" - Articles linked to:") ;
-			for (Article a: bestArticle.getLinksOut()) 
-				System.out.println("   - " + a) ;
+			if (self.isAnchor(term, tp)) {
 				
+				System.out.println("All articles for \"" + term + "\":") ;
+				SortedVector<Article> articles = self.getWeightedArticles(term, tp) ;
+
+				for (Article article: articles) 
+					System.out.println(" - " + article) ;
+
+				String cs = "" ;
+				String[] ca = new String[context.size()] ;
+
+				if (context.size() > 0) {
+					int index = 0 ;
+					for (String ct:context) {
+						cs = cs + ct + ", " ;
+						ca[index] = ct ;
+						index ++ ;
+					}
+					cs = cs.substring(0, cs.length() - 2) ;
+				}
+
+				System.out.println("\nBest article for \"" + term + "\" given {" + cs + "} as context: ") ;
+
+				Article bestArticle = (Article)self.getWeightedArticles(term, tp, ca).first() ;
+				System.out.println(" - " + bestArticle) ;
+
+				System.out.println("\nDetails for Article " + bestArticle) ;
+
+				System.out.println(" - Anchors:") ;
+				for (AnchorText at:bestArticle.getAnchorTexts()) {
+					System.out.println("   - " + at.getText() + " (used " + at.getCount() + " times)") ;
+				}
+
+				System.out.println(" - Redirects:") ;
+				for (Redirect r: bestArticle.getRedirects()) 
+					System.out.println("   - " + r) ;
+
+				System.out.println(" - Translations:") ;
+				HashMap<String,String> translations = bestArticle.getTranslations() ;
+				for (String lang:translations.keySet()){
+					System.out.println("   - " + lang + ", " + translations.get(lang)) ;
+				}
+
+				System.out.println(" - Parent categories:") ;
+				for (Category c: bestArticle.getParentCategories()) 
+					System.out.println("   - " + c) ;
+
+				System.out.println(" - Articles linked to:") ;
+				for (Article a: bestArticle.getLinksOut()) 
+					System.out.println("   - " + a) ;
+			} else {
+				System.out.println("I have no idea what you are talking about") ;
+			}
 		}
 	}
 }
