@@ -25,6 +25,8 @@ import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.model.WikipediaDatabase.CachedAnchor ;
 
 
+import gnu.trove.TIntHashSet;
+
 import java.text.DecimalFormat;
 import java.sql.*;
 import java.io.* ;
@@ -218,7 +220,7 @@ public class Anchor implements Comparable{
 			if (ca == null)
 				return senses ;
 			
-			for (Integer[] s:ca.senses) {
+			for (int[] s:ca.senses) {
 				try{
 					Sense sense = new Sense(s[0], s[1], database) ;
 					senses.add(sense, false) ;
@@ -359,10 +361,12 @@ public class Anchor implements Comparable{
 		DecimalFormat df = new DecimalFormat("0.00") ;
 		
 		Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
+		
+		File dataDirectory = new File("/research/wikipediaminer/data/en/20080727/") ;
 
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );			
 
-		TextProcessor tp = new Cleaner() ;
+		TextProcessor tp = null ; //new Cleaner() ;
 
 		while (true) {
 			System.out.println("Enter a term (or press ENTER to quit): ") ;

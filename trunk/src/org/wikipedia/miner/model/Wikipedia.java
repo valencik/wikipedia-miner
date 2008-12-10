@@ -292,7 +292,7 @@ public class Wikipedia {
 	 * known they are as a sense of the term, and how strongly they relate to the given context 
 	 * terms.
 	 * 
-	 * This is just a convenience method, which resolves each term with getMostLikelyArticle(), and then
+	 * This is just a convenience method, which resolves each context term with getMostLikelyArticle(), and then
 	 * calls the above method. 
 	 *  
 	 * An optional morphological processor (may be null) can be used to alter the way anchor texts are retrieved 
@@ -383,7 +383,7 @@ public class Wikipedia {
 	 * Provides a demo of the functionality provided by this toolkit.
 	 * 
 	 * @param args	an array of 2 or 4 String arguments; the connection string of the wikipedia 
-	 * database server, the name of the wikipedia database and (optionally, if annonymous access
+	 * database server, the name of the wikipedia database and (optionally, if anonymous access
 	 * is not allowed) a username and password for the database.
 	 */
 	public static void main(String[] args) throws Exception{
