@@ -397,4 +397,11 @@ public class PorterStemmer extends TextProcessor {
 	      i_end = k+1; i = 0;
 	   }
 	}
+	
+	public static void main(String[] args) {
+		
+		PorterStemmer ps = new PorterStemmer() ;
+		
+		System.out.println(ps.processText("The quick brown fox jumped over the lazy dog")) ;
+	}
 }

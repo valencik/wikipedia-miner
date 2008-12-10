@@ -203,8 +203,9 @@ public class WikipediaDatabase extends MySqlDatabase {
 		System.out.println("Preparing anchors for " + tp.getName()) ;
 		String tableName = "anchor_" + tp.getName() ;
 		
+		ProgressNotifier pn = new ProgressNotifier(2) ;
 		int rows = this.getRowCountExact("anchor") ;
-		ProgressDisplayer pd = new ProgressDisplayer("Gathering and processing anchors", rows) ;
+		pn.startTask(rows, "Gathering and processing anchors") ;
 		
 		Statement stmt = createStatement() ;
 		stmt.executeUpdate("DROP TABLE IF EXISTS " + tableName) ;
@@ -261,11 +262,11 @@ public class WikipediaDatabase extends MySqlDatabase {
 			stmt.close() ;
 			
 			chunkIndex++ ;
-			pd.update(currRow) ;
+			pn.update(currRow) ;
 		}
 		
 		rows = anchorCounts.size() ;
-		pd = new ProgressDisplayer("Saving processed anchors", rows) ;
+		pn.startTask(rows, "Saving processed anchors") ;
 		
 		chunkIndex = 0 ;
 		
@@ -295,8 +296,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 					
 					insertQuery = new StringBuffer() ;
 				}
-				
-				pd.update(currRow) ;
+				pn.update(currRow) ;
 			}
 		}
 		
@@ -315,7 +315,8 @@ public class WikipediaDatabase extends MySqlDatabase {
 		String tableName = "anchor_occurance_" + tp.getName() ;
 		
 		int rows = this.getRowCountExact("anchor") ;
-		ProgressDisplayer pd = new ProgressDisplayer("Gathering and processing anchor occurances", rows) ;
+		ProgressNotifier pn = new ProgressNotifier(2) ;
+		pn.startTask(rows, "Gathering and processing anchor occurances") ;
 		
 		Statement stmt = createStatement() ;
 		stmt.executeUpdate("DROP TABLE IF EXISTS " + tableName) ;
@@ -373,11 +374,11 @@ public class WikipediaDatabase extends MySqlDatabase {
 			stmt.close() ;
 			
 			chunkIndex++ ;
-			pd.update(currRow) ;
+			pn.update(currRow) ;
 		}
 		
 		rows = occuranceStats.size() ;
-		pd = new ProgressDisplayer("Saving processed anchor occurances", rows) ;
+		pn.startTask(rows, "Saving processed anchor occurances") ;
 		
 		chunkIndex = 0 ;
 		
@@ -404,7 +405,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 					insertQuery = new StringBuffer() ;
 				}
 				
-				pd.update(currRow) ;
+				pn.update(currRow) ;
 			}
 		}
 		
@@ -573,9 +574,8 @@ public class WikipediaDatabase extends MySqlDatabase {
 	private void loadFile(File file, String tableName) throws IOException, SQLException{
 		
 		long bytes = file.length() ; 
-		ProgressDisplayer pd = new ProgressDisplayer("Loading " + tableName, bytes) ;
-		pd.update(0) ;
-		
+		ProgressNotifier pn = new ProgressNotifier(bytes, "Loading " + tableName) ;
+				
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8")) ;
 		String line ;
 		
@@ -605,7 +605,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 					
 					insertQuery = new StringBuffer() ;
 				}
-				pd.update(bytesRead) ;
+				pn.update(bytesRead) ;
 			}
 		}
 		
@@ -619,7 +619,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 			stmt.close() ;
 		}
 		
-		pd.update(bytes) ;
+		pn.update(bytes) ;
 	}
 	
 	private int getLineCount(File file) throws IOException{
@@ -767,27 +767,73 @@ public class WikipediaDatabase extends MySqlDatabase {
 		return maxPageDepth ;
 	}
 	
-	public void cacheAnchors(File dir, TextProcessor tp) throws IOException{
-		
-		File occuranceFile = new File(dir.getPath() + File.separatorChar + "anchor_occurance.csv") ;
+	public void cacheAnchors(File dir, TextProcessor tp, TIntHashSet validIds, ProgressNotifier pn) throws IOException{
+	
 		File anchorFile = new File(dir.getPath() + File.separatorChar + "anchor_summary.csv") ;
-		//int rows = getLineCount(ngramFile) ;
+		File occuranceFile = new File(dir.getPath() + File.separatorChar + "anchor_occurance.csv") ;
+		
+		boolean cachingOccurances = occuranceFile.canRead() ;
 		
 		cachedAnchors = new THashMap<String,CachedAnchor>() ;
 		
-		if (occuranceFile.canRead()) {
-			BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(occuranceFile), "UTF-8")) ;
-			
-			ProgressDisplayer pd = new ProgressDisplayer("caching anchor occurances", occuranceFile.length()) ;
-			
-			long bytesRead = 0 ;
-			long bytesInChunk = 0 ;
-			long chunkSize = occuranceFile.length()/10 ;
-			String line ;
+		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(anchorFile), "UTF-8")) ;
+		
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		if (cachingOccurances)
+			pn.startTask(anchorFile.length() + occuranceFile.length(), "caching anchors") ;
+		else
+			pn.startTask(anchorFile.length(), "caching anchors") ;
+				
+		
+		long bytesRead = 0 ;
+		String line ;
 						
+		while ((line=input.readLine()) != null) {
+			bytesRead = bytesRead + line.length() ;
+						
+			int sep = line.lastIndexOf(',') ;
+			String anchor = line.substring(1, sep-1) ;
+			String data = line.substring(sep+2, line.length()-1) ;
+			
+			//System.out.println(anchor + " -> " + data) ;
+			
+			String[] temp = data.split(";") ;
+			
+			Vector<int[]> senses = new Vector<int[]>() ;
+
+			for (String t:temp) {
+				String[] values = t.split(":") ;
+				int[] sense = new int[2] ;
+								
+				sense[0] = new Integer(values[0]) ;
+				sense[1] = new Integer(values[1]) ;
+				
+				if (validIds == null || validIds.contains(sense[0]))
+					senses.add(sense) ;
+			}
+			
+			if (senses.size() > 0) {
+				if (tp != null) 
+					anchor = tp.processText(anchor) ;
+				
+				CachedAnchor ca = cachedAnchors.get(anchor) ;
+				if (ca == null) {
+					ca = new CachedAnchor(senses) ;
+					cachedAnchors.put(anchor, ca) ;
+				} else {
+					ca.addSenses(senses) ;
+				}
+			}
+			pn.update(bytesRead) ;
+		}
+		
+		input.close() ;
+		
+		if (occuranceFile.canRead()) {
+			input = new BufferedReader(new InputStreamReader(new FileInputStream(occuranceFile), "UTF-8")) ;
+							
 			while ((line=input.readLine()) != null) {
 				bytesRead = bytesRead + line.length() ;
-				bytesInChunk = bytesInChunk + line.length() ;
 				
 				int sep2 = line.lastIndexOf(',') ;
 				int sep1 = line.lastIndexOf(',', sep2-1) ;
@@ -801,233 +847,178 @@ public class WikipediaDatabase extends MySqlDatabase {
 				
 				// if we are doing morphological processing, then we need to resolve collisions
 				CachedAnchor ca = cachedAnchors.get(ngram) ;
-				if (ca != null)
-					ca = new CachedAnchor(linkCount + ca.linkCount, occCount + ca.occCount) ;
-				else 
-					ca = new CachedAnchor(linkCount, occCount) ;
-							
-				cachedAnchors.put(ngram, ca) ;
+				if (ca != null) 
+					ca.addOccCount(occCount) ;
 				
-				if(bytesInChunk > chunkSize) {
-					pd.update(bytesRead) ;
-					bytesInChunk = 0 ;
-				}
+				pn.update(bytesRead) ;
 			}
 			input.close();
 		}
-		
-		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(anchorFile), "UTF-8")) ;
-		
-		ProgressDisplayer pd = new ProgressDisplayer("caching anchor destinations", anchorFile.length()) ;
-		
-		long bytesRead = 0 ;
-		long bytesInChunk = 0 ;
-		long chunkSize = anchorFile.length()/10 ;
-		String line ;
-						
-		while ((line=input.readLine()) != null) {
-			bytesRead = bytesRead + line.length() ;
-			bytesInChunk = bytesInChunk + line.length() ;
-			
-			int sep = line.lastIndexOf(',') ;
-			String anchor = line.substring(1, sep-1) ;
-			String data = line.substring(sep+2, line.length()-1) ;
-			
-			//System.out.println(anchor + " -> " + data) ;
-			
-			String[] temp = data.split(";") ;
-
-			Integer[][] senses = new Integer[temp.length][2] ;
-
-			int i = 0 ;
-			for (String t:temp) {
-				String[] values = t.split(":") ;
-				senses[i][0] = new Integer(values[0]) ;
-				senses[i][1] = new Integer(values[1]) ;
-
-				i++ ;
-			}
-			
-			if (tp != null) 
-				anchor = tp.processText(anchor) ;
-			
-			CachedAnchor ca = cachedAnchors.get(anchor) ;
-			if (ca == null) {
-				ca = new CachedAnchor(senses) ;
-				cachedAnchors.put(anchor, ca) ;
-			} else {
-				ca.addSenses(senses) ;
-			}
-			
-			if(bytesInChunk > chunkSize) {
-				pd.update(bytesRead) ;
-				bytesInChunk = 0 ;
-			}
-		}	
-		
 		this.cachedProcessor = tp ;
 	}
 	
-	public void cachePages(File dir) throws IOException {
+	public void cachePages(File dir, TIntHashSet validIds, ProgressNotifier pn) throws IOException {
 		
 		File pageFile = new File(dir.getPath() + File.separatorChar + "page.csv") ;
 		
-		System.out.println(getPageCount() + ", " + getLineCount(pageFile)) ;
-		
-		cachedPages = new TIntObjectHashMap<CachedPage>(getPageCount() , 1) ;
+		if (validIds == null)
+			cachedPages = new TIntObjectHashMap<CachedPage>(getPageCount(), 1) ;
+		else
+			cachedPages = new TIntObjectHashMap<CachedPage>(validIds.size(), 1) ;
 		
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(pageFile), "UTF-8")) ;
-		ProgressDisplayer pd = new ProgressDisplayer("caching pages", pageFile.length()) ;
+		
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		pn.startTask(pageFile.length(), "caching pages") ;
 		
 		long bytesRead = 0 ;
-		long bytesInChunk = 0 ;
-		long chunkSize = pageFile.length()/10 ;
 		String line ;
 		
 		while ((line=input.readLine()) != null) {
 			bytesRead = bytesRead + line.length() ;
-			bytesInChunk = bytesInChunk + line.length() ;
 			
 			int sep1 = line.indexOf(',') ;
 			int sep2 = line.lastIndexOf(',') ;
 			
 			int id = new Integer(line.substring(0, sep1)) ;
-			String title = line.substring(sep1+2, sep2-1) ;
-			int type = new Integer(line.substring(sep2+1)) ;
-					
-			CachedPage p = new CachedPage(title, type) ;
-			cachedPages.put(id, p) ;
 			
-			if(bytesInChunk > chunkSize) {
-				pd.update(bytesRead) ;
-				bytesInChunk = 0 ;
+			if (validIds == null || validIds.contains(id)) {
+				String title = line.substring(sep1+2, sep2-1) ;
+				int type = new Integer(line.substring(sep2+1)) ;
+						
+				CachedPage p = new CachedPage(title, type) ;
+				cachedPages.put(id, p) ;
 			}
+			pn.update(bytesRead) ;
 		}
 		input.close();
 	}
 	
-	public void cacheInLinks(File dir) throws IOException {
+	public void cacheInLinks(File dir, TIntHashSet validIds, ProgressNotifier pn) throws IOException {
 		
 		File file = new File(dir.getPath() + File.separatorChar + "pagelink_in.csv") ;		
-		cachedInLinks = new TIntObjectHashMap<int[]>(getLineCount(file), 1) ;
+		
+		if (validIds == null)
+			cachedInLinks = new TIntObjectHashMap<int[]>(getLineCount(file), 1) ;
+		else
+			cachedInLinks = new TIntObjectHashMap<int[]>(validIds.size(), 1) ;
 		
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8")) ;
-		ProgressDisplayer pd = new ProgressDisplayer("caching links into pages", file.length()) ;
+		
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		pn.startTask(file.length(), "caching links into pages") ;
 		
 		long bytesRead = 0 ;
-		long bytesInChunk = 0 ;
-		long chunkSize = file.length()/10 ;
 		String line ;
 		
 		while ((line=input.readLine()) != null) {
 			bytesRead = bytesRead + line.length() ;
-			bytesInChunk = bytesInChunk + line.length() ;
 						
 			int pos = line.indexOf(',') ;
 			int id = new Integer(line.substring(0, pos)) ;
-			String data = line.substring(pos+2, line.length()-1) ;
 			
-			String[] temp = data.split(":") ;
-			int[] links = new int[temp.length] ;
-			
-			int i = 0 ;
-			for (String t:temp) {
-				if (!t.equals("")) {
-					links[i] = new Integer(t) ;
-					i++ ;
+			if (validIds == null || validIds.contains(id)) {
+				String data = line.substring(pos+2, line.length()-1) ;
+				
+				String[] temp = data.split(":") ;
+				int[] links = new int[temp.length] ;
+				
+				int i = 0 ;
+				for (String t:temp) {
+					if (!t.equals("")) {
+						links[i] = new Integer(t) ;
+						i++ ;
+					}
 				}
+				
+				cachedInLinks.put(id, links) ;
 			}
-			
-			cachedInLinks.put(id, links) ;
-			
-			if(bytesInChunk > chunkSize) {
-				pd.update(bytesRead) ;
-				bytesInChunk = 0 ;
-			}
+
+			pn.update(bytesRead) ;
 		}
-		
 		input.close();
 	}
 	
-	public void cacheOutLinks(File dir) throws IOException{
+	public void cacheOutLinks(File dir, TIntHashSet validIds, ProgressNotifier pn) throws IOException{
 		
 		File file = new File(dir.getPath() + File.separatorChar + "pagelink_out.csv") ;
 		
-		cachedOutLinks = new TIntObjectHashMap<int[][]>(getPageCount(), 1) ;
-		
+		if (validIds == null)
+			cachedOutLinks = new TIntObjectHashMap<int[][]>(getLineCount(file), 1) ;
+		else
+			cachedOutLinks = new TIntObjectHashMap<int[][]>(validIds.size(), 1) ;
+			
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8")) ;
-		ProgressDisplayer pd = new ProgressDisplayer("caching links out from pages", file.length()) ;
+		
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		pn.startTask(file.length(), "caching links out from pages") ;
 		
 		long bytesRead = 0 ;
-		long bytesInChunk = 0 ;
-		long chunkSize = file.length()/10 ;
 		String line ;
 		
 		while ((line=input.readLine()) != null) {
 			bytesRead = bytesRead + line.length() ;
-			bytesInChunk = bytesInChunk + line.length() ;
 						
 			int pos = line.indexOf(',') ;
 			int id = new Integer(line.substring(0, pos)) ;
-			String data = line.substring(pos+2, line.length()-1) ;
-		
-		
-			String[] temp = data.split(";") ;
-
-			int[][] links = new int[temp.length][2] ;
-
-			int i = 0 ;
-			for (String t:temp) {
-				String[] values = t.split(":") ;
-				links[i][0] = new Integer(values[0]) ;
-				links[i][1] = new Integer(values[1]) ;
-
-				i++ ;
-			}
-			cachedOutLinks.put(id, links) ;
 			
-			if(bytesInChunk > chunkSize) {
-				pd.update(bytesRead) ;
-				bytesInChunk = 0 ;
+			if (validIds == null || validIds.contains(id)) {
+				String data = line.substring(pos+2, line.length()-1) ;
+				String[] temp = data.split(";") ;
+	
+				int[][] links = new int[temp.length][2] ;
+	
+				int i = 0 ;
+				for (String t:temp) {
+					String[] values = t.split(":") ;
+					links[i][0] = new Integer(values[0]) ;
+					links[i][1] = new Integer(values[1]) ;
+	
+					i++ ;
+				}
+				cachedOutLinks.put(id, links) ;
 			}
+			
+			pn.update(bytesRead) ;
 		}
 	}
 	
-	public void cacheGenerality(File dir) throws IOException {
+	public void cacheGenerality(File dir, TIntHashSet validIds, ProgressNotifier pn) throws IOException {
 		
+
 		File pageFile = new File(dir.getPath() + File.separatorChar + "generality.csv") ;		
-		cachedGenerality = new TIntIntHashMap(getPageCount() , 1) ;
-				
+
+		if (validIds == null)
+			cachedGenerality = new TIntIntHashMap(getPageCount() , 1) ;
+		else
+			cachedGenerality = new TIntIntHashMap(validIds.size(), 1) ;
+
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(pageFile), "UTF-8")) ;
-		ProgressDisplayer pd = new ProgressDisplayer("caching generality", pageFile.length()) ;
+		
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		pn.startTask(pageFile.length(), "caching generality") ;
 		
 		long bytesRead = 0 ;
-		long bytesInChunk = 0 ;
-		long chunkSize = pageFile.length()/10 ;
 		String line ;
 		
 		int maxDepth = 0 ;
 		
 		while ((line=input.readLine()) != null) {
 			bytesRead = bytesRead + line.length() ;
-			bytesInChunk = bytesInChunk + line.length() ;
-			
+						
 			int sep = line.indexOf(',') ;			
 			int id = new Integer(line.substring(0, sep)) ;
-			int depth = new Integer(line.substring(sep+1).trim()) ;
-							
-			cachedGenerality.put(id, depth) ;
 			
-			if (depth > maxDepth) maxDepth = depth ;			
-			
-			if(bytesInChunk > chunkSize) {
-				pd.update(bytesRead) ;
-				bytesInChunk = 0 ;
+			if (validIds==null || validIds.contains(id)){
+				int depth = new Integer(line.substring(sep+1).trim()) ;
+				cachedGenerality.put(id, depth) ;
+				if (depth > maxDepth) maxDepth = depth ;	
 			}
+
+			pn.update(bytesRead) ;
 		}
 		
 		this.maxPageDepth = maxDepth ;
-		
 		input.close();
 	}
 	
@@ -1050,6 +1041,36 @@ public class WikipediaDatabase extends MySqlDatabase {
 			return false ;
 		
 		return true ;
+	}
+	
+	public TIntHashSet getValidPageIds(File dir, int minLinkCount, ProgressNotifier pn) throws IOException{
+		File linkCountFile = new File(dir.getPath() + File.separatorChar + "linkcount.csv") ;		
+		TIntHashSet pageIds = new TIntHashSet() ;
+				
+		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(linkCountFile), "UTF-8")) ;
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		pn.startTask(linkCountFile.length(), "gathering valid page ids") ;
+		
+		long bytesRead = 0 ;
+		String line ;
+		
+		while ((line=input.readLine()) != null) {
+			bytesRead = bytesRead + line.length() ;
+			
+			String[] vals = line.split(",") ;
+						
+			int id = new Integer(vals[0]) ;
+			int lc_in = new Integer(vals[1]) ;
+			int lc_out = new Integer(vals[2]) ;
+			
+			if (lc_in >= minLinkCount && lc_out >= minLinkCount)
+				pageIds.add(id) ;
+			
+			pn.update(bytesRead) ;
+		}
+		
+		input.close();
+		return pageIds ;
 	}
 	
 	public boolean areOutLinksCached() {
@@ -1077,37 +1098,53 @@ public class WikipediaDatabase extends MySqlDatabase {
 	protected class CachedAnchor {
 		int linkCount ;
 		int occCount ;
-		Integer[][] senses ;
-		
-		public CachedAnchor(int linkCount, int occCount) {
-			this.linkCount = linkCount ;
-			this.occCount = occCount ;
-		}
-		
-		public CachedAnchor(Integer[][] senses) {
-			this.occCount = -1 ;  //flag this as unavailable
+		int[][] senses ;
+				
+		public CachedAnchor(Vector<int[]> senses) {
+			this.occCount = -1 ;  //flag this as unavailable for now
 			this.linkCount = 0 ;
 			
-			this.senses = senses ;
+			this.senses = new int[senses.size()][2] ;
 			
-			for (Integer[] sense:senses) 
+			int i = 0 ;
+			for (int[] sense:senses) {
+				this.senses[i] = sense ;
 				linkCount = linkCount + sense[1] ;
+				i++ ;
+			}
 		}
 		
-		public void addSenses(Integer[][] senses) {
+		public void addOccCount(int occCount) {
+			
+			if (this.occCount < 0)
+				this.occCount = occCount ;
+			else
+				this.occCount += occCount ;
+		}
+		
+		public void addSenses(Vector<int[]> senses) {
+			
 			if (this.senses == null) {
-				this.senses = senses ;
+				this.linkCount = 0 ;
+				this.senses = new int[senses.size()][2] ;
+				
+				int i = 0 ;
+				for (int[] sense:senses) {
+					this.senses[i] = sense ;
+					linkCount = linkCount + sense[1] ;
+					i++ ;
+				}
 				return ;
 			}
 						
 			// merge the senses
 			HashMap<Integer,Integer> senseCounts = new HashMap<Integer,Integer>() ;
 			
-			for (Integer[] sense: this.senses) {
+			for (int[] sense: this.senses) {
 				senseCounts.put(sense[0], sense[1]) ;			
 			}
 			
-			for (Integer[] sense: senses) {
+			for (int[] sense: senses) {
 				Integer count = senseCounts.get(sense[0]) ;
 				
 				if (count == null)
@@ -1126,11 +1163,11 @@ public class WikipediaDatabase extends MySqlDatabase {
 			}
 			
 			// store 
-			this.senses = new Integer[orderedSenses.size()][2] ;
+			this.senses = new int[orderedSenses.size()][2] ;
 			
 			int index = 0 ;
 			for (Sense sense: orderedSenses) {
-				Integer[] s = {sense.id, sense.count} ;
+				int[] s = {sense.id, sense.count} ;
 				this.senses[index] = s ;			
 				index++ ;
 			}
@@ -1163,8 +1200,25 @@ public class WikipediaDatabase extends MySqlDatabase {
 			File dataDirectory = new File("/research/wikipediaminer/data/en/20080727/") ;
 			wikipedia.getDatabase().loadData(dataDirectory, false) ;
 			
-			wikipedia.getDatabase().prepareForMorphologicalProcessor(new Cleaner()) ;
-			wikipedia.getDatabase().prepareForMorphologicalProcessor(new PorterStemmer()) ;
+			System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc();System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc();		
+			long mem0 = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+			
+			TIntHashSet ids = null ;//wikipedia.getDatabase().getValidPageIds(dataDirectory, 5) ;	
+			
+			ProgressNotifier pn = new ProgressNotifier(4) ; 
+			wikipedia.getDatabase().cacheAnchors(dataDirectory, null, ids, pn) ;	
+			wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;		
+			wikipedia.getDatabase().cacheGenerality(dataDirectory, ids, pn) ;			
+			wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
+			
+			System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc();System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc();
+			long mem1 = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+			
+			System.out.println(mem1 - mem0) ;
+			
+			
+			//wikipedia.getDatabase().prepareForMorphologicalProcessor(new Cleaner()) ;
+			//wikipedia.getDatabase().prepareForMorphologicalProcessor(new PorterStemmer()) ;
 			
 		} catch (Exception e) {
 			e.printStackTrace() ;
