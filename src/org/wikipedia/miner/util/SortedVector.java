@@ -32,16 +32,21 @@ import java.util.Vector;
  * Provided the add methods are used correctly, this class guarantees that the set 
  * will be in ascending element order, according to the natural order  of the elements (see Comparable).
  * It is designed to take advantage of situations where quick lookups are required 
- * (making Vectors undesirable) but where most of the values being inserted into the set are 
+ * (making unsorted Vectors undesirable) but where most of the values being inserted into the set are 
  * known to be in order (making the time and memory overhead of a TreeSet unnecessary).
  * 
  * This implementation provides guaranteed log(n) time cost for the basic operations (add, remove and contains). 
- * If the value to be inserted is known to be greater than any other value in the set, then adds are preformed in constant time.
+ * If the value to be inserted is known to be greater than any other value in the set, then adds are obviously performed in constant time.
+ * 
+ * @param <T> The type of item to be stored and sorted.
  */
 public class SortedVector<T> implements SortedSet<T> {
 	
 	Vector<T> vector ;
 	
+	/**
+	 * Initializes a new, empty SortedVector.
+	 */
 	public SortedVector() {
 		vector = new Vector<T>() ;
 	}
@@ -50,23 +55,26 @@ public class SortedVector<T> implements SortedSet<T> {
 		return null;
 	}
 	
+	@SuppressWarnings("unchecked")
 	public SortedSet<T> subSet(T fromElement, T toElement) {
 		int fromIndex = expectedIndexOf(fromElement) ;
 		int toIndex = expectedIndexOf(toElement) ;
 		
-		return (SortedVector) vector.subList(fromIndex, toIndex) ;
+		return (SortedVector<T>) vector.subList(fromIndex, toIndex) ;
 	}
 	
+	@SuppressWarnings("unchecked")
 	public SortedSet<T> headSet(T toElement) {
 		int toIndex = expectedIndexOf(toElement) ;
 		
-		return (SortedVector) vector.subList(0, toIndex) ;
+		return (SortedVector<T>) vector.subList(0, toIndex) ;
 	}
 	
+	@SuppressWarnings("unchecked")
 	public SortedSet<T> tailSet(T fromElement) {
 		int fromIndex = expectedIndexOf(fromElement) ;
 		
-		return (SortedVector) vector.subList(fromIndex, size()) ;
+		return (SortedVector<T>) vector.subList(fromIndex, size()) ;
 	}
 	
 	public T first() {
@@ -102,6 +110,7 @@ public class SortedVector<T> implements SortedSet<T> {
 		return vector.toArray() ;
 	}
 	
+	@SuppressWarnings("hiding")
 	public <T> T[] toArray(T[] a) {
 		return vector.toArray(a) ;
 	}
@@ -125,6 +134,7 @@ public class SortedVector<T> implements SortedSet<T> {
 	 * @param assumeOrdering	true if the element being inserted is known to be greater than items already in list and fast insert is desired, otherwise false 
 	 * @return true if the set did not already contain the specified element.
 	 */
+	@SuppressWarnings("unchecked")
 	public boolean add(T element, boolean assumeOrdering) {
 		try {
 			//System.out.println("adding " + element + " to " + this) ;
@@ -137,7 +147,7 @@ public class SortedVector<T> implements SortedSet<T> {
 			}
 			
 			if (assumeOrdering) {
-				int compare = ((Comparable)last()).compareTo(element) ;
+				int compare = ((Comparable<T>)last()).compareTo(element) ;
 				
 				if (compare == 0)
 					return false ;
@@ -151,7 +161,7 @@ public class SortedVector<T> implements SortedSet<T> {
 				int index = expectedIndexOf(element) ;
 				
 				if (index < size) {
-					int compare = ((Comparable)vector.elementAt(index)).compareTo(element) ;
+					int compare = ((Comparable<T>)vector.elementAt(index)).compareTo(element) ;
 					
 					if (compare==0)
 						return false ;
@@ -169,6 +179,11 @@ public class SortedVector<T> implements SortedSet<T> {
 		}
 	}
 	
+	/**
+	 * Removes the element at the specified index
+	 * 
+	 * @param index the index of the element to remove.
+	 */
 	public void removeElementAt(Integer index) {
 		vector.remove(index) ;
 	}
@@ -215,12 +230,20 @@ public class SortedVector<T> implements SortedSet<T> {
 		vector.clear() ;
 	}
 	
+	
+	/**
+	 * Returns the component at the specified index.
+	 * 
+	 * @param index an index into this vector.
+	 * @return the component at the specified index.
+	 */
 	public T elementAt(int index) {
 		return vector.elementAt(index) ;
 	}
 	
+	@SuppressWarnings("unchecked")
 	private int expectedIndexOf(Object o) {
-		Comparable c = (Comparable) o ;
+		Comparable<T> c = (Comparable<T>) o ;
 		
 		int low = 0 ;
 		int high = size() - 1 ;
@@ -263,35 +286,4 @@ public class SortedVector<T> implements SortedSet<T> {
 		else
 			return "{}" ;
 	}
-	
-	
-	public static void main(String[] args) {
-		try {
-			
-			SortedVector<Long> ov = new SortedVector<Long>() ;
-			
-			for (int i=0 ; i<400 ; i++) {
-				Long rand = Math.round(Math.random() * 1000) ;
-				ov.add(rand, false) ;
-			}
-			
-			boolean passed = true ;
-			Long prevVal = new Long(-1) ; 
-			
-			for (Long val: ov) {
-				
-				if (prevVal > val)
-					passed = false ;
-			}
-			
-			System.out.println("=" + ov) ;
-			System.out.println("Passed: " + passed) ; 
-			
-			System.out.println("contains 22: " + ov.contains(new Long(22))) ;
-			
-		} catch (Exception e) {
-			e.printStackTrace() ;
-		}
-	}
-	
 }

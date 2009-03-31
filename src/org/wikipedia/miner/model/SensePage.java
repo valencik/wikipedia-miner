@@ -21,7 +21,7 @@ package org.wikipedia.miner.model;
 
 
 /**
- * This class represents an entry in a disambiguation page: a sense for which the 
+ * This class represents an entry in a disambiguation page: a sense for the ambiguous term for which the disambiguation page was created.
  * 
  * @author David Milne
  */
@@ -30,6 +30,17 @@ public class SensePage extends Page{
 	private int index ;
 	private String scopeNote ;
 	
+	
+	/**
+	 * Initializes a sense page.
+	 * 
+	 * @param database an active Wikipedia database
+	 * @param id the id of the sense page
+	 * @param title the title of the page
+	 * @param type the type of the page (ARTICLE, REDIRECT or DISAMBIGUATION_PAGE)
+	 * @param index the position at which this sense was found on the disambiguation page 
+	 * @param scopeNote the supportive text that was used to describe this sense on the disambiguation page.  
+	 */
 	public SensePage(WikipediaDatabase database, int id, String title, int type, int index, String scopeNote) {
 		super(database, id, title, type) ;
 		this.index = index ;
@@ -47,7 +58,7 @@ public class SensePage extends Page{
 	}
 	
 	/** 
-	 * Returns the supportive text that was used to describe this sense on the disambguation page.  
+	 * Returns the supportive text that was used to describe this sense on the disambiguation page.  
 	 * 
 	 * @return descriptive text.
 	 */

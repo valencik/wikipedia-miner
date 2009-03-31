@@ -31,7 +31,7 @@ import org.wikipedia.miner.util.text.*;
 
 /**
  * This class serves as the main portal into a Wikipedia database, and is intended to provide convenient methods
- * for analysing it's content. 
+ * for analyzing it's content. 
  * 
  * @author David Milne
  */
@@ -42,20 +42,20 @@ public class Wikipedia {
 	/**
 	 * Initializes a newly created Wikipedia and attempts to make a connection to the mysql
 	 * database defined by the arguments given. In addition, it will check
-	 * that the wikipedia database is complete; that all necessary tables and indexes exist.
+	 * that the Wikipedia database is complete; that all necessary tables and indexes exist.
 	 * 
 	 * @param databaseServer	the connection string for the server (e.g 130.232.231.053:8080 or bob:8080)
 	 * @param databaseName	the name of the database (e.g <em>enwiki</em>)
-	 * @param userName	the user for the sql database (null if anonymous)
+	 * @param userName	the user for the SQL database (null if anonymous)
 	 * @param password	the users password (null if anonymous)
+	 * @throws Exception if there is a problem connecting to the database, or if the database is not complete.
 	 */
 	public Wikipedia(String databaseServer, String databaseName, String userName, String password) throws Exception{
 		database = new WikipediaDatabase(databaseServer, databaseName, userName, password) ;
 	}
 
 	/**
-	 * Returns the wikipedia database that this Wikipedia instance is connected to
-	 * @return the wikipedia database
+	 * @return the Wikipedia database that this is connected to
 	 */
 	public WikipediaDatabase getDatabase() {
 		return database ;
@@ -65,10 +65,11 @@ public class Wikipedia {
 	 * Returns the root Category (<a href="http://en.wikipedia.org/wiki/Category:Fundamental">Fundamental</a>), 
 	 * from which all other categories can be browsed.
 	 * 
-	 * @return the root (fundamental)
+	 * @return the root (fundamental) category
 	 * @throws SQLException
 	 */
 	public Category getFundamentalCategory() throws SQLException {
+		//TODO: make this language independent somehow
 		return new Category(database, "Fundamental") ;
 	}
 
@@ -116,15 +117,16 @@ public class Wikipedia {
 	/**
 	 * Returns the Article referenced by the given (case sensitive) title. If the title
 	 * matches a redirect, this will be resolved to return the redirect's target.
-	 * 
+	 * <p>
 	 * The given title must be matched exactly to return an article. If you want some more leeway,
 	 * use getMostLikelyArticle() instead. 
 	 *  
 	 * @param title	the title of an Article (or it's redirect).
 	 * @return the Article referenced by the given title, or null if one does not exist
-	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public Article getArticleByTitle(String title) throws SQLException {
+	public Article getArticleByTitle(String title) {
+		
+		title = title.substring(0,1).toUpperCase() + title.substring(1) ;
 		
 		try {
 			return new Article(database, title) ;			
@@ -145,9 +147,8 @@ public class Wikipedia {
 	 *  
 	 * @param title	the title of an Article (or it's redirect).
 	 * @return the Article referenced by the given title, or null if one does not exist
-	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public Category getCategoryByTitle(String title) throws SQLException {
+	public Category getCategoryByTitle(String title) {
 		
 		try {
 			return new Category(database, title) ;			
@@ -161,20 +162,22 @@ public class Wikipedia {
 	 * the article "30579: Tree", rather than "30806: Tree (data structure)" or "7770: Christmas tree"
 	 * This is defined by the number of times the term is used as an anchor for links to each of these 
 	 * destinations. 
-	 *  
-	 * An optional morphological processor (may be null) can be used to alter the way anchor texts are 
-	 * retrieved (eg via stemming or casefolding) 
+	 *  <p>
+	 * An optional text processor (may be null) can be used to alter the way anchor texts are 
+	 * retrieved (e.g. via stemming or case folding) 
 	 * 
 	 * @param term	the term to obtain articles for
-	 * @param mp	an optional TextProcessor to modify how the term is searched for. 
+	 * @param tp	an optional TextProcessor to modify how the term is searched for. 
 	 * 
 	 * @return the most likely sense of the given term.
 	 * 
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @throws SQLException if there is a problem with the Wikipedia database, or if it has not been prepared
+	 * for the given text processor.
 	 */
 	public Article getMostLikelyArticle(String term, TextProcessor tp) throws SQLException{
 
-		//database.checkMorphologicalProcessor(tp) ;
+		if (tp != null)
+			database.checkTextProcessor(tp) ;
 
 		Anchor anch = new Anchor(term, tp, database) ;
 
@@ -198,20 +201,20 @@ public class Wikipedia {
 	 * known they are as a sense of the term. For example, searching for "club" returns
 	 * the article about associations of people, followed by articles about nightclubs, 
 	 * football teams, the type of weapon, etc. 
-	 * 
+	 * <p>
 	 * This order is calculated from the number of times the text is used to link to each article; 
 	 * The most obvious well-known sense (the one which is the destination for most "club" links) 
 	 * is first in the list.
-	 *  
-	 * An optional morphological processor (may be null) can be used to alter the way anchor texts 
-	 * are retrieved (e.g. via stemming or casefolding) 
+	 * <p>
+	 * An optional text processor (may be null) can be used to alter the way anchor texts 
+	 * are retrieved (e.g. via stemming or case folding) 
 	 * 
 	 * @param term	the term to obtain articles for
-	 * @param tp	the TextProcessor by which the term is compared to wikipedia anchors.
+	 * @param tp	the TextProcessor by which the term is compared to Wikipedia anchors.
 	 * 
 	 * @return the SortedVector of all relevant Articles, ordered by commoness of the link being made.
 	 * 
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @throws SQLException if there is a problem with the Wikipedia database
 	 */
 	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp) throws SQLException{
 
@@ -237,18 +240,17 @@ public class Wikipedia {
 	 * Returns a SortedVector of all Articles which are about the given term, sorted by how well 
 	 * known they are as a sense of the term, and how strongly they relate to the given context 
 	 * articles. 
-	 * 
+	 * <p>
 	 * For example, searching for "club" returns "10830: Football team" at the top of the list
 	 * if you provide "3928: Ball" and "26853: Sport" as context, and "305482: Nightclub" if you 
 	 * provide "18839: Music" and "7885: Dance".
-	 *  
-	 * An optional morphological processor (may be null) can be used to alter the way anchor texts 
+	 *  <p>
+	 * An optional text processor (may be null) can be used to alter the way anchor texts 
 	 * are retrieved (e.g. via stemming or casefolding) 
 	 * 
 	 * @param term	the term to obtain articles for
 	 * @param tp	the TextProcessor by which the term is compared to wikipedia anchors.
 	 * @param contextArticles	a collection of articles that relate to the intended meaning of the term.
-	 * 
 	 * @return the SortedVector of all relevant Articles, ordered how well-known they are and how they relate to context articles.
 	 * 
 	 * @throws SQLException if there is a problem with the wikipedia database
@@ -291,18 +293,18 @@ public class Wikipedia {
 	 * Returns a SortedVector of all Articles which are about the given term, sorted by how well 
 	 * known they are as a sense of the term, and how strongly they relate to the given context 
 	 * terms.
-	 * 
+	 * <p>
 	 * This is just a convenience method, which resolves each context term with getMostLikelyArticle(), and then
 	 * calls the above method. 
-	 *  
+	 * <p>
 	 * An optional morphological processor (may be null) can be used to alter the way anchor texts are retrieved 
-	 * (eg via stemming or casefolding) 
+	 * (e.g. via stemming or casefolding) 
 	 * 
 	 * @param term	the term to obtain articles for
 	 * @param tp	the TextProcessor by which the term is compared to wikipedia anchors.
 	 * @param contextTerms	an array of phrases or terms that relate to the intended meaning of the term.
 	 * 
-	 * @return the SortedVector of all relevant Articles, ordered by commoness of the link being made and relatedness to context articles.
+	 * @return the SortedVector of all relevant Articles, ordered by commonness of the link being made and relatedness to context articles.
 	 * 
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
@@ -357,12 +359,30 @@ public class Wikipedia {
 	}
 	
 	/**
+	 * @return an iterator for all pages in the database, in order of ascending ids.
+	 * @throws SQLException if there is a problem with the Wikipedia database.
+	 */
+	public PageIterator getPageIterator() throws SQLException{
+		return new PageIterator(database) ;
+	}
+	
+	/**
+	 * @param pageType the type of page of interest (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
+	 * @return an iterator for all pages in the database of the given type, in order of ascending ids.
+	 * @throws SQLException if there is a problem with the Wikipedia database.
+	 */
+	public PageIterator getPageIterator(int pageType) throws SQLException{
+		return new PageIterator(database, pageType) ;		
+	}
+	
+	/**
 	 * A convenience method that returns an instance of Wikipedia, initialized according to the given 
 	 * array of String arguments. 
 	 * 
 	 * @param args	an array at least 2 String arguments; the connection string of the wikipedia 
-	 * database server, the name of the wikipedia database and (optionally, if annonymous access
+	 * database server, the name of the Wikipedia database and (optionally, if anonymous access
 	 * is not allowed) a username and password.
+	 * @return the initialized Wikipedia instance.
 	 * @throws Exception if the arguments are invalid, or if there is a problem connecting to the database.
 	 */
 	public static Wikipedia getInstanceFromArguments(String[] args) throws Exception{
@@ -382,11 +402,12 @@ public class Wikipedia {
 	/**
 	 * Provides a demo of the functionality provided by this toolkit.
 	 * 
-	 * @param args	an array of 2 or 4 String arguments; the connection string of the wikipedia 
-	 * database server, the name of the wikipedia database and (optionally, if anonymous access
+	 * @param args	an array of 2 or 4 String arguments; the connection string of the Wikipedia 
+	 * database server, the name of the Wikipedia database and (optionally, if anonymous access
 	 * is not allowed) a username and password for the database.
+	 * @throws Exception
 	 */
-	public static void main(String[] args) throws Exception{
+	public static void main(String[] args) throws Exception {
 		Wikipedia self = Wikipedia.getInstanceFromArguments(args) ;
 		
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );			

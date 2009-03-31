@@ -20,19 +20,18 @@
 package org.wikipedia.miner.util.text;
 
 /**
- * <p>
  * This abstract class provides a framework of what is expected from a TextProcessor; a class that 
- * performs modifications on strings to facilitate matching between them. Conservative morphology 
+ * performs modifications on strings to facilitate matching between them. Conservative modifications 
  * makes few changes to the string, sacrificing recall for precision.
- * Aggressive morphology makes significant changes to the string, sacrificing precision for recall.
+ * Aggressive modifications makes significant changes to the string, sacrificing precision for recall.
  * 
  * @author David Milne
  */
 public abstract class TextProcessor {
 	
 	/**
-	 * Returns a string that identifies this MorphologicalProcessor. It should be human-readable and describe what this
-	 * processor does, with enough detail to distinguish it from other MorphologicalProcessors. The default is to return the
+	 * Returns a string that identifies this TextProcessor. It should be human-readable and describe what this
+	 * processor does, with enough detail to distinguish it from other TextProcessors. The default is to return the
 	 * name of the class.
 	 * 
 	 * @return	the name of this TextProcessor. 
@@ -42,7 +41,7 @@ public abstract class TextProcessor {
 	}
 	
 	/**
-	 * Returns the modified copy of the argument text, after morphological operations have been performed 
+	 * Returns the modified copy of the argument text
 	 * 
 	 * @param text	the text to be processed.
 	 * @return	the processed version of this text.

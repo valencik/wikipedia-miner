@@ -22,6 +22,8 @@ package org.wikipedia.miner.model;
 import java.io.* ;
 import java.sql.*;
 import java.util.* ;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import gnu.trove.* ;
 
@@ -31,9 +33,9 @@ import org.wikipedia.miner.util.text.*;
 /**
  * This class loads, provides access to and maintains the Wikipedia database. It most cases it 
  * should not be used directly - use a Wikipedia instance instead.  
- * 
+ * <p>
  * <b>NOTE:</b> Each wikipedia database is only intended to store one instance of Wikipedia. If you require more,
- * (for different languages, or from different points in time) then you must create seperate databases.
+ * (for different languages, or from different points in time) then you must create separate databases.
  * 
  * @author David Milne
  */
@@ -43,6 +45,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 	
 	private boolean contentImported = true ;
 	private boolean anchorOccurancesSummarized = true ;
+	private boolean definitionsSummarized = true ;
 	
 	private int article_count = 0 ;
 	private int category_count = 0 ;
@@ -55,6 +58,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 	protected TIntObjectHashMap<int[]> cachedInLinks = null ;
 	protected TIntObjectHashMap<int[][]> cachedOutLinks = null ;
 	protected TIntIntHashMap cachedGenerality = null ; 
+	protected TIntObjectHashMap<int[]> cachedParentIds = null ;
 	
 	private TextProcessor cachedProcessor = null ;
 		
@@ -191,14 +195,20 @@ public class WikipediaDatabase extends MySqlDatabase {
 		stmt.close() ;		
 	}
 	
-	public void prepareForMorphologicalProcessor(TextProcessor tp) throws SQLException{
-		prepareAnchorsForMorphologicalProcessor(tp) ;
+	/**
+	 * Prepares the database so that it can be efficiently searched with the given text processor 
+	 *
+	 * @param tp the text processor to prepare this database for
+	 * @throws SQLException if there is a problem with the Wikipedia database
+	 */
+	public void prepareForTextProcessor(TextProcessor tp) throws SQLException{
+		prepareAnchorsForTextProcessor(tp) ;
 		
 		if (tableExists("anchor_occurance"))
-			prepareAnchorOccurancesForMorphologicalProcessor(tp) ;
+			prepareAnchorOccurancesForTextProcessor(tp) ;
 	}
 	
-	private void prepareAnchorsForMorphologicalProcessor(TextProcessor tp) throws SQLException {
+	private void prepareAnchorsForTextProcessor(TextProcessor tp) throws SQLException {
 		
 		System.out.println("Preparing anchors for " + tp.getName()) ;
 		String tableName = "anchor_" + tp.getName() ;
@@ -291,6 +301,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 					insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
 					
 					stmt = createStatement() ;
+					stmt.setEscapeProcessing(false) ;
 					stmt.executeUpdate("INSERT IGNORE INTO " + tableName + " VALUES" + insertQuery.toString() ) ;
 					stmt.close() ;
 					
@@ -304,12 +315,13 @@ public class WikipediaDatabase extends MySqlDatabase {
 			insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
 						
 			stmt = createStatement() ;
+			stmt.setEscapeProcessing(false) ;
 			stmt.executeUpdate("INSERT IGNORE INTO " + tableName + " VALUES" + insertQuery.toString() ) ;
 			stmt.close() ;
 		}
 	}
 	
-	private void prepareAnchorOccurancesForMorphologicalProcessor(TextProcessor tp) throws SQLException {
+	private void prepareAnchorOccurancesForTextProcessor(TextProcessor tp) throws SQLException {
 		
 		System.out.println("Preparing anchor occurances for " + tp.getName()) ;
 		String tableName = "anchor_occurance_" + tp.getName() ;
@@ -399,6 +411,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 					insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
 					
 					stmt = createStatement() ;
+					stmt.setEscapeProcessing(false) ;
 					stmt.executeUpdate("INSERT IGNORE INTO " + tableName + " VALUES" + insertQuery.toString() ) ;
 					stmt.close() ;
 					
@@ -413,6 +426,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 			insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
 						
 			stmt = createStatement() ;
+			stmt.setEscapeProcessing(false) ;
 			stmt.executeUpdate("INSERT IGNORE INTO " + tableName + " VALUES" + insertQuery.toString() ) ;
 			stmt.close() ;
 		}
@@ -455,11 +469,10 @@ public class WikipediaDatabase extends MySqlDatabase {
 		File pagelinkFile = new File(directory.getPath() + File.separatorChar + "pagelink.csv") ;
 		if (!pagelinkFile.canRead())
 			throw new IOException(pagelinkFile.getPath() + " cannot be read") ;
-		
-		
-		//File linkcount = new File(directory.getPath() + File.separatorChar + "linkcount.csv") ;
-		//checkFile(linkcount) ; 
 		*/
+		
+		File linkcount = new File(directory.getPath() + File.separatorChar + "linkcount.csv") ;
+		checkFile(linkcount) ; 
 		
 		File anchor = new File(directory.getPath() + File.separatorChar + "anchor.csv") ;
 		checkFile(anchor) ;
@@ -511,11 +524,12 @@ public class WikipediaDatabase extends MySqlDatabase {
 			initializeTable("pagelink") ;
 			loadFile(pagelinkFile, "pagelink") ;
 		}
-		
+		*/
+		 
 		if (overwrite || !tableExists("linkcount")) {
 			initializeTable("linkcount") ;
 			loadFile(linkcount, "linkcount") ;
-		}*/
+		}
 		
 		if (overwrite || !tableExists("anchor")) {
 			initializeTable("anchor") ;
@@ -615,6 +629,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 			insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
 			
 			Statement stmt = createStatement() ;
+			stmt.setEscapeProcessing(false) ;
 			stmt.executeUpdate("INSERT IGNORE INTO " + tableName + " VALUES" + insertQuery.toString() ) ;
 			stmt.close() ;
 		}
@@ -701,6 +716,11 @@ public class WikipediaDatabase extends MySqlDatabase {
 			anchorOccurancesSummarized = false ;
 			System.err.println("WARNING: anchor occurances have not been imported. You will not be able to calculate how often anchor terms occur as plain text.") ;
 		}
+		
+		if (!tableExists("definition")){
+			definitionsSummarized = false ;
+			System.err.println("WARNING: definitions have not been summarized. Obtaining the first sentence and first paragraph of pages will be more expensive than it needs to be. ") ;
+		}
 	}
 	
 	/**
@@ -709,7 +729,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 	 * @param TextProcessor the TextProcessor to be checked.
 	 * @throws SQLException if the data has not been prepared for this TextProcessor.
 	 */
-	public void checkMorphologicalProcessor(TextProcessor TextProcessor) throws SQLException {
+	public void checkTextProcessor(TextProcessor TextProcessor) throws SQLException {
 			
 		if (!tableExists("anchor_" + TextProcessor.getName()))
 			throw new SQLException("anchors have not been prepared for the morphological processor \"" + TextProcessor.getName() + "\"") ;
@@ -720,34 +740,66 @@ public class WikipediaDatabase extends MySqlDatabase {
 		}
 	}
 
+	/**
+	 * @return true if the database contains the content markup of pages, otherwise false.
+	 */
 	public boolean isContentImported() {
 		return contentImported;
 	}
 	
+	/**
+	 * @return true if the counts of when terms occur as anchors and as plain text have been calculated and imported, otherwise false.
+	 */
 	public boolean areAnchorOccurancesSummarized() {
 		return anchorOccurancesSummarized;
 	}
 	
+	/**
+	 * @return true if the first paragraphs and first sections of pages have been summarised, otherwise false.
+	 */
+	public boolean areDefinitionsSummarized() {
+		return definitionsSummarized;
+	}
+	
+	/**
+	 * @return the exact number of articles (not redirects or disambiguations) stored in the database.
+	 */
 	public int getArticleCount() {
 		return article_count;
 	}
 
+	/**
+	 * @return the exact number of categories stored in the database.
+	 */
 	public int getCategoryCount() {
 		return category_count;
 	}
 
+	/**
+	 * @return the exact number of disambiguations stored in the database.
+	 */
 	public int getDisambigCount() {
 		return disambig_count;
 	}
 
+	/**
+	 * @return the exact number of redirects stored in the database.
+	 */
 	public int getRedirectCount() {
 		return redirect_count;
 	}
 	
+	/**
+	 * @return the total number of pages stored in the database.
+	 */
 	public int getPageCount() {
 		return article_count + category_count + disambig_count + redirect_count ;
 	}
 	
+	/**
+	 * @return the maximum path length from any article to the root "Fundamental" category. 
+	 * @throws SQLException if there is a problem with the Wikipedia database.
+	 */
 	public int getMaxPageDepth() throws SQLException{
 		if (maxPageDepth > 0)
 			return maxPageDepth ;
@@ -767,7 +819,18 @@ public class WikipediaDatabase extends MySqlDatabase {
 		return maxPageDepth ;
 	}
 	
-	public void cacheAnchors(File dir, TextProcessor tp, TIntHashSet validIds, ProgressNotifier pn) throws IOException{
+	/**
+	 * Caches anchors, destinations, and occurrence counts (if these have been summarized), so that they can 
+	 * be searched very quickly without consulting the database.
+	 * 
+	 * @param dir	the directory containing csv files extracted from a Wikipedia dump.
+	 * @param tp	an optional text processor
+	 * @param validIds an optional set of ids. Only anchors that point to these ids, and only destinations within this list will be cached.
+	 * @param minLinkCount the minimum number of times a destination must occur for a particular anchor before it is cached. 
+	 * @param pn an optional progress notifier
+	 * @throws IOException if the relevant files cannot be read.
+	 */
+	public void cacheAnchors(File dir, TextProcessor tp, TIntHashSet validIds, int minLinkCount, ProgressNotifier pn) throws IOException{
 	
 		File anchorFile = new File(dir.getPath() + File.separatorChar + "anchor_summary.csv") ;
 		File occuranceFile = new File(dir.getPath() + File.separatorChar + "anchor_occurance.csv") ;
@@ -808,8 +871,9 @@ public class WikipediaDatabase extends MySqlDatabase {
 				sense[0] = new Integer(values[0]) ;
 				sense[1] = new Integer(values[1]) ;
 				
-				if (validIds == null || validIds.contains(sense[0]))
+				if ((validIds == null || validIds.contains(sense[0])) && sense[1] > minLinkCount) {
 					senses.add(sense) ;
+				}
 			}
 			
 			if (senses.size() > 0) {
@@ -820,7 +884,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 				if (ca == null) {
 					ca = new CachedAnchor(senses) ;
 					cachedAnchors.put(anchor, ca) ;
-				} else {
+				} else {			
 					ca.addSenses(senses) ;
 				}
 			}
@@ -839,7 +903,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 				int sep1 = line.lastIndexOf(',', sep2-1) ;
 				
 				String ngram = line.substring(1, sep1-1) ;
-				int linkCount = new Integer(line.substring(sep1+1, sep2)) ;
+				//int linkCount = new Integer(line.substring(sep1+1, sep2)) ;
 				int occCount = new Integer(line.substring(sep2+1)) ;
 				
 				if (tp != null) 
@@ -856,7 +920,16 @@ public class WikipediaDatabase extends MySqlDatabase {
 		}
 		this.cachedProcessor = tp ;
 	}
-	
+
+	/**
+	 * Caches pages, so that titles and types can be retrieved 
+	 * very quickly without consulting the database.
+	 * 
+	 * @param dir	the directory containing csv files extracted from a Wikipedia dump.
+	 * @param validIds an optional set of ids. Only anchors that point to these ids, and only destinations within this list will be cached. 
+	 * @param pn an optional progress notifier
+	 * @throws IOException if the relevant files cannot be read.
+	 */
 	public void cachePages(File dir, TIntHashSet validIds, ProgressNotifier pn) throws IOException {
 		
 		File pageFile = new File(dir.getPath() + File.separatorChar + "page.csv") ;
@@ -894,6 +967,15 @@ public class WikipediaDatabase extends MySqlDatabase {
 		input.close();
 	}
 	
+	/**
+	 * Caches links in to pages, so these and relatedness measures can be calculated very quickly,
+	 * without consulting the database.
+	 * 
+	 * @param dir	the directory containing csv files extracted from a Wikipedia dump.
+	 * @param validIds an optional set of ids. Only anchors that point to these ids, and only destinations within this list will be cached. 
+	 * @param pn an optional progress notifier
+	 * @throws IOException if the relevant files cannot be read.
+	 */
 	public void cacheInLinks(File dir, TIntHashSet validIds, ProgressNotifier pn) throws IOException {
 		
 		File file = new File(dir.getPath() + File.separatorChar + "pagelink_in.csv") ;		
@@ -939,6 +1021,15 @@ public class WikipediaDatabase extends MySqlDatabase {
 		input.close();
 	}
 	
+	/**
+	 * Caches links out from pages, so these and relatedness measures can be calculated very quickly,
+	 * without consulting the database.
+	 * 
+	 * @param dir	the directory containing csv files extracted from a Wikipedia dump.
+	 * @param validIds an optional set of ids. Only anchors that point to these ids, and only destinations within this list will be cached. 
+	 * @param pn an optional progress notifier
+	 * @throws IOException if the relevant files cannot be read.
+	 */
 	public void cacheOutLinks(File dir, TIntHashSet validIds, ProgressNotifier pn) throws IOException{
 		
 		File file = new File(dir.getPath() + File.separatorChar + "pagelink_out.csv") ;
@@ -983,6 +1074,16 @@ public class WikipediaDatabase extends MySqlDatabase {
 		}
 	}
 	
+	
+	/**
+	 * Caches generality, so measures can be retrieved very quickly,
+	 * without consulting the database.
+	 * 
+	 * @param dir	the directory containing csv files extracted from a Wikipedia dump.
+	 * @param validIds an optional set of ids. Only anchors that point to these ids, and only destinations within this list will be cached. 
+	 * @param pn an optional progress notifier
+	 * @throws IOException if the relevant files cannot be read.
+	 */
 	public void cacheGenerality(File dir, TIntHashSet validIds, ProgressNotifier pn) throws IOException {
 		
 
@@ -1022,10 +1123,98 @@ public class WikipediaDatabase extends MySqlDatabase {
 		input.close();
 	}
 	
+	/**
+	 * Caches parent categories of articles and categories, so that they can be retrieved and 
+	 * traversed very quickly without consulting the database.
+	 * 
+	 * @param dataDirectory the directory containing csv files extracted from a Wikipedia dump.
+	 * @param pn an optional progress notifier
+	 * @throws IOException if the relevant files cannot be read.
+	 */
+	public void cacheParentIds(File dataDirectory, ProgressNotifier pn) throws IOException{
+		//TODO: make this work for a set of article ids
+		cachedParentIds = new TIntObjectHashMap<int[]> () ;
+		
+		File categoryFile = new File(dataDirectory.getPath() + File.separatorChar + "categorylink.csv") ;	
+		
+		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(categoryFile), "UTF-8")) ;
+		
+		if (pn== null) pn = new ProgressNotifier(1) ;
+		pn.startTask(categoryFile.length(), "caching parents") ;
+		
+		long bytesRead = 0 ;
+		String line ;
+		Pattern p = Pattern.compile("^(\\d*),(\\d*)$") ;
+		
+		int lastChild = -1 ;
+		Vector<Integer> parents = new Vector<Integer>() ;
+		
+		while ((line=input.readLine()) != null) {
+			bytesRead = bytesRead + line.length() ;
+			
+			Matcher m = p.matcher(line) ;
+			if (m.matches()) {
+				int parentId = new Integer(m.group(1)) ;
+				int childId = new Integer(m.group(2)) ;
+				
+				if (childId == lastChild)
+					parents.add(parentId) ;
+				else {
+					if (!parents.isEmpty()) {
+						int[] pArray = new int[parents.size()] ;
+						
+						int i=0 ;
+						for (int pId:parents) {
+							pArray[i] = pId ;
+							i++ ;
+						}
+						
+						cachedParentIds.put(lastChild, pArray) ;
+					}
+
+					lastChild = childId ;
+					parents = new Vector<Integer>() ;
+					parents.add(parentId) ;
+				}
+			}
+			
+			pn.update(bytesRead) ;
+		}
+		
+		if (!parents.isEmpty()) {
+			int[] pArray = new int[parents.size()] ;
+			
+			int i=0 ;
+			for(int pId :parents) {
+				pArray[i] = pId ;
+				i++ ;				
+			}
+			
+			cachedParentIds.put(lastChild, pArray) ;
+		}
+		
+		input.close();
+	}
+	
+	
+	/**
+	 * @return true if parent category ids are cached, otherwise false
+	 */
+	public boolean areParentIdsCached() {
+		return !(cachedParentIds == null) ;
+	}
+	
+	/**
+	 * @return true if page titles and types are cached, otherwise false
+	 */
 	public boolean arePagesCached() {
 		return !(cachedPages == null) ;
 	}
 	
+	/**
+	 * @param tp an optional textProcessor
+	 * @return true if anchors and their destinations are cached according to the given textProcessor, otherwise false
+	 */
 	public boolean areAnchorsCached(TextProcessor tp) {
 		
 		if (cachedAnchors == null)
@@ -1043,13 +1232,25 @@ public class WikipediaDatabase extends MySqlDatabase {
 		return true ;
 	}
 	
+	/**
+	 * Identifies the set of valid article ids which fit the given constrains. 
+	 * 
+	 * @param dir the directory containing csv files extracted from a Wikipedia dump.
+	 * @param minLinkCount the minimum number of links that an article must have (both in and out)
+	 * @param pn an optional progress notifier
+	 * @return the set of valid ids which fit the given constrains. 
+	 * @throws IOException if the relevant files cannot be read.
+	 */
 	public TIntHashSet getValidPageIds(File dir, int minLinkCount, ProgressNotifier pn) throws IOException{
+		
 		File linkCountFile = new File(dir.getPath() + File.separatorChar + "linkcount.csv") ;		
+		File pageFile = new File(dir.getPath() + File.separatorChar + "page.csv") ;
+		
 		TIntHashSet pageIds = new TIntHashSet() ;
 				
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(linkCountFile), "UTF-8")) ;
 		if (pn == null) pn = new ProgressNotifier(1) ;
-		pn.startTask(linkCountFile.length(), "gathering valid page ids") ;
+		pn.startTask(linkCountFile.length() + pageFile.length(), "gathering valid page ids") ;
 		
 		long bytesRead = 0 ;
 		String line ;
@@ -1070,17 +1271,46 @@ public class WikipediaDatabase extends MySqlDatabase {
 		}
 		
 		input.close();
+		
+		
+		input = new BufferedReader(new InputStreamReader(new FileInputStream(pageFile), "UTF-8")) ;
+		Pattern p = Pattern.compile("(\\d*),.*?,(\\d*)");	
+		while ((line=input.readLine()) != null) {
+			bytesRead = bytesRead + line.length() ;
+			
+			Matcher m = p.matcher(line) ;
+			if (m.matches()) {
+				int id = Integer.parseInt(m.group(1)) ;
+				int type = Integer.parseInt(m.group(2)) ;
+
+				if (type == Page.CATEGORY)
+					pageIds.add(id) ;
+			}	
+			pn.update(bytesRead) ;
+		}
+		input.close();
+		
 		return pageIds ;
 	}
 	
+	/**
+	 * @return true if links out from pages are cached, otherwise false.
+	 */
 	public boolean areOutLinksCached() {
 		return !(cachedOutLinks == null) ;
 	}
 	
+	/**
+	 * @return true if links in from pages are cached, otherwise false.
+	 */
 	public boolean areInLinksCached() {
 		return !(cachedInLinks == null) ;
 	}
 	
+	
+	/**
+	 * @return true if generality measures are cached, otherwise false.
+	 */
 	public boolean isGeneralityCached() {
 		return !(cachedGenerality == null) ;
 	}
@@ -1153,6 +1383,8 @@ public class WikipediaDatabase extends MySqlDatabase {
 					count = count + sense[1] ;
 				
 				senseCounts.put(sense[0], count) ;	
+				
+				linkCount = linkCount + sense[1] ;
 			}
 			
 			// sort the merged senses
@@ -1168,12 +1400,12 @@ public class WikipediaDatabase extends MySqlDatabase {
 			int index = 0 ;
 			for (Sense sense: orderedSenses) {
 				int[] s = {sense.id, sense.count} ;
-				this.senses[index] = s ;			
+				this.senses[index] = s ;		
 				index++ ;
 			}
 		}
 		
-		private class Sense implements Comparable {
+		private class Sense implements Comparable<Sense> {
 			Integer id ;
 			Integer count ;
 			
@@ -1182,8 +1414,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 				this.count = count ;
 			}
 			
-			public int compareTo(Object o) {
-				Sense s = (Sense) o ;
+			public int compareTo(Sense s) {
 				int cmp = s.count.compareTo(count) ;
 				if (cmp == 0) 
 					cmp = id.compareTo(s.id) ;
@@ -1192,34 +1423,108 @@ public class WikipediaDatabase extends MySqlDatabase {
 		}
 	}
 	
+	/**
+	 * Summarizes first paragraphs and first sentences so short definitions can be obtained efficiently. 
+	 * 
+	 * @throws SQLException 
+	 */
+	public void summarizeDefinitions() throws SQLException {
+		
+		if (!isContentImported())
+			throw new SQLException("You must import article content first!") ;
+		
+		int rows = this.getPageCount() ;
+		
+		ProgressNotifier pn = new ProgressNotifier(1) ;
+		pn.startTask(rows, "Summarizing definitions") ;
+		
+		Statement stmt = createStatement() ;
+		stmt.executeUpdate("DROP TABLE IF EXISTS definition") ;
+		stmt.close() ;
+		
+		stmt = createStatement() ;
+		stmt.executeUpdate("CREATE TABLE definition (" 
+				+ "df_id int(8) unsigned NOT NULL, "
+				+ "df_firstSentence mediumblob NOT NULL, "
+				+ "df_firstParagraph mediumblob NOT NULL, "
+				+ "PRIMARY KEY (df_id)) ENGINE=MyISAM DEFAULT CHARSET=utf8;") ;
+					
+		stmt.close() ;
+		
+		int currRow = 0 ;
+		
+		int chunkSize = 100 ;
+			
+		StringBuffer insertQuery = new StringBuffer() ;
+		SentenceSplitter ss = new SentenceSplitter() ;
+		
+		PageIterator i = new PageIterator(this) ;
+		while (i.hasNext()) {
+			Page p = i.next() ;
+			currRow ++ ;
+			
+			String paragraph = "" ;
+			String sentence = "" ;
+			
+			try {
+				paragraph = p.getFirstParagraph() ;
+				sentence = p.getFirstSentence(paragraph, ss) ;
+			} catch (Exception e) {
+				System.err.println(p + " " + e.getMessage()) ;
+			}
+			
+			insertQuery.append(" (" + p.getId() + ",\"" + addEscapes(sentence) + "\",\"" + addEscapes(paragraph) + "\"),") ;
+			
+			if (currRow%chunkSize == 0) {
+				if (insertQuery.length() > 0) {
+					insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
+					
+					stmt = createStatement() ;
+					stmt.setEscapeProcessing(false) ;
+					stmt.executeUpdate("INSERT IGNORE INTO definition VALUES" + insertQuery.toString() ) ;
+					stmt.close() ;
+					
+					insertQuery = new StringBuffer() ;
+				}
+				
+				pn.update(currRow) ;
+			}
+		}
+		
+		if (insertQuery.length() > 0) {
+			insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
+						
+			stmt = createStatement() ;
+			stmt.setEscapeProcessing(false) ;
+			stmt.executeUpdate("INSERT IGNORE INTO definition VALUES" + insertQuery.toString() ) ;
+			stmt.close() ;
+		}
+	}	
 	
+	
+	/**
+	 * Demo code for importing and initializing a Wikipedia database. 
+	 * 
+	 * @param args
+	 */
 	public static void main(String[] args) {
 		try {
-			Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
+			Wikipedia wikipedia = new Wikipedia("localhost", "enwiki_20080727", "student", "*****") ; 
+			//Wikipedia.getInstanceFromArguments(args) ;
 			
-			File dataDirectory = new File("/research/wikipediaminer/data/en/20080727/") ;
-			wikipedia.getDatabase().loadData(dataDirectory, false) ;
+			//File dataDirectory = new File("/research/wikipediaminer/data/en/20080727") ;
+			//wikipedia.getDatabase().loadData(dataDirectory, false) ;
 			
-			System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc();System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc();		
-			long mem0 = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+			//wikipedia.getDatabase().summarizeDefinitions() ;
+			//wikipedia.getDatabase().prepareForTextProcessor(new CaseFolder()) ;
+			//wikipedia.getDatabase().prepareForTextProcessor(new Cleaner()) ;
+			//wikipedia.getDatabase().prepareForTextProcessor(new PorterStemmer()) ;
 			
-			TIntHashSet ids = null ;//wikipedia.getDatabase().getValidPageIds(dataDirectory, 5) ;	
-			
-			ProgressNotifier pn = new ProgressNotifier(4) ; 
-			wikipedia.getDatabase().cacheAnchors(dataDirectory, null, ids, pn) ;	
-			wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;		
-			wikipedia.getDatabase().cacheGenerality(dataDirectory, ids, pn) ;			
-			wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
-			
-			System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc();System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc(); System.gc();
-			long mem1 = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-			
-			System.out.println(mem1 - mem0) ;
+			//Wikipedia wikipedia = new Wikipedia("nui", "enwiki_20080727", "root", null) ;
+			//wikipedia.getDatabase().getValidPageIds(dataDirectory, 5, null) ;	
 			
 			
-			//wikipedia.getDatabase().prepareForMorphologicalProcessor(new Cleaner()) ;
-			//wikipedia.getDatabase().prepareForMorphologicalProcessor(new PorterStemmer()) ;
-			
+			wikipedia.getDatabase().summarizeDefinitions() ;
 		} catch (Exception e) {
 			e.printStackTrace() ;
 		}

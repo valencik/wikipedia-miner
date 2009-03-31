@@ -32,7 +32,7 @@ import java.util.*;
 public class Redirect extends Page {
 	
 	/**
-	 * Initialises a newly created Redirect so that it represents the page given by <em>id</em> and <em>title</em>.
+	 * Initializes a newly created Redirect so that it represents the page given by <em>id</em> and <em>title</em>.
 	 * 
 	 * This is the most efficient constructor as no database lookup is required.
 	 * 
@@ -45,7 +45,7 @@ public class Redirect extends Page {
 	}
 	
 	/**
-	 * Initialises a newly created Redirect so that it represents the redirect given by <em>id</em>.
+	 * Initializes a newly created Redirect so that it represents the redirect given by <em>id</em>.
 	 * 
 	 * @param database	an active WikipediaDatabase
 	 * @param id	the unique identifier of the redirect
@@ -73,6 +73,7 @@ public class Redirect extends Page {
 	 * Returns the Page that this redirect points to. 
 	 * 
 	 * @return	the equivalent Page for this redirect.
+	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */	
 	public Article getTarget() throws SQLException{
 		
