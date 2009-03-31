@@ -34,7 +34,6 @@ import org.wikipedia.miner.util.* ;
  * the categories it belongs to, and the articles that link to it.  
  * 
  * @author David Milne
- *
  */
 public class Article extends Page {
 
@@ -63,7 +62,7 @@ public class Article extends Page {
 	}
 
 	/**
-	 * Initialises a newly created Article so that it represents the article given by <em>id</em>.
+	 * Initializes a newly created Article so that it represents the article given by <em>id</em>.
 	 * 
 	 * @param database	an active WikipediaDatabase
 	 * @param id	the unique identifier of the article
@@ -115,6 +114,22 @@ public class Article extends Page {
 
 		return redirects ;	
 	}
+	
+	/**
+	 * @return an array of category ids that this article belongs to. 
+	 */
+	public int[] getParentCategoryIds() {
+		
+		int[] parentIds = null;
+		
+		if (database.areParentIdsCached())
+			parentIds = database.cachedParentIds.get(id) ;
+		
+		if (parentIds == null)
+			parentIds = new int[0] ;
+		
+		return parentIds ;
+	}
 
 	/**
 	 * Returns a SortedVector of Categories that this article belongs to. These are the categories 
@@ -122,9 +137,11 @@ public class Article extends Page {
 	 * equivalent category, if one exists.
 	 * 
 	 * @return	a Vector of WikipediaCategories
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @throws SQLException if there is a problem with the Wikipedia database
 	 */
 	public SortedVector<Category> getParentCategories() throws SQLException {
+		//TODO: use cached parent ids
+		
 		SortedVector<Category> parentCategories = new SortedVector<Category>() ;
 
 		Statement stmt = getWikipediaDatabase().createStatement() ;
@@ -366,9 +383,13 @@ public class Article extends Page {
 		if (database.areInLinksCached()) 
 			return getRelatednessFromInLinks(article) ;
 		
-		return Math.max(getRelatednessFromInLinks(article),getRelatednessFromOutLinks(article)) ;
+		return (getRelatednessFromInLinks(article) + getRelatednessFromOutLinks(article))/2 ;
 	}
 
+	/**
+	 * @return an ordered array of article ids that link to this page (with redirects resolved) 
+	 * @throws SQLException if there is a problem with the Wikipedia database.
+	 */
 	public int[] getLinksInIds() throws SQLException{
 
 		if (inLinkIds != null)
@@ -387,13 +408,20 @@ public class Article extends Page {
 		ResultSet rs = stmt.executeQuery("SELECT li_data FROM pagelink_in WHERE li_id=" + id) ;
 
 		inLinkIds = new int[0] ;
+		
+		
 
 		if (rs.first()) {
-			String[] l = rs.getString(1).split(":") ;
-			inLinkIds = new int[l.length] ;
-			for (int i=0 ; i<l.length ; i++) 
-				inLinkIds[i] = new Integer(l[i]).intValue() ;
+			String data = rs.getString(1) ;
+			if (!data.equals("")) {
+				String[] l = data.split(":") ;
+				inLinkIds = new int[l.length] ;
+				for (int i=0 ; i<l.length ; i++) 
+					inLinkIds[i] = new Integer(l[i]).intValue() ;
+			}
 		}
+		
+		
 
 		rs.close() ;
 		stmt.close() ;
@@ -401,6 +429,50 @@ public class Article extends Page {
 		return inLinkIds ;
 	}
 	
+	/**
+	 * @return the number of articles that link to this one 
+	 * @throws SQLException
+	 */
+	public int getLinksInCount() throws SQLException {
+		
+		int linkCount = 0 ;
+		
+		Statement stmt = getWikipediaDatabase().createStatement() ;
+		ResultSet rs = stmt.executeQuery("SELECT lc_in FROM linkcount WHERE lc_id=" + id) ;
+		
+		if (rs.first())
+			linkCount = rs.getInt(1) ;
+		
+		rs.close() ;
+		stmt.close() ;
+		
+		return linkCount ;
+	}
+	
+	/**
+	 * @return the number of articles that this one links to 
+	 * @throws SQLException
+	 */
+	public int getLinksOutCount() throws SQLException {
+		
+		int linkCount = 0 ;
+		
+		Statement stmt = getWikipediaDatabase().createStatement() ;
+		ResultSet rs = stmt.executeQuery("SELECT lc_out FROM linkcount WHERE lc_id=" + id) ;
+		
+		if (rs.first())
+			linkCount = rs.getInt(1) ;
+		
+		rs.close() ;
+		stmt.close() ;
+		
+		return linkCount ;
+	}
+	
+	/**
+	 * @return an ordered array of article ids that this page links to (with redirects resolved) 
+	 * @throws SQLException
+	 */
 	public int[] getLinksOutIds() throws SQLException {
 		
 		int[][] idsAndCounts = getLinksOutIdsAndCounts() ;
@@ -601,12 +673,19 @@ public class Article extends Page {
 	/**
 	 * Represents a term or phrase that is used to link to a particular page.
 	 */
-	public class AnchorText implements Comparable{
+	public class AnchorText implements Comparable<AnchorText>{
 
 		private String text ;
 		private Page destination ;
 		private int count ;
 
+		/**
+		 * Initializes the AnchorText
+		 * 
+		 * @param text the text used within the anchor
+		 * @param destination the id of the article that this anchor links to
+		 * @param count the number of times the given text is used to link to the given destination.
+		 */
 		public AnchorText(String text, Page destination, int count) {
 			this.text = text;
 			this.destination = destination ;
@@ -660,26 +739,12 @@ public class Article extends Page {
 			
 			return cmp ;
 		}
-
-		/**
-		 * Compares this AnchorText to another Object. If the Object is a AnchorText, 
-		 * this function behaves like compareTo(AnchorText). Otherwise, 
-		 * it throws a ClassCastSQLException (as AnchorTexts are comparable only to other 
-		 * AnchorTexts).
-		 * 
-		 * @param	o	the Object to be compared
-		 * @return	see above
-		 */
-		public int compareTo(Object o) throws ClassCastException{
-			AnchorText at = (AnchorText) o ;
-			return compareTo(at) ;
-		}
 	}
 
 	/**
 	 * Provides a demo of functionality available to Articles
 	 * 
-	 * @param args an array of arguments for connecting to a wikipedia datatabase: server and database names at a minimum, and optionally a username and password
+	 * @param args an array of arguments for connecting to a wikipedia database: server and database names at a minimum, and optionally a username and password
 	 * @throws Exception if there is a problem with the wikipedia database.
 	 */
 	public static void main(String[] args) throws Exception {
@@ -711,7 +776,7 @@ public class Article extends Page {
 				if (wikipedia.getDatabase().isContentImported()) {
 					
 					System.out.println(" - first sentence:") ;
-					System.out.println("    - " + article.getFirstSentence()) ;
+					System.out.println("    - " + article.getFirstSentence(null, null)) ;
 					
 					System.out.println(" - first paragraph:") ;
 					System.out.println("    - " + article.getFirstParagraph()) ;

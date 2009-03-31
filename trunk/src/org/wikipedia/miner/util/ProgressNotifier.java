@@ -1,3 +1,22 @@
+/*
+ *    ProgressNotifier.java
+ *    Copyright (C) 2007 David Milne, d.n.milne@gmail.com
+ *
+ *    This program is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 2 of the License, or
+ *    (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with this program; if not, write to the Free Software
+ *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
 package org.wikipedia.miner.util;
 
 import java.text.DecimalFormat;
@@ -6,7 +25,7 @@ import java.util.* ;
 /**
  * @author David Milne
  * 
- *  This class provides a very naive means of tracking the progress of a task 
+ *  This class provides a naive means of tracking the progress of a task 
  *  or set of tasks, with percentage of completion, time spent, and estimated time remaining.
  */
 public class ProgressNotifier {
@@ -21,24 +40,16 @@ public class ProgressNotifier {
 	
 	private long lastReportTime ;
 	private long minReportInterval = 1000 ;
+	
+	private double minReportProgress = 0.01 ;
+	private double lastReportProgress ;
+	
 	private int lastMessageLength ;
 	
 	private boolean clearPrevMessage = false ;
 	
 	DecimalFormat percentFormat = new DecimalFormat("#0.00 %") ;
 	DecimalFormat digitFormat = new DecimalFormat("00") ;
-	
-	/**
-	 * Creates a ProgressNotifier for tracking a single unnamed task.
-	 * 
-	 * @param taskParts the number of parts this task involves.
-	 */
-	public ProgressNotifier(long taskParts) {
-		tasks = 1 ;
-		tasksDone = -1 ;
-		startTask(taskParts) ;
-	}
-	
 	
 	/**
 	 * Creates a ProgressNotifier for tracking a single named task.
@@ -86,7 +97,6 @@ public class ProgressNotifier {
 	 * Starts an unnamed task. Previous tasks are assumed to be completed. 
 	 * 
 	 * @param taskParts the number of parts this task involves.
-	 * @param message the message to be displayed alongside all progress updates
 	 */
 	public void startTask(long taskParts) {
 		this.tasksDone ++ ;
@@ -97,7 +107,7 @@ public class ProgressNotifier {
 		currTask_start = new Date().getTime() ; 
 		
 		lastReportTime = currTask_start ;
-		
+		lastReportProgress = 0 ;
 	}	
 	
 	/**
@@ -159,34 +169,42 @@ public class ProgressNotifier {
 			output = currTask_message + ": " ;
 
 		long now = new Date().getTime() ;
-			
-		if (currTask_partsDone > 1 && now - lastReportTime >= minReportInterval) {
+		
+		if (currTask_partsDone < 1)
+			return ;
+		
+		if (now - lastReportTime < minReportInterval)
+			return ;
+		
+		double progress = (double)currTask_partsDone/currTask_parts ;
+		
+		if (progress - lastReportProgress < minReportProgress)
+			return ;
+		
 				
-			double progress = (double)currTask_partsDone/currTask_parts ;			
-			long timeElapsed = now - currTask_start ;
+		long timeElapsed = now - currTask_start ;
 
-			long timeTotal = (long)(timeElapsed * ((double)currTask_parts/currTask_partsDone)) ; 
-			long timeLeft = timeTotal - timeElapsed ;
+		long timeTotal = (long)(timeElapsed * ((double)currTask_parts/currTask_partsDone)) ; 
+		long timeLeft = timeTotal - timeElapsed ;
 
-			output = output + percentFormat.format(progress) 
-			+ " in " + formatTime(timeElapsed) 
-			+ ", ETA " + formatTime(timeLeft) ;	
+		output = output + percentFormat.format(progress) 
+		+ " in " + formatTime(timeElapsed) 
+		+ ", ETA " + formatTime(timeLeft) ;	
 
-			if (clearPrevMessage && lastMessageLength > 0) {
-				StringBuffer sb = new StringBuffer() ;
-				for (int i=0 ; i<lastMessageLength ; i++)
-					sb.append('\b') ;
+		if (clearPrevMessage && lastMessageLength > 0) {
+			StringBuffer sb = new StringBuffer() ;
+			for (int i=0 ; i<lastMessageLength ; i++)
+				sb.append('\b') ;
 				
-				
-				System.out.println(sb) ;
-			}
-				
-			
-			System.out.println(output) ;
-			
-			lastReportTime = now ;
-			lastMessageLength = output.length() ;
+			System.out.println(sb) ;
 		}
+				
+			
+		System.out.println(output) ;
+			
+		lastReportTime = now ;
+		lastMessageLength = output.length() ;
+		lastReportProgress = progress ;
 	}
 	
 	private String formatTime(long time) {

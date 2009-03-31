@@ -26,9 +26,9 @@ import java.util.* ;
 /**
  * This class represents disambiguation pages in Wikipedia; the pages that list the various articles that an
  * ambiguous term may refer to.
- *  
+ *  <p>
  * On top of the functionality provided by Article, it attempts to identify the linked articles which relate to
- * alternative senses for the term in question. This is done through the following hueristics:
+ * alternative senses for the term in question. This is done through the following heuristics:
  * <ul>
  * <li> Only the first link in each line or list item is used. </li>
  * <li> This link is only used if the ambiguous term does not occur before it on the same line. </li>
@@ -40,7 +40,7 @@ import java.util.* ;
 public class Disambiguation extends Article{
 
 	/**
-	 * Initialises a newly created DisambiguationPage so that it represents the page given by <em>id</em> and <em>title</em>.
+	 * Initializes a newly created DisambiguationPage so that it represents the page given by <em>id</em> and <em>title</em>.
 	 * 
 	 * This is the most efficient constructor as no database lookup is required.
 	 * 
@@ -54,7 +54,7 @@ public class Disambiguation extends Article{
 	}
 	
 	/**
-	 * Initialises a newly created DisambiguationPage so that it represents the disambiguation page given by <em>id</em>.
+	 * Initializes a newly created DisambiguationPage so that it represents the disambiguation page given by <em>id</em>.
 	 * 
 	 * @param database	an active WikipediaDatabase
 	 * @param id	the unique identifier of the disambiguation page
@@ -68,7 +68,7 @@ public class Disambiguation extends Article{
 	}
 	
 	/**
-	 * Initialises a newly created DisambiguationPage so that it represents the disambiguation page given by <em>title</em>.
+	 * Initializes a newly created DisambiguationPage so that it represents the disambiguation page given by <em>title</em>.
 	 * 
 	 * @param database	an active WikipediaDatabase
 	 * @param title	the (case dependent) title of the disambiguation page
@@ -82,7 +82,8 @@ public class Disambiguation extends Article{
 	 * Returns the most obvious or most common sense of the ambiguous term, by selecting the first article that the 
 	 * disambiguation page links to. 
 	 * 
-	 * @throws SQLException	if there is a problem with the wikipedia database.
+	 * @return the most obvious (first) sense listed.
+	 * @throws SQLException	if there is a problem with the Wikipedia database.
 	 */
 	public SensePage getMostObviousSense() throws SQLException{
 		SensePage sense = null ;
@@ -103,9 +104,8 @@ public class Disambiguation extends Article{
 	}
 	
 	/**
-	 * Returns all senses of the ambiguous term, ordered by page id.
-	 * 
-	 * @throws SQLException	if there is a problem with the wikipedia database.
+	 * @return all senses of the ambiguous term, ordered by page id.
+	 * @throws SQLException	if there is a problem with the Wikipedia database.
 	 */
 	public SortedVector<SensePage> getSenses() throws SQLException{
 		
@@ -131,6 +131,7 @@ public class Disambiguation extends Article{
 	 * Returns all senses of the ambiguous term, in the order they were found on the page.
 	 * This order usually correlates with how obvious or well known each sense is. 
 	 * 
+	 * @return see above
 	 * @throws SQLException	if there is a problem with the wikipedia database.
 	 */
 	public Vector<SensePage> getSensesInPageOrder() throws SQLException{
@@ -152,30 +153,30 @@ public class Disambiguation extends Article{
 		
 		return senses ;
 	}
+	
+	
+	
+	/**
+	 * Provides a demo of functionality available to Disambiguations
+	 * 
+	 * @param args an array of arguments for connecting to a wikipedia database: server and database names at a minimum, and optionally a username and password
+	 * @throws Exception if there is a problem with the wikipedia database.
+	 */
+	public static void main(String[] args) throws Exception {
 		
-	public static void main(String[] args) {
-		
-		try {
-			Wikipedia wikipedia = new Wikipedia("kia", "enwiki_20071120", "root", "");
+		Wikipedia wikipedia = new Wikipedia("kia", "enwiki_20071120", "root", "");
 			
-			Disambiguation dp = new Disambiguation(wikipedia.getDatabase(), "Texas (disambiguation)") ;
-			System.out.println("Disambiguation Page: " + dp) ;
-			System.out.println("") ;
+		Disambiguation dp = new Disambiguation(wikipedia.getDatabase(), "Texas (disambiguation)") ;
+		System.out.println("Disambiguation Page: " + dp) ;
+		System.out.println("") ;
 			
-			System.out.println("Most obvious Sense: " + dp.getMostObviousSense().getArticle()) ;
-			System.out.println("") ;
+		System.out.println("Most obvious Sense: " + dp.getMostObviousSense().getArticle()) ;
+		System.out.println("") ;
 			
-			for (SensePage sp: dp.getSensesInPageOrder()) {
-				System.out.println(" - Sense (" + sp.getIndex() + "): " + sp) ;
-				System.out.println("     " + sp.getScopeNote()) ;
-			}
-			System.out.println("") ;
-			
-			System.out.println(wikipedia.getDatabase().getStatementsIssuedSinceStartup() + " statements issued.") ;
-			
-		} catch (Exception e) {
-			e.printStackTrace() ;
+		for (SensePage sp: dp.getSensesInPageOrder()) {
+			System.out.println(" - Sense (" + sp.getIndex() + "): " + sp) ;
+			System.out.println("     " + sp.getScopeNote()) ;
 		}
-		
+		System.out.println("") ;
 	}
 }

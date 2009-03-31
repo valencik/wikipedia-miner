@@ -19,13 +19,9 @@
 
 
 package org.wikipedia.miner.model;
-
 import org.wikipedia.miner.util.text.*;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.model.WikipediaDatabase.CachedAnchor ;
-
-
-import gnu.trove.TIntHashSet;
 
 import java.text.DecimalFormat;
 import java.sql.*;
@@ -34,11 +30,11 @@ import java.io.* ;
 /**
  * This class represents a term or phrase that is used to link to pages in Wikipedia.  
  * 
- * These provide your best way of searching for articles relating to or describing a particluar term. 
+ * These provide your best way of searching for articles relating to or describing a particular term. 
  * 
  * @author David Milne
  */
-public class Anchor implements Comparable{
+public class Anchor implements Comparable<Anchor>{
 	
 	private WikipediaDatabase database ;
 	private TextProcessor tp ;
@@ -50,6 +46,14 @@ public class Anchor implements Comparable{
 	
 	private SortedVector<Sense> senses ;
 	
+	/**
+	 * Initializes an anchor
+	 * 
+	 * @param text the term or phrase of interest
+	 * @param tp a text processor which will be used to alter how the given text and Wikipedia's anchors are matched (may be null)
+	 * @param wd an active WikipediaDatabase
+	 * @throws SQLException if there is a problem with the Wikipedia database
+	 */
 	public Anchor(String text, TextProcessor tp, WikipediaDatabase wd) throws SQLException {
 
 		this.database = wd ;
@@ -64,7 +68,7 @@ public class Anchor implements Comparable{
 	}
 	
 	
-	private void initializeFromCache() throws SQLException{
+	private void initializeFromCache(){
 		
 		String t = text ;
 		if (tp != null)
@@ -163,16 +167,17 @@ public class Anchor implements Comparable{
 	}
 	
 	/**
-	 * Returns the probability that ngram is used as a link within wikipedia.
+	 * Returns the probability that ngram is used as a link within Wikipedia.
 	 * 
 	 * @return see above.
 	 * @throws SQLException if ngrams have not been summarized
 	 */
 	public double getLinkProbability() throws SQLException{
-		if (occCount<0)
-			throw new SQLException("Link probabilities for anchors are not available. Occurance counts have not been summarized") ;
 		
-		if (occCount == 0) return 0 ;
+		if (!database.areAnchorOccurancesSummarized()) 
+			throw new SQLException("Link probabilities for anchors are not available. Occurance counts have not been summarized") ;
+				
+		if (occCount <= 0) return 0 ;
 		
 		double prob = ((double)linkCount)/occCount ;
 			
@@ -185,22 +190,14 @@ public class Anchor implements Comparable{
 	public String toString() {
 		return text ;
 	}
-	
-	public boolean linksTo(Article article) throws SQLException {
 		
-		for (Sense sense:getSenses()) {
-			if (sense.getId() == article.getId())
-				return true ;			
-		} 
-		return false ;		
-	}
-	
 	/**
 	 * Returns a sorted vector of AnchorSenses that this text is used to link to, 
 	 * in descending order of the number of times the text is used as a link to that 
 	 * particular destination. 
 	 * 
 	 * @return see above.
+	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
 	public SortedVector<Sense> getSenses() throws SQLException{
 		
@@ -261,61 +258,69 @@ public class Anchor implements Comparable{
 	
 	
 	/**
-	 * Returns the relatedness of this anchor to another. 
+	 * Returns the semantic relatedness of this anchor to another. 
 	 * 
 	 * The relatedness measure is described in:
-	 * TODO: add reference.
+	 * Milne, D. and Witten, I.H. (2008) An effective, low-cost measure of semantic relatedness obtained from Wikipedia links. In Proceedings of the first AAAI Workshop on Wikipedia and Artifical Intellegence (WIKIAI'08), Chicago, I.L.
 	 * 
+	 * @param anchor the anchor to which this should be compared.
 	 * @return see above.
+	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
-	public double getRelatednessTo(Anchor anch) throws SQLException{
+	public double getRelatednessTo(Anchor anchor) throws SQLException{
 		
-		Anchor anchCombined = new Anchor(text + " " + anch.getText(), null, database) ;
-		
-		double wc = anchCombined.getLinkCount() ;
-		if (wc > 0) wc = Math.log(wc)/30 ;
+		Cleaner cleaner = null ;
 				
-		double minProb = 0.005 ;
+		Anchor anchCombined = new Anchor(this.getText() + " " + anchor.getText(), cleaner, database) ;
+		double wc = anchCombined.getLinkCount() ;
+		if (wc > 0) 
+			wc = Math.log(wc)/30 ;
+		
+		double minProb = 0.01 ;
 		double benchmark_relatedness = 0 ;
-		double benchmark_distance = 0.20 ;
+		double benchmark_distance = 0.40 ;
 		
 		SortedVector<CandidatePair> candidates = new SortedVector<CandidatePair>() ;
 		
 		int sensesA = 0 ;
 		int sensesB = 0 ;
 
-		for (Anchor.Sense sense1: getSenses()) {
+		for (Anchor.Sense senseA: this.getSenses()) {
 
-			if (sense1.getProbability() < minProb) break ;
+			if (senseA.getProbability() < minProb) break ;
 			sensesA++ ;
 			sensesB = 0 ;
 
-			for (Anchor.Sense sense2: anch.getSenses()) {
+			for (Anchor.Sense senseB: anchor.getSenses()) {
 
-				if (sense2.getProbability() < minProb) break ;
+				if (senseB.getProbability() < minProb) break ;
 				sensesB++ ;
 
-				double relatedness = sense1.getRelatednessTo(sense2) ;
-				double obviousness = (sense1.getProbability() + sense2.getProbability()) / 2 ;
+				Article artA = new Article(database, senseA.getId(), senseA.getTitle()) ;
+				Article artB = new Article(database, senseB.getId(), senseB.getTitle()) ;
+
+				//double relatedness = artA.getRelatednessTo(artB) ;
+				double relatedness = artA.getRelatednessTo(artB) ;
+				double obviousness = (senseA.getProbability() + senseB.getProbability()) / 2 ;
 
 				if (relatedness > (benchmark_relatedness - benchmark_distance)) {
 
-					//System.out.println(" - - likely candidate " + candidate + ", r=" + relatedness + ", o=" + sense.getProbability()) ;
-					// candidate a likely sense
 					if (relatedness > benchmark_relatedness + benchmark_distance) {
 						//this has set a new benchmark of what we consider likely
-						//System.out.println(" - - new benchmark") ;
 						benchmark_relatedness = relatedness ;
 						candidates.clear() ;
 					}
-					candidates.add(new CandidatePair(sense1, sense2, relatedness, obviousness), false) ;
+					candidates.add(new CandidatePair(senseA, senseB, relatedness, obviousness), false) ;
 				}
 			}
 		}
 		
-		CandidatePair bestSenses = candidates.first() ;
-						
-		double sr = bestSenses.relatedness + wc ;
+		CandidatePair cp = candidates.first() ;
+		
+		double sr = cp.relatedness + wc ;
+		if (sr > 1)
+			sr = 1 ;
+		
 		return sr ;
 	}
 		
@@ -323,10 +328,6 @@ public class Anchor implements Comparable{
 		return text.compareTo(a.getText()) ;
 	}
 	
-	public int compareTo(Object o) {
-		Anchor a = (Anchor)o ;
-		return compareTo(a) ;
-	}
 	
 	/**
 	 * Represents a particular sense or destination of an Anchor.
@@ -334,6 +335,14 @@ public class Anchor implements Comparable{
 	public class Sense extends Article{
 		int occCount ;
 		
+		/**
+		 * Initializes a sense
+		 * 
+		 * @param id the id of the relevant article (or disambiguation)
+		 * @param occCount the number of times the anchor goes to this destination
+		 * @param wd an active Wikipedia database
+		 * @throws SQLException if there is a problem 
+		 */
 		public Sense(int id, int occCount, WikipediaDatabase wd) throws SQLException {
 			super(wd, id) ;
 			
@@ -341,10 +350,16 @@ public class Anchor implements Comparable{
 			setWeight(this.occCount) ;
 		}
 		
+		/**
+		 * @return the number of times the anchor goes to this destination
+		 */
 		public int getOccurances() {
 			return occCount ;
 		}
 		
+		/**
+		 * @return the probability that this anchor goes to this destination
+		 */
 		public double getProbability() {
 			return ((double)occCount) / linkCount ;
 		}
@@ -361,12 +376,10 @@ public class Anchor implements Comparable{
 		DecimalFormat df = new DecimalFormat("0.00") ;
 		
 		Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
-		
-		File dataDirectory = new File("/research/wikipediaminer/data/en/20080727/") ;
 
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );			
 
-		TextProcessor tp = null ; //new Cleaner() ;
+		TextProcessor tp = null ; 
 
 		while (true) {
 			System.out.println("Enter a term (or press ENTER to quit): ") ;
@@ -410,13 +423,21 @@ public class Anchor implements Comparable{
 		}
 	}
 	
-	private class CandidatePair implements Comparable {
+	private class CandidatePair implements Comparable<CandidatePair> {
 		
 		Sense senseA ;
 		Sense senseB ;
 		double relatedness ;
 		double obviousness ;
 		
+		/**
+		 * initializes a new pair of candidate senses when disambiguating two anchors against each other
+		 * 
+		 * @param senseA the candidate sense of the first anchor
+		 * @param senseB the candidate sense of the seccond anchor
+		 * @param relatedness the amount that these senses relate to each other
+		 * @param obviousness the average prior probability of the two senses
+		 */
 		public CandidatePair(Sense senseA, Sense senseB, double relatedness, double obviousness) {
 			this.senseA = senseA ;
 			this.senseB = senseB ;
@@ -424,8 +445,7 @@ public class Anchor implements Comparable{
 			this.obviousness = obviousness ;			
 		}
 		
-		public int compareTo(Object o) {
-			CandidatePair cp = (CandidatePair) o ;
+		public int compareTo(CandidatePair cp) {
 			return new Double(cp.obviousness).compareTo(obviousness) ;
 		}
 		

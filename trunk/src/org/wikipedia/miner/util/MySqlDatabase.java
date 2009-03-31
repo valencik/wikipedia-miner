@@ -19,7 +19,6 @@
 
 package org.wikipedia.miner.util;
 
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -27,7 +26,7 @@ import java.sql.Statement;
 import java.sql.SQLException;
 
 /**
- * This conveniece class provides access to a MySql database via the MySqlConnector-J toolkit. 
+ * This convenience class provides access to a MySql database via the MySqlConnector-J toolkit. 
  * 
  * @author David Milne
  */
@@ -51,6 +50,7 @@ public class MySqlDatabase {
 	 * @param databaseName the name of the database (e.g <em>enwiki</em>)
 	 * @param userName the user for the sql database (null if anonymous)
 	 * @param password the users password (null if anonymous)
+	 * @param encoding the character encoding (e.g. utf8) in which data is stored (null if using database default)
 	 * @throws Exception if there is a problem connecting to the database defined by given arguments.
 	 */
 	public MySqlDatabase(String server, String databaseName, String userName, String password, String encoding) throws Exception{
@@ -65,13 +65,31 @@ public class MySqlDatabase {
 	}
 	
 	/**
+	 * @return true if the connection to the database is active, otherwise false.
+	 */
+	public boolean checkConnection() {
+		try {
+			//try a simple query
+			Statement stmt = createStatement() ;
+			ResultSet rs = stmt.executeQuery("SHOW TABLES") ;
+			
+			rs.close() ;
+			stmt.close() ;
+			
+			return true ;
+		} catch (SQLException e) {
+			return false ;
+		}
+	}
+	
+	/**
 	 * attempts to make a connection to the mysql database.
 	 * @throws	SQLException	if a connection cannot be made.
 	 * @throws InstantiationException	if the mysql driver class cannot be instantiated
 	 * @throws IllegalAccessException	if the mysql driver class cannot be instantiated
 	 * @throws ClassNotFoundException	if the mysql driver class cannot be found
 	 */
-	private void connect() throws SQLException, InstantiationException, IllegalAccessException, ClassNotFoundException{
+	public void connect() throws SQLException, InstantiationException, IllegalAccessException, ClassNotFoundException{
 			
 		// load the sql drivers
 		Class.forName("org.gjt.mm.mysql.Driver").newInstance(); 
@@ -106,7 +124,7 @@ public class MySqlDatabase {
 	}
 	
 	/**
-	 * specifies whether each update statement is to be automatically executed immediately, or left until commit() is called. 
+	 * Specifies whether each update statement is to be automatically executed immediately, or left until commit() is called. 
 	 * It is often more efficent set this to false and wait for several update statements to be issued before calling commit().
 	 * This is false by default. 
 	 *  
@@ -134,7 +152,17 @@ public class MySqlDatabase {
 	 */
 	public Statement createStatement() throws SQLException {
 		statementsIssued ++ ;
-		return connection.createStatement() ;
+		
+		try {
+			return connection.createStatement() ;
+		} catch (SQLException e) {
+			try {
+				this.connect() ;
+				return connection.createStatement() ;
+			} catch (Exception e2) {
+				throw new SQLException() ;
+			}
+		}
 	}
 	
 	/**
@@ -175,7 +203,7 @@ public class MySqlDatabase {
 	 * 
 	 * @param tableName the name of the table to check
 	 * @param indexName the name of the index to check
-	 * @return true true if this database contains an index for the given table and index name, otherwise false.
+	 * @return true if this database contains an index for the given table and index name, otherwise false.
 	 * @throws SQLException if there is a problem with the database
 	 */
 	public boolean indexExists(String tableName, String indexName) throws SQLException {
