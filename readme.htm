@@ -376,7 +376,9 @@
 			With Tomcat running, you should now be able to navigate to <span class=code>server_path</span> in a web browser and see a page like <a href="http://wdm.cs.waikato.ac.nz:8080">this</a>, listing all of the web services available.
 		</p>
 		
-		
+		<p>
+			<span class=bold>Note:</span> You will probably have to allocate more memory to Tomcat than usual, because these web services have to cache wikipedia's skelleton structure into memory. That's about 3G for the current english language version. To allocate this, modify the <span class=code>CATALINA_OPTS</span> environment variable to include <span class=code>"-Xmx3G"</span>		
+		</p>
 		
 		
 		
