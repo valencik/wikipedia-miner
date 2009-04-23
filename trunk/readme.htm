@@ -209,9 +209,24 @@
    			</p>
     
     		<p class="small">
-    			The details of this are in the JavaDoc.
+    			Here is some code to get you going:
    			</p>
-    
+			
+			<div class=code style="border:1px solid grey ; background-color:rgb(250,250,250) ; white-space: pre; padding: 5px ;">				
+<i>//connect to database</i>
+Wikipedia wikipedia = new Wikipedia(<i>mysql_server</i>, <i>databaseName</i>, <i>mysql_username</i>, <i>mysql_password</i>) ;
+				
+<i>//load cvs files</i>
+File dataDirectory = new File(<i>"path/to/csv/directory/"</i>) ;
+wikipedia.getDatabase().loadData(dataDirectory, false) ;
+				
+<i>//prepare text processors</i>
+wikipedia.getDatabase().prepareForTextProcessor(new CaseFolder()) ;
+				
+<i>//cache definitions (only worth doing if you will be using them a lot - will take a day or so)</i>
+wikipedia.getDatabase().summarizeDefinitions() ;
+			</div>
+			
     		<p class="small">
     			<em>NOTE:</em> You need the MySQLConnectorJ, Trove, and Wikipedia-Miner jar files in the build path to compile and run the java code.
     			You may also need to increase the memory available to the Java virtual machine, with the -Xmx flag
@@ -244,7 +259,7 @@
 			Start developing!
  			
 			<p class="small">
-    			Hopefully the JavaDoc will be clear enough to get you going. Also have a look at the main methods for
+    			Hopefully the <a href="http://wdm.cs.waikato.ac.nz:8080/doc/">JavaDoc</a> will be clear enough to get you going. Also have a look at the main methods for
     			each of the main classes (Wikipedia, Article, Anchor, Category, etc) for demos on how to use them.
 			</p>
 			<p class="small">
