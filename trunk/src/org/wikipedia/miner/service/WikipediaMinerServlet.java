@@ -29,7 +29,7 @@ import javax.xml.transform.dom.*;
 import javax.xml.transform.stream.*;
 
 import java.io.*;
-import java.text.DecimalFormat;
+import java.text.*;
 import java.util.* ;
 
 import org.w3c.dom.Document;
@@ -64,7 +64,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 	private HashMap<String,Transformer> transformersByName ;
 	DOMParser parser = new DOMParser() ;
 	protected Document doc = new DocumentImpl();
-	protected DecimalFormat df = new DecimalFormat("#0.000000") ;
+	protected DecimalFormat df = (DecimalFormat) NumberFormat.getInstance(Locale.US);
 
 
 	public void init(ServletConfig config) throws ServletException {
