@@ -68,7 +68,7 @@
 		
 		<p>
 			If you only need Wikipedia's structure rather than it's full textual content, then you can save a lot of time  by using one of our pre-summarized
-			dumps (available <a href="">here</a>). Otherwise, you will need: 
+			dumps (available <a href="https://sourceforge.net/project/showfiles.php?group_id=191683&package_id=300169">here</a>). Otherwise, you will need: 
 		</p>
 		
 		<ul>
@@ -230,7 +230,14 @@ wikipedia.getDatabase().summarizeDefinitions() ;
     		<p class="small">
     			<em>NOTE:</em> You need the MySQLConnectorJ, Trove, and Wikipedia-Miner jar files in the build path to compile and run the java code.
     			You may also need to increase the memory available to the Java virtual machine, with the -Xmx flag
-			</p>
+				</p>
+				
+				<p class="small">
+    			<em>NOTE:</em> The format of the csv files has changed recently. If you are using an older summarized dump 
+    			you may need to run the <span class="code">patchWikipediaData.pl</span> script (in the extraction directory). 
+    			It takes the same parameters as the <span class="code">extractWikipediaData.pl</span> script discussed above.
+				</p>
+				
  	    </li>   
 		
 		<li class="bold">  		
