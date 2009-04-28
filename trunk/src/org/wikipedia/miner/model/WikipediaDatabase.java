@@ -613,7 +613,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 		String line ;
 		
 		long bytesRead = 0 ;		
-		long chunkSize = bytes/100 ;
+		long chunkSize = 1000000 ;
 				
 		StringBuffer insertQuery = new StringBuffer() ;
 		
@@ -1551,7 +1551,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 	public static void main(String[] args) {
 		try {
 			
-			Wikipedia wikipedia = new Wikipedia("localhost", "enwiki_20090306", "student", "*****") ;
+			Wikipedia wikipedia = new Wikipedia("localhost", "enwiki_20090306", "dnk2", null) ;
 			//Wikipedia wikipedia = new Wikipedia("localhost", "enwiki_2000727", "dnk2", null) ;
 						
 			//Wikipedia.getInstanceFromArguments(args) ;
@@ -1559,7 +1559,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 			File dataDirectory = new File("/research/wikipediaminer/data/en/20090306") ;
 			wikipedia.getDatabase().loadData(dataDirectory, false) ;
 						
-			wikipedia.getDatabase().prepareForTextProcessor(new CaseFolder()) ;
+			//wikipedia.getDatabase().prepareForTextProcessor(new CaseFolder()) ;
 			//wikipedia.getDatabase().prepareForTextProcessor(new Cleaner()) ;
 			//wikipedia.getDatabase().prepareForTextProcessor(new PorterStemmer()) ;
 			
@@ -1567,7 +1567,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 			//wikipedia.getDatabase().getValidPageIds(dataDirectory, 5, null) ;	
 			
 			
-			//wikipedia.getDatabase().summarizeDefinitions() ;
+			wikipedia.getDatabase().summarizeDefinitions() ;
 		} catch (Exception e) {
 			e.printStackTrace() ;
 		}
