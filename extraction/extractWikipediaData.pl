@@ -4,6 +4,8 @@
 	 
 	use strict ;
 	use Parse::MediaWikiDump;
+	use File::Basename;
+	
 	no warnings 'utf8';
 
 	binmode(STDOUT, ':utf8');
@@ -12,7 +14,6 @@
 
 	my $data_dir = shift(@ARGV) or die "You must specify a writable data directory containing a single WikiMedia dump file\n" ;
 	
-	
 	my $args = join(' ',@ARGV);
 	my $contentFlag = 1 ;
 	
@@ -20,36 +21,23 @@
 	 $contentFlag = 0 ;
 	}
 	
-	 	
+	if ($contentFlag) {
+		print " - page content will be extracted.\n" ;
+	} else {
+		print " - page content will not be extracted.\n" ;
+	}
+	
 	my $passes = 2 ; 
 	if ($args =~ m/-passes[\s\=]*(\d+)/i) {
 	 $passes = $1 ;
-	}	
-	
-	if ($contentFlag) {
-		print "page content will be extracted.\n" ;
-	} else {
-		print "page content will not be extracted.\n" ;
 	}
-	print "data will be split into $passes passes for memory-intesive operations. Try using more passes if you run into problems.\n" ;
+	print " - data will be split into $passes passes for memory-intesive operations. Try using more passes if you run into problems.\n" ;
 	
-	# tweaking for different versions of wikipedia ==================================================================================
+	my $languageFile = "languages.xml" ; 
+	if ($args =~ m/-languageFile[\s\=]*(\S+)/i) {
+	 $languageFile = $1 ;
+	}
 	
-	# as far as I know, this is the only part of the import process that depends on the version of wikipedia being imported. If you 
-	# want this to work on anything other than the en (english) dump file, then you must find out how disambiguation pages are 
-	# identified in that language, and which category forms the root of all non-system pages, and modify the follwing values accordingly. 
-	
-	my @disambig_templates = ("disambig", "disambig-cleanup", "geodis", "hndis", "numberdis") ;
-	my @disambig_categories = ("disambiguation") ;
-	
-	my $root_category = "Fundamental" ;  # for enwiki
-	#my $root_category = "Main page" ; # for simple wiki
-
-	# logging===================================================================================================================
-	
-	open (LOG, "> $data_dir/log.txt") or die "data dir '$data_dir' is not writable. \n" ;
-	binmode(LOG, ':utf8');
-
 	# get dump file ============================================================================================================
 
 	my $dump_file ;
@@ -67,12 +55,15 @@
 	if (not defined $dump_file) {
 	    die "the data directory '$data_dir' does not contain a WikiMedia dump file\n" ;
 	}
-
+	
 	# get namespaces ============================================================================================================
 
 	my %namespaces = () ;
+	my $categoryPrefix ;
 
 	open(DUMP, $dump_file) or die "dump file '$dump_file' is not readable.\n" ;
+	binmode(DUMP, ':utf8');
+	
 	while (defined (my $line = <DUMP>)) {
 
 	    $line =~ s/\s//g ;  #clean whitespace
@@ -83,6 +74,10 @@
 		
 	    if ($line =~ m/<namespaceKey=\"(\d+)\">(.*)<\/namespace>/i){
 		    $namespaces{lc($2)} = $1 ;
+		    
+		    if ($1 == 14) {
+		    	$categoryPrefix = $2 ;
+		    }
 	    }
 		
 	    if ($line =~ m/<namespaceKey=\"(\d+)\"\/>/i) {
@@ -90,6 +85,22 @@
 	    }
 	}
 	close DUMP ;
+	
+	# get language specific variables ========================================================================================
+	
+	my $languageCode = getLanguageCode($dump_file) ;
+  my @langVariables = &getLanguageVariables($languageFile, $categoryPrefix, $languageCode);
+  
+  my $langName = $langVariables[0] ;
+  my $root_category = $langVariables[1] ;
+  my $dt_test = $langVariables[2] ;
+  my $dc_test = $langVariables[3] ;
+  
+
+	# logging=================================================================================================================
+	
+	open (LOG, "> $data_dir/log.txt") or die "data dir '$data_dir' is not writable. \n" ;
+	binmode(LOG, ':utf8');
 	
 	# get progress ===========================================================================================================	
 	
@@ -114,21 +125,7 @@
 
 	# disambig tests =========================================================================================================
 	
-	my $dt_test  ;
-	if (scalar @disambig_templates == 1) {
-		$dt_test = $disambig_templates[0] ;
-	}else {
-		$dt_test = "(".join("|", @disambig_templates).")" ;
-	}
-	$dt_test = "\\{\\{".lc($dt_test)."\\}\\}" ;
 	
-	my $dc_test = join("|", @disambig_categories) ;	
-	if (scalar @disambig_categories == 1) {
-		$dc_test = $disambig_categories[0] ;
-	}else {
-		$dc_test = "(".join("|", @disambig_categories).")" ;
-	}
-	$dc_test = "\\[\\[category:".lc($dc_test)."\\]\\]" ;
 
 
 	# page summary ===========================================================================================================
@@ -1485,6 +1482,102 @@
 	if ($contentFlag) {
 		extractContent() ;
 	}
+	
+	# language dependent stuff ===============================================================================================
+
+	sub getLanguageVariables($$) {
+	
+		my $fileName = shift ;
+		my $categoryPrefix = shift ;
+		my $languageCode = shift ;
+	
+		open(LANGUAGES, $fileName) or die "Could not locate language definition file '$fileName'" ;
+		binmode(LANGUAGES, ':utf8') ;
+		
+		my $languageData = "" ;
+		
+		while (defined (my $line = <LANGUAGES>)) { 
+				$languageData = "$languageData$line" ;
+		}
+		
+		while($languageData =~ m/<Language(.*?)>(.*?)<\/Language>/gis) {
+		
+			my $attributes = $1 ;
+			my $content = $2 ;
+			
+			my $code ;
+			if ($attributes =~ m/code\s*=\s*\"(.*?)\"/i) {
+				$code = $1 ;
+			}
+			
+			if (defined $code and $code eq $languageCode) { 
+			
+				my $name ;
+				if ($attributes =~ m/name\s*=\s*\"(.*?)\"/i) {
+					$name = $1 ;
+				}
+			
+				my $root_category ;
+				if ($content =~ m/<RootCategory>(.*?)<\/RootCategory>/i) {
+					$root_category = $1 ;
+				}
+				
+				my @disambig_categories = () ;
+				while($content =~ m/<DisambiguationCategory>(.*?)<\/DisambiguationCategory>/gis) {
+					push(@disambig_categories, $1) ;
+				}
+				
+				my @disambig_templates = () ;
+				while($content =~ m/<DisambiguationTemplate>(.*?)<\/DisambiguationTemplate>/gis) {
+					push(@disambig_templates, $1) ;
+				}
+				
+				if (not defined $name or not defined $root_category or not @disambig_categories or not @disambig_templates) {
+					die "language definition for $code is not valid" ;
+				}
+				
+				my @array = () ;
+				
+				push (@array, $name) ;
+				push (@array, $root_category) ;
+				
+				my $dt_test  ;
+				if (scalar @disambig_templates == 1) {
+					$dt_test = $disambig_templates[0] ;
+				}else {
+					$dt_test = "(".join("|", @disambig_templates).")" ;
+				}
+				$dt_test = "\\{\\{".lc($dt_test)."\\}\\}" ;
+				push (@array, $dt_test) ;		
+			
+				my $dc_test = join("|", @disambig_categories) ;	
+				if (scalar @disambig_categories == 1) {
+					$dc_test = $disambig_categories[0] ;
+				}else {
+					$dc_test = "(".join("|", @disambig_categories).")" ;
+				}
+				$dc_test = "\\[\\[".$categoryPrefix.":".lc($dc_test)."\\]\\]" ;
+				push (@array, $dc_test) ;
+				
+				return @array ;
+			}
+		}
+		die "could not find '$languageCode' language definition." ;
+	}
+	
+	sub getLanguageCode($) {
+		
+		my $dump_name = fileparse(shift);
+				
+		if ($dump_name =~ m/^(.*?)wiki-(.*?)-pages-articles.xml$/i) {
+			return $1 ;
+		}
+		
+		print "Could not determine the language of this dump from it's filename, so assuming it's an English one.\n" ;
+		return "en" ;
+	}
+	
+	
 
 
 	# text cleaning =================================================================================================================
