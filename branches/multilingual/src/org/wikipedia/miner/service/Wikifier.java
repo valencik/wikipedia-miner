@@ -22,6 +22,7 @@ package org.wikipedia.miner.service;
 import java.io.* ;
 import java.net.*;
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -61,7 +62,7 @@ public class Wikifier {
 	private int defaultRepeatMode = DocumentTagger.FIRST_IN_REGION ;
 	private boolean defaultShowTooltips = false ;
 	
-	private DecimalFormat df = new DecimalFormat("#0.000000") ;
+	private DecimalFormat df =  (DecimalFormat) NumberFormat.getInstance(Locale.US);
 	
 	/**
 	 * The type of the source document will be detected automatically
