@@ -55,7 +55,7 @@
 	my $dump_file ;
 	my @files = <$data_dir/*>;
 	foreach my $file (@files) {
-	   if ($file =~ m/pages-articles.xml/i) {
+	   if ($file =~ m/pages-articles.xml$/i) {
 	      if (defined $dump_file) {
 		  die "the data directory '$data_dir' contains multiple dump files\n" ;
 	      } else {
@@ -1469,7 +1469,7 @@
 	}	
 	
 	if ($progress < 8) {
-		if ($progress < 4) {
+		if ($progress <= 4) {
 			extractPageSummary() ;
 			extractRedirectSummary() ;
 			extractCoreSummaries() ;

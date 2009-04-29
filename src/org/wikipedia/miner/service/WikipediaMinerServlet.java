@@ -41,6 +41,7 @@ import org.xml.sax.InputSource;
 
 import com.sun.org.apache.xerces.internal.dom.DocumentImpl;
 import com.sun.org.apache.xerces.internal.parsers.DOMParser;
+import java.text.NumberFormat;
 
 /**
  * @author David Milne
