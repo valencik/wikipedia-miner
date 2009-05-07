@@ -751,19 +751,19 @@ public class WikipediaDatabase extends MySqlDatabase {
 	}
 	
 	/**
-	 * Checks if the database has been prepared for use with a particular morphological processor
+	 * Checks if the database has been prepared for use with a particular text processor
 	 * 
 	 * @param TextProcessor the TextProcessor to be checked.
 	 * @throws SQLException if the data has not been prepared for this TextProcessor.
 	 */
 	public void checkTextProcessor(TextProcessor TextProcessor) throws SQLException {
-			
-		if (!tableExists("anchor_" + TextProcessor.getName()))
-			throw new SQLException("anchors have not been prepared for the morphological processor \"" + TextProcessor.getName() + "\"") ;
 		
-		if (!tableExists("ngram")) {
-			if (!tableExists("ngram_" + TextProcessor.getName()))
-				throw new SQLException("ngrams have not been prepared for the morphological processor \"" + TextProcessor.getName() + "\"") ;
+		if (!tableExists("anchor_" + TextProcessor.getName()))
+			throw new SQLException("anchors have not been prepared for the text processor \"" + TextProcessor.getName() + "\"") ;
+		
+		if (tableExists("anchor_occurance")) {
+			if (!tableExists("anchor_occurance_" + TextProcessor.getName()))
+				throw new SQLException("anchor occurances have not been prepared for the text processor \"" + TextProcessor.getName() + "\"") ;
 		}
 	}
 
@@ -1551,15 +1551,15 @@ public class WikipediaDatabase extends MySqlDatabase {
 	public static void main(String[] args) {
 		try {
 			
-			Wikipedia wikipedia = new Wikipedia("localhost", "enwiki_20090306", "dnk2", null) ;
+			Wikipedia wikipedia = new Wikipedia("localhost", "rowiki_20090203", "root", null) ;
 			//Wikipedia wikipedia = new Wikipedia("localhost", "enwiki_2000727", "dnk2", null) ;
 						
 			//Wikipedia.getInstanceFromArguments(args) ;
 			
-			File dataDirectory = new File("/research/wikipediaminer/data/en/20090306") ;
+			File dataDirectory = new File("/research/wikipediaminer/data/ro/20090203") ;
 			wikipedia.getDatabase().loadData(dataDirectory, false) ;
 						
-			//wikipedia.getDatabase().prepareForTextProcessor(new CaseFolder()) ;
+			wikipedia.getDatabase().prepareForTextProcessor(new CaseFolder()) ;
 			//wikipedia.getDatabase().prepareForTextProcessor(new Cleaner()) ;
 			//wikipedia.getDatabase().prepareForTextProcessor(new PorterStemmer()) ;
 			
@@ -1567,7 +1567,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 			//wikipedia.getDatabase().getValidPageIds(dataDirectory, 5, null) ;	
 			
 			
-			wikipedia.getDatabase().summarizeDefinitions() ;
+			//wikipedia.getDatabase().summarizeDefinitions() ;
 		} catch (Exception e) {
 			e.printStackTrace() ;
 		}
