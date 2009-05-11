@@ -1,6 +1,6 @@
 /*
- *    StopwordRemover.java
- *    Copyright (C) 2007 David Milne, d.n.milne@gmail.com
+ *    SnowballStemmerWrapper.java
+ *    Copyright (C) 2009 Giulio Paci, g.paci@cineca.it
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,15 +24,16 @@ import org.tartarus.snowball.ext.*;
 
 
 /**
- * This class provides moderate morphology. This involves cleaning the text using a TextCleaner then
- * removing all stopwords.
+ * This class provides a TextProcessor based on snowball stemmers.
+ * Have a look at http://snowball.tartarus.org/
  */	
 public class SnowballStemmerWrapper extends TextProcessor {
     private int repeat;
 	private Cleaner cleaner ;
     private SnowballStemmer stemmer;
-	/**
-	 * Initializes a newly created PorterStemmer.
+
+    /**
+	 * Initializes a newly created Stemmer (English).
 	 */
 	public SnowballStemmerWrapper() {
 		this.cleaner = new Cleaner();
@@ -41,7 +42,7 @@ public class SnowballStemmerWrapper extends TextProcessor {
 	}
 
 	/**
-	 * Initializes a newly created PorterStemmer.
+	 * Initializes a newly created Stemmer for a specific language.
 	 */
 	public SnowballStemmerWrapper(String language) throws ClassNotFoundException, InstantiationException, IllegalAccessException {
 		this.cleaner = new Cleaner();
@@ -61,18 +62,16 @@ public class SnowballStemmerWrapper extends TextProcessor {
     }
 
 	/**
-	 * Returns the processed version of the argument string. This involves 
-	 * removing all stopwords, then cleaning each remaining term.
+	 * Returns the processed version of the argument string.
 	 * 
 	 * @param	text	the string to be processed
 	 * @return the processed string
 	 */	
 	public synchronized String processText(String text) {
 		String t = text ;
-        t = this.cleaner.processText(t);
         String ret = "";
         
-		String[] terms = t.split("[:space:]") ;
+		String[] terms = t.toLowerCase().split("\\s+") ;
 		for(int i=0;i<terms.length; i++)
         {
             if(terms[i].length() > 0)
@@ -84,6 +83,7 @@ public class SnowballStemmerWrapper extends TextProcessor {
                 ret += stemmer.getCurrent() + " ";
             }
         }
+        ret = this.cleaner.processText(ret);
 		
 		return ret.trim();
 	}
