@@ -48,7 +48,7 @@ public class StopwordRemover extends TextProcessor {
 		String line ;
 		while ((line = input.readLine()) != null) {
 			String word = line.trim().toLowerCase() ;
-            word = word.replaceAll("\s*[|].*", "");
+            word = word.replaceAll("\\s*[|].*", "");
 			stopwords.add(word) ;
 		}
 	}
