@@ -118,17 +118,32 @@ public class Article extends Page {
 	/**
 	 * @return an array of category ids that this article belongs to. 
 	 */
-	public int[] getParentCategoryIds() {
-		
-		int[] parentIds = null;
-		
+	public int[] getParentCategoryIds() throws SQLException {
+
 		if (database.areParentIdsCached())
-			parentIds = database.cachedParentIds.get(id) ;
-		
-		if (parentIds == null)
-			parentIds = new int[0] ;
-		
-		return parentIds ;
+			return database.cachedParentIds.get(id) ;
+
+
+		Vector<Integer> parentCategories = new Vector<Integer>() ;
+
+		Statement stmt = getWikipediaDatabase().createStatement() ;
+		ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id FROM categorylink, page WHERE cl_parent=page_id AND cl_child=" + id + " ORDER BY page_id") ;
+
+		while(rs.next())
+			parentCategories.add(rs.getInt(1)) ;
+
+		rs.close() ;
+		stmt.close() ;
+
+		int[] ids = new int[parentCategories.size()] ;
+
+		int c=0 ;
+		for (Integer catId:parentCategories) {
+			ids[c] = catId ;
+			c++ ;
+		}
+
+		return ids ;
 	}
 
 	/**
