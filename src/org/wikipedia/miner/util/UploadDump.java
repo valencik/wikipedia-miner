@@ -15,7 +15,7 @@ public class UploadDump {
         my_properties = new Properties();
 
         dumpdir = (new File(args[0])).getAbsoluteFile();
-        prop_file = new File(args[0] + "/config.xml");
+        prop_file = new File(dumpdir, "config.xml");
 
         if (prop_file.isFile() && prop_file.canRead()) {
             FileInputStream prop_file_inputstream;

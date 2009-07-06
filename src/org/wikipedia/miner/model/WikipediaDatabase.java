@@ -870,7 +870,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 		
 		if (pn == null) pn = new ProgressNotifier(1) ;
 		if (cachingOccurances)
-			pn.startTask(anchorFile.length() + occuranceFile.length(), "caching anchors") ;
+			pn.startTask(anchorFile.length() + occuranceFile.length(), "caching anchors and anchors occurrances") ;
 		else
 			pn.startTask(anchorFile.length(), "caching anchors") ;
 				
