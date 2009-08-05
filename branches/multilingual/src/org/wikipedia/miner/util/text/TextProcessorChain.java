@@ -39,6 +39,7 @@ import java.util.Vector;
 public class TextProcessorChain extends TextProcessor {
 
     private Vector<TextProcessor> text_processor_list;
+    String name = null;
 
     public TextProcessorChain() {
         this.text_processor_list = new Vector<TextProcessor>();
@@ -50,6 +51,23 @@ public class TextProcessorChain extends TextProcessor {
     }
 
 
+    void setName(String name){
+        this.name = name;
+    }
+
+    @Override
+    public String getName(){
+        if(this.name != null){
+            return this.name;
+        }
+        else{
+            String ret_name = "tp_list";
+            for(TextProcessor tp : this.text_processor_list){
+                ret_name += ":" + tp.getName();
+            }
+            return ret_name;
+        }
+    }
     /**
      * Appends a TextProcessor to the chain.
      *

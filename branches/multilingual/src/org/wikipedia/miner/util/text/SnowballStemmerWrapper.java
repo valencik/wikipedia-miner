@@ -50,7 +50,10 @@ public class SnowballStemmerWrapper extends TextProcessor {
         this.repeat = 1;
 	}
 
-
+    @Override
+    public String getName(){
+        return this.getClass().getSimpleName() + "<" + this.stemmer.getClass().getSimpleName() + ">";
+    }
 
 	/**
 	 * Select a language for the SnowballStemmer.
