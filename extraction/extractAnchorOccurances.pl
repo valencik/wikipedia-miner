@@ -6,10 +6,27 @@ ExtractAnchorOccurrences - Perl script for extracting the number of times anchor
 
 =head1 DESCRIPTION
 
-TODO: describe how to call...
+This script counts occurances of ngrams (words and phrases) in a Wikipedia dump. Ngrams are only counted
+if they correspond to anchors (the text used within links between wikipedia articles), which must first be 
+extracted using extractWikipediaData.pl script.
 
-TODO: describe extracted files...
-	
+The script requires a directory which contains a single Wikipedia xml dump 
+and the csv files produced by extractWikipediaData.pl (Specifically, the anchor.csv file)
+
+This is a very large process; there are millions of wikipedia articles, and each 
+contains thousands of ngrams. Luckily, this script can easily be run
+on several machines or processors at once.  Use -passes=<num> to specify how many 
+machines it will be run on, and on each machine use -passIndex=<num> to specify which 
+part of the data the machine will process (-passIndex must be a number from 1 to -passes).
+
+If only one machine is used (-passes=1), then this script produces a single file called 
+anchor_occurance.csv in the same directory as the xml dump. The file is described in the 
+README of your Wikipedia-Miner distribution.
+
+If multiple machines are used, each will produce a numbered file from anchor_occurance_1.csv to
+anchor_occurance_<passes>.csv. Use the mergeAnchorOccurances.pl script to produce anchor_occurance.csv
+from these.
+
 =cut
 	
 use strict ;
