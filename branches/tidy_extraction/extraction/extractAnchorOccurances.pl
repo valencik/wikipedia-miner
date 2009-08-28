@@ -1,300 +1,293 @@
 #!/usr/bin/perl -w
 
-	use strict ;
-	no warnings 'utf8';
+=head1 NAME
 
-	binmode(STDOUT, ':utf8');
+ExtractAnchorOccurrences - Perl script for extracting the number of times anchors occur in Wikipedia 
 
-	my $data_dir = shift(@ARGV) or die "You must specify a writable data directory containing a single split file, and the anchor.csv file produced by extractWikipediaData\n" ;
+=head1 DESCRIPTION
+
+TODO: describe how to call...
+
+TODO: describe extracted files...
 	
-	my $max_ngram_length = 10 ;
-	my $report_rate = 0.001;
+=cut
 	
+use strict ;
 
-	
-	
-	
-	# logging===================================================================================================================
-	
-	open (LOG, "> $data_dir/log.txt") or die "data dir '$data_dir' is not writable. \n" ;
-	binmode(LOG, ':utf8');
-	
-	# get data files ============================================================================================================
+use Parse::MediaWikiDump;	
+use Getopt::Long ;
+use File::Basename;
+use Encode ;
 
-	my $split_file ;
-	my $split_index ;
-	
-	my @files = <$data_dir/*>;
-	foreach my $file (@files) {
-	   if ($file =~ m/split_(\d+)\.csv$/) {
-	      if (defined $split_file) {
-		  		die "the data directory '$data_dir' contains multiple split files\n" ;
-	      } else {
-		  		$split_file = $file ;
-		  		$split_index = $1 ;
-	      }
-	   }
-	}
+use ProgressMonitor ;
+use Stripper ;
 
-	if (not defined $split_file) {
-	    die "the data directory '$data_dir' does not contain any split files\n" ;
-	}
-
-	# get anchors - just set count=0 ==============================================================================================
-
-	my %anchorFreq = () ;             #anchor text -> freq
-
-	open(ANCHOR, "$data_dir/anchor.csv") || die "'$data_dir/anchor.csv' could not be found\n" ;
-	binmode(ANCHOR, ':utf8') ;
-
-	my $start_time = time  ;
-
-	my $parts_total = -s "$data_dir/anchor.csv";
-	my $parts_done = 0 ;
-
-	while (defined(my $line=<ANCHOR>)) {
-	  $parts_done = $parts_done + length $line ;
-
-	  chomp($line) ;
-	    
-	  if ($line =~ m/\"(.+?)\",(\d+),(\d+)(,\d+)?/) {
-			my $anchor = $1 ;
-			my $id = $2 ;
-			my $count = $3 ;
-						
-			$anchorFreq{$anchor} = 0 ;
-	  }
-	  print_progress("Loading anchors", $start_time, $parts_done, $parts_total) ;
-	}
-	close ANCHOR ;
-
-	print_progress("Loading anchors", $start_time, $parts_total, $parts_total) ;
-	print "\n" ;
-
-	# get number of documents in which these anchors occur (as plain text or within links, we dont care) ============================
-
-	$start_time = time ;
-	$parts_total = -s $split_file ;
-	$parts_done = 0 ;
-	
-	open(SPLIT, $split_file) ;
-	binmode(SPLIT, ':utf8') ;
-	
-	my %ngrams_seen ;
-
-	while (defined(my $line=<SPLIT>)) {
-	
-		%ngrams_seen = () ;
-    
-   	$parts_done = $parts_done + length $line ;
-    
-    if ($line =~ m/^(\d+),\"(.+?)\"$/) {
-    	my $id = $1 ;
-    	my $content = $2 ;
-    	
-    	$content = unescape_text($content) ;
-    	
-    	$content = strip_text($content) ;
-
-			while($content =~ m/(.*?)\n/gi) {	
-
-		    my $line = $1 ;
-		    #print LOG "LINE: $line\n" ;
-		    
-		    get_ngrams($line, %ngrams_seen) ;	
-			}
-    }
-    print_progress("Gathering anchor occurances", $start_time, $parts_done, $parts_total) ;
-	}
-
-	close SPLIT ;
-
-	print_progress("Gathering anchor occurances", $start_time, $parts_total, $parts_total) ;
-	print("\n") ;
-
-	# save anchor frequencies...................................................................
-
-	$start_time = time ;
-
-	open(OCCURANCES, "> $data_dir/anchor_occurance_".$split_index.".csv") ;
-	binmode(OCCURANCES, ':utf8');
-
-	$parts_total = scalar keys %anchorFreq ; 
-	$parts_done = 0 ;
-
-	while (my ($anchor, $freq) = each(%anchorFreq) ) {
-    $parts_done++ ;
-
-    print OCCURANCES "\"$anchor\",$freq\n" ;
-    print_progress("Printing anchor occurances", $start_time, $parts_done, $parts_total) ;
-	}
-
-	print_progress("Printing n-grams and frequencies", $start_time, $parts_total, $parts_total) ;
-	print "\n" ;
-
-	close(OCCURANCES) ;
- 
-
-	sub get_ngrams {
-  	my $line = shift;
-    my @words = split(" ",$line);
-    #my $max = 5 ;
-    
-    for (my $i = 0;$i <= $#words; $i++) {
-			for (my $j = $i+$max_ngram_length; $j >= $i; $j--) {
-	    
-	    	if ($j > $#words) {
-					$j = $#words;
-	    	}
-    
-	    	my $ngram = subarray($i, $j, @words);
-	    	
-	    	if (not defined $ngrams_seen{$ngram}) {
-	    	
-	    		my $freq = $anchorFreq{$ngram} ;
-	    
-	    		if (defined $freq) {
-						$anchorFreq{$ngram} = $freq + 1 ;
-						#print LOG "$ngram,$freq\n" ;
-	    		}
-	    		$ngrams_seen{$ngram} = 1 ;
-	    	}
-			}
-    }
-	}
-
-	sub subarray ($$@) {
-    my $start = shift;
-    my $end = shift;
-    my @array = @_;
-    my @subarray = ();
-    
-    for (my $i = $start; $i <= $end; $i++) {
-			push(@subarray,$array[$i]);
-    }
-    return join(" ",@subarray);
-	}
-	
-	sub unescape_text {
-    my $text = shift ;
-    
-    $text =~ s/\\\\/\\/g ;
-    $text =~ s/\\\"/\"/g ;
-    $text =~ s/\\n/\n/g ;
-
-    return $text ;
-	}	
-
-	# removes all markup
-	sub strip_text {
-
-    my $text = shift ;
-
-    $text =~ s/<!-{2,}((.|\n)*?)-{2,}>//g ;             #remove comments
-
-    #formatting
-    $text =~ s/\'{2,}//g ;                              #remove all bold and italic markup
-    $text =~ s/\={2,}//g ;                              #remove all header markup
-
-    #templates
-    $text =~ s/\{\{((?:[^{}]+|\{(?!\{)|\}(?!\}))*)\}\}//sxg ;  #remove all templates that dont have any templates in them
-    $text =~ s/\{\{((.|\n)*?)\}\}//g ;                         #repeat to get rid of nested templates
-    $text =~ s/\{\|((.|\n)+?)\|\}//g ;                         #remove {|...|} structures
-    
-    #links
-    $text =~ s/\[\[([^\[\]\:]*?)\|([^\[\]]*?)\]\]/$2/g ;   #replace piped links with anchor texts, as long as they dont contain other links ;
-    $text =~ s/\[\[([^\[\]\:]*?)\]\]/$1/g ;                #replace unpiped links with content, as long as they dont contain other links ;
-
-    $text =~ s/\[\[wiktionary\:(.+?)\|(.+?)\]\]/$2/gi ;       #retain piped wiktionary links
-    $text =~ s/\[\[wiktionary\:(.*?)\]\]/$1/gi ;              #retain unpiped wiktionary links
-    
-    $text =~ s/\[\[(.*?)\]\]//g ;                #remove remaining links (they must have unwanted namespaces).
-
-    $text =~ s/\[(.*?)\s(.*?)\]/$2/g ;           #replace external links with anchor text
-
-    #references 
-    $text =~ s/\<ref\/\>//gi ;                          #remove simple ref tags
-    $text =~ s/\<ref\>((.|\n)*?)\<\/ref\>//gi ;         #remove ref tags and all content between them. 
-    $text =~ s/\<ref\s(.+?)\>((.|\n)*?)\<\/ref\>//gi ;  #remove ref tags and all content between them (with attributes).
-    
-    #whitespace
-    $text =~ s/\n{3,}/\n\n/g ;   #collapse multiple newlines
-
-    #html tags
-    $text =~ s/\<(.+?)\>//g ;   
-
-    return $text ;
-	}
+binmode(STDOUT, ':utf8');
 
 
-	# cleans the given text so that it can be safely inserted into database
-	sub clean_text {
-    my $text = shift ; 
-    
-    $text =~ s/\\/\\\\/g;     #escape escape chars
-    $text =~ s/\"/\\\"/g;     #escape double quotes
-    $text =~ s/\n/\\n/g ;  #escape newlines 
-    $text =~ s/^\s+|\s+$//g;  #remove leading & trailing spaces
+#get options ===============================================================================================
 
-    return $text ;
-	}
-	
-	
-	# displaying progress ============================================================================================================
+my $passes ;
+my $passIndex ; 
+my $log ;
+my $languageFile ;
+my $max_ngram_length = 10 ;
 
-	my $msg ;
-	my $last_report_time ;
-	
-	sub format_percent {
-    return sprintf("%.2f",($_[0] * 100))."%" ;
-	}
+GetOptions("passes=i"=>\$passes, "passIndex=i"=>\$passIndex, 'log' => \$log, "languageFile=s"=>\$languageFile);
 
-	sub format_time {
-    my @t = gmtime($_[0]) ;
+if (!defined $passes) {
+	die "You must specify passes=<num> ; the number of passes this task will be split into.\n" ;
+}
 
-    my $hr = $t[2] + (24*$t[7]) ;
-    my $min = $t[1] ;
-    my $sec = $t[0] ;
-	
-    return sprintf("%02d:%02d:%02d",$hr, $min, $sec) ; 
-	}
+if (!defined $passIndex) {
+	die "You must specify currPass=<num> ; the index (a number between 1 and $passes) of the pass to perform.\n" ; 
+}
 
-	sub print_progress {
-	
-    my $message = shift ;
-    my $start_time = shift ;
-    my $parts_done = shift ;
-    my $parts_total = shift ;
-    
-    if (not defined $last_report_time) {
-    	$last_report_time = $start_time
-    }
-    
-    if (time == $last_report_time && $parts_done < $parts_total) {
-			#do not report if we reported less than a second ago, unless we have finished.
-			return ;
+if ($passIndex > 0 and $passIndex <= $passes) {
+	print " - performing pass $passIndex of $passes\n" ;
+} else {
+	die " - passIndex must be a number between 1 and $passes\n" ;
+}
+
+if ($log) {
+	print " - problems will be logged to \"occurrences.log\" in the data directory you specified\n" ;
+}
+
+if (not defined $languageFile) {
+	$languageFile = "./languages.xml" ;
+} 
+print " - language dependant variables will be loaded from \"$languageFile\"\n" ;
+
+
+#get data directory and dump file ==========================================================================
+
+my $data_dir = shift(@ARGV) or die " - you must specify a writable directory containing a single WikiMedia dump file\n" ;
+
+my $dump_file ;
+my @files = <$data_dir/*>;
+foreach my $file (@files) {
+	if ($file =~ m/pages-articles.xml/i) {
+		if (defined $dump_file) {
+			die " - '$data_dir' contains multiple dump files\n" ;
+		} else {
+			$dump_file = $file ;
 		}
-
-    my $work_done = $parts_done/$parts_total ;    
-    my $time_elapsed = time - $start_time ;
-    my $time_expected = (1/$work_done) * $time_elapsed ;
-    my $time_remaining = $time_expected - $time_elapsed ;
-    $last_report_time = time ;
-
-		#clear 
-    if (defined $msg) {
-			$msg =~ s/./\b/g ;
-			print $msg ;
-    }
-    
-    #flush output, so we definitely see this message
-    $| = 1 ;
-    
-    if ($parts_done >= $parts_total) {
-    	$msg = $message.": done in ".format_time($time_elapsed)."                          " ;
-    } else {
-    	$msg = $message.": ".format_percent($work_done)." in ".format_time($time_elapsed).", ETA:".format_time($time_remaining) ;
-    }
-    
-    print $msg ;
 	}
+}
+
+if (not defined $dump_file) {
+	die " - '$data_dir' does not contain a WikiMedia dump file\n" ;
+}
+
+
+
+
+# get namespaces ===========================================================================================
+
+my %namespaces = () ;
+my $categoryPrefix ;
+
+open(DUMP, $dump_file) or die "dump file '$dump_file' is not readable.\n" ;
+binmode(DUMP, ':utf8');
+	
+while (defined (my $line = <DUMP>)) {
+
+	$line =~ s/\s//g ;  #clean whitespace
+
+	if ($line =~ m/<\/namespaces>/i) {
+		last ;
+	}
+		
+	if ($line =~ m/<namespaceKey=\"(\d+)\">(.*)<\/namespace>/i){
+		$namespaces{lc($2)} = $1 ;
+			
+		if ($1 == 14) {
+			$categoryPrefix = $2 ;
+		}
+	}
+		
+	if ($line =~ m/<namespaceKey=\"(\d+)\"\/>/i) {
+		$namespaces{""} = $1 ;
+	}
+}
+close DUMP ;
+
+
+# language dependent variables =========================================================================
+
+my $languageCode = getLanguageCode($dump_file) ;
+my @langVariables = &getLanguageVariables($languageFile, $categoryPrefix, $languageCode);
+  
+my $langName = $langVariables[0] ;
+my $root_category = $langVariables[1] ;
+my $dt_test = $langVariables[2] ;
+my $dc_test = $langVariables[3] ;
+
+
+# logging===============================================================================================
+
+if($log) {
+	Stripper::setLogfile("$data_dir/occurrences.log") ;
+}
+
+
+# get the vocabulary of anchors that we are interested in ==============================================
+
+my %anchorFreq = () ;			 #anchor text -> freq
+
+open(ANCHOR, "$data_dir/anchor.csv") || die "'$data_dir/anchor.csv' could not be found. You must run extractWikipediaData.pl first!\n" ;
+binmode(ANCHOR, ':utf8') ;
+
+my $pm = ProgressMonitor->new(-s "$data_dir/anchor.csv", "Loading anchor vocabulary") ;
+my $parts_done = 0 ;
+
+while (defined(my $line=<ANCHOR>)) {
+	$parts_done = $parts_done + length $line ;
+
+	chomp($line) ;
+		
+	if ($line =~ m/(.+?),(\d+),(\d+)(,\d+)?/) {
+		my $anchor = unescape($1) ;
+		my $id = $2 ;
+		my $count = $3 ;
+		
+		$anchor = decode_utf8($anchor) ;		
+		$anchorFreq{$anchor} = 0 ;
+	}
+	$pm->update($parts_done) ;
+}
+close ANCHOR ;
+
+$pm->done() ; 
+
+
+# now measure how many wikipedia articles they are found in =============================================
+
+$pm = ProgressMonitor->new(-s $dump_file, "Gathering anchor occurances") ;
+
+my $pages = Parse::MediaWikiDump::Pages->new($dump_file) ;
+my $page ;
+
+while(defined($page = $pages->page)) {
+
+	$pm->update($pages->current_byte) ;
+
+	my $id = int($page->id) ;
+	
+	if ($id % $passes == $passIndex) {
+		#only process pages that are valid for this pass
+		
+		my $title = $page->title ;
+		
+		my $namespace = $page->namespace;
+		my $namespace_key = $namespaces{lc($namespace)} ;
+			   
+		# check if namespace is valid
+		if ($page->namespace ne "" && defined $namespace_key) {
+			$title = substr $title, (length $page->namespace) + 1;
+		} else {
+			$namespace = "" ;
+			$namespace_key = 0 ;
+		}
+	
+		#only process articles (and disambig pages)
+		if ($namespace_key==0 and not defined $page->redirect) {
+			
+			#only interested in first ngram occurance in each document.
+			my %ngrams_seen = () ;
+			
+			my $textRef = $page->text ;
+			my $text = $$textRef ;
+			
+			$text = Stripper::stripToPlainText($text) ;
+			
+			#it is a little tricky to decide wheither an ngram can span a line break. 
+
+			$text =~ s/\n\s*\n/\n\n/g ; #collapse whitespace if it is the only thing found between two linebreaks
+			$text =~ s/(?<!\n)\n(?!\n)/ /g ;  #replace isolated line breaks with spaces			
+			$text =~ s/ {2,}/ /g ;  #collapse multiple spaces
+			
+			#now process text one line at a time
+			while($text =~ m/(.*?)\n/gi) {		
+				gather_ngrams($1, \%ngrams_seen) ;	
+			}
+		}
+	} 
+}
+
+
+sub gather_ngrams {
+	
+	my $text = shift ;
+	$text = "\$ $text \$" ;
+	
+	my $ref = shift ;
+	my %ngrams_seen = %$ref ;	
+	
+	#gather all positions where ngrams could possibly split on
+	my @splits = () ;
+	while ($text =~ m/([\s\{\}\(\)\[\]\<\>\\\"\'\.\,\!\;\:\-\_\#\@\%\^\&\*\~\|])/g) {	
+		push(@splits, pos($text) -1) ;
+	}
+	
+	for (my $i=0 ; $i<scalar(@splits) ; $i++) {
+
+		my $startIndex = $splits[$i] + 1 ;
+		
+		for (my $j=min($i + $max_ngram_length, scalar(@splits)-1) ; $j > $i ; $j--) {
+			my $currIndex = $splits[$j] ;	
+			my $ngram = substr($text, $startIndex, $currIndex-$startIndex) ;
+			$ngram =~ s/^\s+|\s+$//g;
+			
+			if ($ngram eq "") { 
+				next ; 
+			}
+			
+			if (length($ngram)==1 && substr($text, $startIndex-1, 1) eq "'") {
+				next ;
+			} 
+			
+			if (defined $ngrams_seen{$ngram}) {
+				next ;
+			}
+		  	
+		  	my $freq = $anchorFreq{$ngram} ;
+			
+		  	if (defined $freq) {
+				$anchorFreq{$ngram} = $freq + 1 ;
+		  	}
+		  	
+		  	$ngrams_seen{$ngram} = 1 ;
+		}
+	}
+}
+
+
+# text cleaning stuff ======================================================================================
+
+
+# escape newlines and quotes; the only two characters which would screw up importing data into mysql.
+sub escape {
+	
+	my $text = shift ;
+	
+	$text =~ s/\n/\\n/g ;
+	$text =~ s/\r/\\r/g ;
+	$text =~ s/\"/\\"/g ;
+	
+	return $text ;
+}
+
+# unescape newlines and quotes; the only two characters which would screw up importing data into mysql.
+sub unescape {
+	
+	my $text = shift ;
+	
+	$text =~ s/\\n/\n/g ;
+	$text =~ s/\\r/\r/g ;
+	$text =~ s/\\"/\"/g ;
+	
+	return $text ;
+}
+
+
