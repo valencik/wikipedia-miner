@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<WikipediaLanguageList>
+
+	<Language code="en" name="English" localName="English">
+
+		<RootCategory>fundamental</RootCategory>
+		
+		<DisambiguationCategory>disambiguation</DisambiguationCategory>
+		
+		<DisambiguationTemplate>disambiguation</DisambiguationTemplate>
+		<DisambiguationTemplate>disambig</DisambiguationTemplate>
+		<DisambiguationTemplate>disambig-cleanup</DisambiguationTemplate>
+		<DisambiguationTemplate>geodis</DisambiguationTemplate>
+		<DisambiguationTemplate>hndis</DisambiguationTemplate>
+		<DisambiguationTemplate>hndis-cleanup</DisambiguationTemplate>
+		<DisambiguationTemplate>hospitaldis</DisambiguationTemplate>
+		<DisambiguationTemplate>mathdab</DisambiguationTemplate>
+		<DisambiguationTemplate>mountianindex</DisambiguationTemplate>
+		<DisambiguationTemplate>numberdis</DisambiguationTemplate>
+		<DisambiguationTemplate>roaddis</DisambiguationTemplate>
+		<DisambiguationTemplate>schooldis</DisambiguationTemplate>
+		<DisambiguationTemplate>shipindex</DisambiguationTemplate>
+		<DisambiguationTemplate>SIA</DisambiguationTemplate>
+
+	</Language>
+
+
+	<Language code="simple" name="Simple English" localName="Simple English">
+
+		<RootCategory>fundamental</RootCategory>
+
+		<DisambiguationCategory>disambiguation</DisambiguationCategory>
+
+		<DisambiguationTemplate>disambiguation</DisambiguationTemplate>
+		<DisambiguationTemplate>disambig</DisambiguationTemplate>
+		<DisambiguationTemplate>2CC</DisambiguationTemplate>
+		<DisambiguationTemplate>3CC</DisambiguationTemplate>
+		<DisambiguationTemplate>hndis</DisambiguationTemplate>
+		
+	</Language>
+
+
+	<Language code="it" name="Italian" localName="Italiano">
+
+		<RootCategory>enciclopedia</RootCategory>
+
+		<DisambiguationCategory>disambigua</DisambiguationCategory
+
+		<DisambiguationTemplate>disambigua</DisambiguationTemplate>
+		<DisambiguationTemplate>sigla2</DisambiguationTemplate>
+		<DisambiguationTemplate>sigla3</DisambiguationTemplate>
+		<DisambiguationTemplate>sigla4</DisambiguationTemplate>
+
+	</Language>
+
+
+	<Language code="de" name="German" localName="Deutsch">
+
+		<RootCategory></RootCategory>
+
+		<DisambiguationCategory></DisambiguationCategory>
+
+		<DisambiguationTemplate></DisambiguationTemplate>
+
+	</Language>
+
+
+	<Language code="fr" name="French" localName="Français">
+
+		<RootCategory>Espace_encyclopédique</RootCategory>
+
+		<DisambiguationCategory>homonymie</DisambiguationCategory>
+		<DisambiguationCategory>homonymie dynastique</DisambiguationCategory>
+		<DisambiguationCategory>homonymie de personnes</DisambiguationCategory>
+		<DisambiguationCategory>homonymie d'arrondissements</DisambiguationCategory>
+		<DisambiguationCategory>homonymie de cantons</DisambiguationCategory>
+		<DisambiguationCategory>homonymie d'unités militaires</DisambiguationCategory>
+		<DisambiguationCategory>homonymie de patronyme</DisambiguationCategory>
+		<DisambiguationCategory>homonymie de toponyme</DisambiguationCategory>
+		<DisambiguationCategory>homonymie de prénom</DisambiguationCategory>
+		<DisambiguationCategory>homonymie d'acronyme</DisambiguationCategory>
+
+		<DisambiguationTemplate>bandeau standard pour page d'homonymie</DisambiguationTemplate>
+		<DisambiguationTemplate>homonymie</DisambiguationTemplate>
+		<DisambiguationTemplate>toponymie</DisambiguationTemplate>
+		<DisambiguationTemplate>paronymie</DisambiguationTemplate>
+		<DisambiguationTemplate>batailles homonymes</DisambiguationTemplate>
+		<DisambiguationTemplate>homonymie bateau</DisambiguationTemplate>
+		<DisambiguationTemplate>homonymie de clubs sportifs</DisambiguationTemplate>
+		<DisambiguationTemplate>homonymie de comtés</DisambiguationTemplate>
+		<DisambiguationTemplate>homonymie dynastique</DisambiguationTemplate>
+		<DisambiguationTemplate>gouvernements homonymes</DisambiguationTemplate>
+		<DisambiguationTemplate>internationalisation</DisambiguationTemplate>
+		<DisambiguationTemplate>isomérie/2</DisambiguationTemplate>
+		<DisambiguationTemplate>homonymie de ligne</DisambiguationTemplate>
+		<DisambiguationTemplate>homonymie de nom romain</DisambiguationTemplate>
+		<DisambiguationTemplate>patronyme</DisambiguationTemplate>
+		<DisambiguationTemplate>personnes homonymes</DisambiguationTemplate>
+		<DisambiguationTemplate>saints homonymes</DisambiguationTemplate>
+		<DisambiguationTemplate>unités homonymes</DisambiguationTemplate>
+		<DisambiguationTemplate>villes homonymes</DisambiguationTemplate>
+		<DisambiguationTemplate>arrondissements homonymes</DisambiguationTemplate>
+		<DisambiguationTemplate>cantons homonymes</DisambiguationTemplate>
+
+	</Language>
+
+
+	<Language code="ro" name="Romanian" localName="RomÃ¢nÄ">
+
+		<RootCategory>fundament</RootCategory>
+
+		<DisambiguationCategory>dezambiguizare</DisambiguationCategory>
+
+		<DisambiguationTemplate>dezambiguizare</DisambiguationTemplate>
+
+	</Language>
+
+
+	<Language code="ru" name="Russian" localName="Русский">
+		<RootCategory>Статьи</RootCategory>
+		<DisambiguationCategory>Многозначные_термины</DisambiguationCategory>
+		<DisambiguationTemplate>Неоднозначность</DisambiguationTemplate>
+	</Language>
+
+
+	<Language code="ua" name="Ukrainian" localName="Українська">
+		<RootCategory>Головна</RootCategory>
+		<DisambiguationCategory>Шаблони:Багатозначні_терміни</DisambiguationCategory>
+		<DisambiguationTemplate>Disambig</DisambiguationTemplate>
+	</Language>
+	
+	
+	<Language code="nl" name="Dutch" localName="Nederlands">
+
+		<RootCategory>Fundamental</RootCategory>
+
+		<DisambiguationCategory>Wikipedia:Doorverwijspagina</DisambiguationCategory>
+
+		<DisambiguationTemplate>Dp</DisambiguationTemplate>
+
+	</Language>
+	
+	
+	<Language code="ja" name="Japanese" localName="日本語">
+
+		<RootCategory>総記</RootCategory>
+
+		<DisambiguationCategory>曖昧さ回避</DisambiguationCategory>
+
+		<DisambiguationTemplate>aimai</DisambiguationTemplate>
+    <DisambiguationTemplate>曖昧さ回避</DisambiguationTemplate>
+
+	</Language>
+	
+	
+	<Language code="zh" name="Chinese" localName="中文">
+
+		<RootCategory></RootCategory>
+
+		<DisambiguationCategory></DisambiguationCategory>
+
+		<DisambiguationTemplate></DisambiguationTemplate>
+
+	</Language>
+	
+	
+	<Language code="id" name="Indonesian" localName="Bahasa Indonesia">
+
+		<RootCategory>Utama</RootCategory>
+
+		<DisambiguationCategory>Disambiguasi</DisambiguationCategory>
+
+		<DisambiguationTemplate>disambig</DisambiguationTemplate>
+
+  </Language>
+  
+  
+	<Language code="ms" name="Malay" localName="Bahasa Melayu">
+
+		<RootCategory>Asas</RootCategory>
+
+		<DisambiguationCategory>Nyahkekaburan</DisambiguationCategory>
+
+		<DisambiguationTemplate>disambig</DisambiguationTemplate>
+		<DisambiguationTemplate>geodis</DisambiguationTemplate>
+		<DisambiguationTemplate>disambiguation</DisambiguationTemplate>
+
+	</Language>
+	
+
+	<Language code="su" name="Sundanese" localName="Basa Sunda">
+
+		<RootCategory>Utami</RootCategory>
+
+		<DisambiguationCategory>Disambiguasi</DisambiguationCategory>
+
+		<DisambiguationTemplate>disambig</DisambiguationTemplate>
+		<DisambiguationTemplate>Base_disambig</DisambiguationTemplate>
+
+	</Language>
+	
+	
+	<Language code="jv" name="Javanese" localName="Basa Jawa">
+
+		<RootCategory>Kategori Utama</RootCategory>
+
+		<DisambiguationCategory>Disambiguasi</DisambiguationCategory>
+
+		<DisambiguationTemplate>disambig</DisambiguationTemplate>
+
+	</Language>
+	
+	
+	<Language code="ta" name="Tamil" localName="தமிழ்">
+
+		<RootCategory></RootCategory>
+
+		<DisambiguationCategory></DisambiguationCategory>
+
+		<DisambiguationTemplate></DisambiguationTemplate>
+
+	</Language>	
+	
+
+</WikipediaLanguageList>
