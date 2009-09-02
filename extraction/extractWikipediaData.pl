@@ -17,7 +17,6 @@ use strict ;
 use Parse::MediaWikiDump;	
 use Getopt::Long ;
 use File::Basename;
-use Encode ;
 
 use ProgressMonitor ;
 use Splitter ;
@@ -164,7 +163,7 @@ print ("done!\n") ;
 
 # page summary =========================================================================================
 
-my @ids = () ;		  #ordered array of page ids
+#my @ids = () ;		  #ordered array of page ids
 my %pages_ns0 = () ;	#case normalized title -> id
 my %pages_ns14 = () ;   #case normalized title -> id
 	
@@ -198,15 +197,28 @@ sub readPageSummaryFromCsv {
 			my $page_type = int $3 ;
 			
 			
+			
 			#$page_title = decode_utf8($page_title) ;
-			$page_title = normalizeTitle($page_title) ;
-				
-			push(@ids, $page_id) ;
-				
+			my $normalizedTitle = normalizeTitle($page_title) ;
+			
+			#print("$page_id ; $normalizedTitle ; $page_type\n") ;
+			
+			#push(@ids, $page_id) ;
+			
+			
 			if ($page_type == 2) {
-				$pages_ns14{$page_title} = $page_id ;
+				$pages_ns14{$normalizedTitle} = $page_id ;
 			} else {
-				$pages_ns0{$page_title} = $page_id ;	
+				my $existing_id = $pages_ns0{$normalizedTitle} ;
+				
+				if (defined $existing_id) {
+					if ($page_type != 3) {
+						# only replace with non-redirect
+						$pages_ns0{$normalizedTitle} = $page_id ; 
+					}
+				} else {
+					$pages_ns0{$normalizedTitle} = $page_id ;
+				}
 			}
 		} else {
 			logProblem("\"$line\" does not match our expected format for lines in \"page.csv\"") ;			
@@ -495,12 +507,14 @@ sub extractCoreSummariesFromDump {
 		my $id = int($page->id) ;
 		my $title = $page->title ;
 		
+		Stripper::setCurrDoc("$id:$title") ;
+		
 		
 		my $namespace = $page->namespace;
 		my $namespace_key = $namespaces{lc($namespace)} ;
 		
 		
-		my %seenAnchors = () ;
+		#my %seenAnchors = () ;
 		   
 		# check if namespace is valid
 		if ($page->namespace ne "" && defined $namespace_key) {
@@ -589,7 +603,7 @@ sub extractCoreSummariesFromDump {
 						if (defined $target_id) {
 							print PAGELINK "$id,$target_id,$start\n" ;
 
-							if (not $seenAnchors{"$anchor_text:$target_id"}) {
+							#if (not $seenAnchors{"$anchor_text:$target_id"}) {
 								# we have not seen this anchor -> destination combination in this document before.
 							
 								#save this anchor:dest combination as a two element array, with count as first element, and flag (0) as seccond
@@ -607,8 +621,11 @@ sub extractCoreSummariesFromDump {
 		 
 								$anchors{"$anchor_text:$target_id"} = \@array ;
 								
-								$seenAnchors{"$anchor_text:$target_id"} = 1 ;
-							}
+								logProblem("saving $anchor_text:$target_id, $array[0]") ;
+								
+								logProblem("anchor hash size: " . keys( %anchors ) . "\n");  
+								
+								#$seenAnchors{"$anchor_text:$target_id"} = 1 ;
 						} else {
 							logProblem("could not resolve page link to $target_title") ;
 						}
@@ -623,7 +640,7 @@ sub extractCoreSummariesFromDump {
 						} else {
 							logProblem("could not resolve category link to $target_title") ;
 						}
-					}  
+					}
 				} 
 			}
 		}
@@ -637,6 +654,7 @@ sub extractCoreSummariesFromDump {
 	close EQUIVALENCE ;
 	close STRUCTURE ;
 	
+	logProblem("anchor hash size after gathering all links: " . keys( %anchors ) . "\n");  
 	
 	
 	#now flag any anchor:dest combinations that are mirrored by redirects or article titles, and add titles and redirects if they havent been used as anchors yet.
@@ -708,6 +726,8 @@ sub extractCoreSummariesFromDump {
 	$pm->done() ;
 	close PAGE ;
 	
+	logProblem("anchor hash size after adding titles and redirects: " . keys( %anchors ) . "\n");  
+	
 	#now we need to save the anchors we have gathered
 	
 	$pm = ProgressMonitor->new($anchorCount, " - saving anchors") ;
@@ -718,7 +738,7 @@ sub extractCoreSummariesFromDump {
 	while (my ($key, $ref) = each(%anchors)) {
 		$parts_done++ ;
 	
-		if ($key =~ m/\"(.+?)\":(\d+)/) {
+		if ($key =~ m/(.+?):(\d+)/) {
 			my $anchor = $1 ;
 			my $target_id = $2 ;
 			
@@ -762,18 +782,29 @@ sub save_progress() {
 
 # text cleaning stuff ======================================================================================
 
+sub normalizeAnchor {
+	my $anchor = shift ;
+	
+	$anchor =~ s/\s{2,}/ /g;  			#collapse multiple spaces
+	$anchor =~ s/^\s+|\s+$//g;  			#remove leading & trailing spaces
+	
+	return $anchor;
+}
+
+
+
 # normalizes the given page title so that it will be matched to entries saved in the page table 
 sub normalizeTitle {  
 	my $title = shift ;
-	my $normalizedTitle = $title ;
+		
+	$title =~ s/_+/ /g; 				#replace underscores with spaces
+	$title =~ s/\s{2,}/ /g;  			#collapse multiple spaces
+	$title =~ s/\#.+//; 				#remove page-internal part of link (the bit after the #)
+	$title =~ s/^\s+|\s+$//g;  			#remove leading & trailing spaces
 	
-	$normalizedTitle =~ s/_+/ /g; 				#replace underscores with spaces
-	$normalizedTitle =~ s/\s{2,}/ /g;  			#collapse multiple spaces
-	$normalizedTitle =~ s/\#.+//; 				#remove page-internal part of link (the bit after the #)
-	$normalizedTitle =~ s/^\s+|\s+$//g;  			#remove leading & trailing spaces
-	$normalizedTitle =~ s/(\w)(\w*)/\u$1$2/g;		#make first letter of every word uppercase
+	$title =~ s/^(\w)/\u$1/g;		#make first letter of first word uppercase
 	
-	return $normalizedTitle;
+	return $title;
 }
 
 
@@ -786,11 +817,11 @@ sub resolve_link {
     my $target_id ;
 
     if ($namespace == 0) {
-		$target_id = $pages_ns0{normalizeTitle($title)} ;
+		$target_id = $pages_ns0{$title} ;
     }
 
     if ($namespace == 14) {
-		$target_id = $pages_ns14{normalizeTitle($title)} ;
+		$target_id = $pages_ns14{$title} ;
     }
 
     my %redirects_seen = () ;
