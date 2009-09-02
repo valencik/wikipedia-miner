@@ -168,82 +168,9 @@ sub stripInternalLinks {
 	
 	my @regions = gatherComplexRegions(\$text, "\\[\\[", "\\]\\]") ;
 	
-	my $strippedText = "" ;
-	my $lastPos = length($text) ;
+	my $clearedText = stripRegions(\$text, \@regions, $replacementChar) ;
 	
-	#because regions are sorted by end position, we work backwards through them
-	my $i = @regions ;
-	
-	while ($i > 0) {
-		$i -- ;
-		
-		my $start = $regions[$i][0] ;
-		my $end = $regions[$i][1] ;
-				
-		#only deal with this region is not within a region we have already delt with. 
-		if ($start < $lastPos) {
-			
-			#copy everything between this region and start of last one we dealt with. 
-			$strippedText = substr($text, $end, $lastPos-$end) . $strippedText ;
-			
-			my $linkMarkup = substr($text, $start, $end-$start) ;
-					
-			#print("link [$start,$end] = $linkMarkup\n\n") ;
-					
-			# by default (if anything goes wrong) we will keep the link as it is
-			my $strippedLinkMarkup = $linkMarkup ;
-					
-			if ($linkMarkup =~ m/^\[\[(.*?:)?(.*?)(\|.*?)?\]\]$/s) {
-						
-				my $prefix = $1 ;
-				my $dest = $2 ;
-				my $anchor = $3 ;
-				
-				if (defined $prefix) {
-					# this is not a link to another article, so get rid of it entirely
-					if (defined $replacementChar && not $replacementChar eq "") {
-						$strippedLinkMarkup = sprintf("%*s", $end-$start, '') ;			
-					} else {
-						$strippedLinkMarkup = "" ;
-					}
-				} else {
-					if (defined $anchor) {
-						#this has an anchor defined, so use that but blank out everything else
-						
-						if ($replacementChar) {
-							$strippedLinkMarkup = sprintf("%*s", 2+length($dest)+1, '') . substr($anchor, 1) . sprintf("%*s", 2, '') ;
-						} else {
-							$strippedLinkMarkup = substr($anchor, 1)
-						}
-					} else {
-						#this has no anchor defined, so treat dest as anchor and blank out everything else
-
-						if ($replacementChar) {
-							$strippedLinkMarkup = sprintf("%*s", 2, '') . $dest . sprintf("%*s", 2, '') ;
-						} else {
-							$strippedLinkMarkup = $dest ;
-						}
-					}
-				}
-				
-				if (not $replacementChar eq " ") {
-					$strippedLinkMarkup =~ s/ /$replacementChar/g ;					
-				}
-				
-			} else {
-				logProblem("our pattern for delimiting links has a problem") ;
-			}
-			
-			$strippedText = $strippedLinkMarkup . $strippedText ;
-			$lastPos = $start ;
-		}
- 	}	
- 	
- 	if ($lastPos > 0) {
- 		$strippedText = substr($text, 0, $lastPos) . $strippedText ;
- 	}
-		
-	return $strippedText ; 	
+	return $clearedText ;
 }
 
 =item * stripToPlainText($text)
@@ -408,11 +335,11 @@ sub gatherHTML {
 	my @regions = gatherReferences($textRef, "\\<(.*?)\\>") ;
 	
 	#gather <div> </div> pairs
-	my @regions = gatherComplexRegions($textRef, "\\<div(\\s*?)([^>\\/]*?)\\>", "\\<\\/div(\\s*?)\\>") ;
-	#@regions = mergeRegionLists(\@regions, \@tmpRegions) ;
+	my @tmpRegions = gatherComplexRegions($textRef, "\\<div(\\s*?)([^>\\/]*?)\\>", "\\<\\/div(\\s*?)\\>") ;
+	@regions = mergeRegionLists(\@regions, \@tmpRegions) ;
 	
 	#gather remaining tags
-	my @tmpRegions = gatherSimpleRegions($textRef, "\\<(.*?)\\>") ;
+	@tmpRegions = gatherSimpleRegions($textRef, "\\<(.*?)\\>") ;
 	@regions = mergeRegionLists(\@regions, \@tmpRegions) ;
 	
 	return @regions ;
