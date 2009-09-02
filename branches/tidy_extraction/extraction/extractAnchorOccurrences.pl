@@ -34,7 +34,7 @@ use strict ;
 use Parse::MediaWikiDump;	
 use Getopt::Long ;
 use File::Basename;
-use Encode ;
+
 
 use ProgressMonitor ;
 use Stripper ;
@@ -57,7 +57,7 @@ if (!defined $passes) {
 }
 
 if (!defined $passIndex) {
-	die "You must specify currPass=<num> ; the index (a number between 1 and $passes) of the pass to perform.\n" ; 
+	die "You must specify passIndex=<num> ; the index (a number between 1 and $passes) of the pass to perform.\n" ; 
 }
 
 if ($passIndex > 0 and $passIndex <= $passes) {
@@ -163,12 +163,11 @@ while (defined(my $line=<ANCHOR>)) {
 
 	chomp($line) ;
 		
-	if ($line =~ m/(.+?),(\d+),(\d+)(,\d+)?/) {
+	if ($line =~ m/\"(.+?)",(\d+),(\d+)(,\d+)?/) {
 		my $anchor = unescape($1) ;
 		my $id = $2 ;
 		my $count = $3 ;
 		
-		$anchor = decode_utf8($anchor) ;		
 		$anchorFreq{$anchor} = 0 ;
 	}
 	$pm->update($parts_done) ;
@@ -190,12 +189,12 @@ while(defined($page = $pages->page)) {
 	$pm->update($pages->current_byte) ;
 
 	my $id = int($page->id) ;
+	my $title = $page->title ;
 	
-	if ($id % $passes == $passIndex) {
+	Stripper::setCurrDoc("$id:$title") ;
+	
+	if ($id % $passes == ($passIndex-1)) {
 		#only process pages that are valid for this pass
-		
-		my $title = $page->title ;
-		
 		my $namespace = $page->namespace;
 		my $namespace_key = $namespaces{lc($namespace)} ;
 			   
@@ -207,7 +206,7 @@ while(defined($page = $pages->page)) {
 			$namespace_key = 0 ;
 		}
 	
-		#only process articles (and disambig pages)
+		#only process articles
 		if ($namespace_key==0 and not defined $page->redirect) {
 			
 			#only interested in first ngram occurance in each document.
@@ -215,6 +214,7 @@ while(defined($page = $pages->page)) {
 			
 			my $textRef = $page->text ;
 			my $text = $$textRef ;
+			
 			
 			$text = Stripper::stripToPlainText($text) ;
 			
@@ -231,6 +231,38 @@ while(defined($page = $pages->page)) {
 		}
 	} 
 }
+
+$pm->done() ;
+
+
+# now save the occurrence counts==========================================================================
+
+open(OCCURRENCES, "> $data_dir/anchor_occurrence_".$passIndex.".csv") ;
+binmode(OCCURRENCES, ':utf8');
+
+$pm = ProgressMonitor->new(scalar keys %anchorFreq, "Saving anchor occurrences") ; 
+$parts_done = 0 ;
+
+while (my ($anchor, $freq) = each(%anchorFreq) ) {
+	$pm->update() ;
+
+	print OCCURRENCES "\"$anchor\",$freq\n" ;
+}
+
+$pm->done() ;
+close(OCCURRENCES) ;
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 sub gather_ngrams {
@@ -280,6 +312,29 @@ sub gather_ngrams {
 }
 
 
+sub min {
+	
+	$a = shift ;
+	$b = shift ;
+	
+	if (defined $a and defined $b) {
+		if ($a < $b){
+			return $a ;
+		} else {
+			return $b ;
+		}
+	} else {
+		if (defined $a) {
+			return $a ;
+		} else {
+			return $b ;
+		}
+	}
+}
+
+
+
+
 # text cleaning stuff ======================================================================================
 
 
@@ -307,4 +362,100 @@ sub unescape {
 	return $text ;
 }
 
+# language dependent stuff =================================================================================
 
+sub getLanguageVariables($$) {
+	
+	my $fileName = shift ;
+	my $categoryPrefix = shift ;
+	my $languageCode = shift ;
+	
+	open(LANGUAGES, $fileName) or die "Could not locate language definition file '$fileName'" ;
+	binmode(LANGUAGES, ':utf8') ;
+		
+	my $languageData = "" ;
+		
+	while (defined (my $line = <LANGUAGES>)) { 
+		$languageData = "$languageData$line" ;
+	}
+	
+	close(LANGUAGES) ;
+		
+	while($languageData =~ m/<Language(.*?)>(.*?)<\/Language>/gis) {
+		
+		my $attributes = $1 ;
+		my $content = $2 ;
+			
+		my $code ;
+		if ($attributes =~ m/code\s*=\s*\"(.*?)\"/i) {
+			$code = $1 ;
+		}
+			
+		if (defined $code and $code eq $languageCode) { 
+		
+			my $name ;
+			if ($attributes =~ m/name\s*=\s*\"(.*?)\"/i) {
+				$name = $1 ;
+			}
+		
+			my $root_category ;
+			if ($content =~ m/<RootCategory>(.*?)<\/RootCategory>/i) {
+				$root_category = $1 ;
+			}
+			
+			my @disambig_categories = () ;
+			while($content =~ m/<DisambiguationCategory>(.*?)<\/DisambiguationCategory>/gis) {
+				push(@disambig_categories, $1) ;
+			}
+			
+			my @disambig_templates = () ;
+			while($content =~ m/<DisambiguationTemplate>(.*?)<\/DisambiguationTemplate>/gis) {
+				push(@disambig_templates, $1) ;
+			}
+			
+			if (not defined $name or not defined $root_category or not @disambig_categories or not @disambig_templates) {
+				die "language definition for $code is not valid" ;
+			}
+			
+			my @array = () ;
+			
+			push (@array, $name) ;
+			push (@array, $root_category) ;
+			
+			my $dt_test  ;
+			if (scalar @disambig_templates == 1) {
+				$dt_test = $disambig_templates[0] ;
+			}else {
+				$dt_test = "(".join("|", @disambig_templates).")" ;
+			}
+			$dt_test = "\\{\\{".lc($dt_test)."\\}\\}" ;
+			push (@array, $dt_test) ;		
+		
+			my $dc_test = join("|", @disambig_categories) ;	
+			if (scalar @disambig_categories == 1) {
+				$dc_test = $disambig_categories[0] ;
+			}else {
+				$dc_test = "(".join("|", @disambig_categories).")" ;
+			}
+			$dc_test = "\\[\\[".$categoryPrefix.":".lc($dc_test)."\\]\\]" ;
+			push (@array, $dc_test) ;
+			
+			return @array ;
+		}
+	}
+	die "could not find '$languageCode' language definition." ;
+}
+
+
+
+sub getLanguageCode {
+		
+	my $dump_name = fileparse(shift);
+				
+	if ($dump_name =~ m/^(.*?)wiki-(.*?)-pages-articles.xml$/i) {
+		return $1 ;
+	}
+		
+	print "Could not determine the language of this dump from it's filename, so we will assume it is an English one.\n" ;
+	return "en" ;
+}
