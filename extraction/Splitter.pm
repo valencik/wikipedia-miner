@@ -74,8 +74,8 @@ the paragraph, the last indicates the end of it, and the others indicate sentenc
 within it.
 
 Ideally, the document should have been processed beforehand using the Stripper to remove all
-markup other than section headers, list markers and links. If you want this structure string
-to be valid for the original, fully marked up document, then make sure the length of the 
+markup other than section headers, list markers and links between articles. If you want this 
+structure string to be valid for the original, fully marked up document, then make sure the length of the 
 string and the locations of unstripped characters is not modified by the Stripper 
 (use a space as the replacement character).
 
@@ -95,58 +95,79 @@ sub getStructureString {
 	
 	if (not defined $offset) {
 		$offset = 0 ;
-	}	
-	
-	
-	my @sectionBreaks = getSectionBreaks($text, $lvl) ;
-		
-	my $last_sb = 0 ;
-		
-	for my $sb (@sectionBreaks) {
-			
-		my $sectionText = substr($text, $last_sb, $sb - $last_sb) ; 
-				
-		if ($last_sb == 0) {
-			$structureString = $structureString . getStructureString($sectionText,$lvl+1, $offset + $last_sb) ;
-		} else {
-			$structureString = $structureString . "(" . getStructureString($sectionText,$lvl+1, $offset + $last_sb) . ")" ;
-		} 
-			
-		$last_sb = $sb ;
 	}
 	
-	if ($last_sb > 0) {
-		# this text had sections, and there is still text after the last section marker to deal with
+	if ($text =~ m/^(\s*={2,}\s*([^=]+)\s*={2,})?\s*(.*?)\s*$/s) {
+	
+		my $title = $2 ;
+		my $content = $3 ;
 		
-		my $sectionText = substr($text, $last_sb) ; 
-		$structureString = $structureString . "(" . getStructureString($sectionText,$lvl+1, $offset + $last_sb) . ")" ; 
-	} else {
-		# this text didn't have any sections, so lets split it into paragraphs and sentences
+		#print("sectionTitle:$2\n\n") ;
+		#print("sectionText:$3\n\n") ;
+		
+		
+		if (defined $title) {
+			#create a paragraph marker to show where to find section title
+			
+			$structureString = $structureString . "[" . ($offset + $-[2]) . "," . ($offset + $+[2]) . "]" ; 
+		}
+		
+		#skip ahead to ignore leading whitespace
+		$offset = $offset + $-[3] ;
+		
+		
+		
+		#recursively gather structure strings from subsections in content 
+		my @sectionBreaks = getSectionBreaks($content, $lvl) ;
+			
+		my $last_sb = 0 ;
+		for my $sb (@sectionBreaks) {
 				
-		my @paragraphBreaks = getParagraphBreaks($text) ;
+			my $sectionText = substr($content, $last_sb, $sb - $last_sb) ; 
+					
+			if ($last_sb == 0) {
+				$structureString = $structureString . getStructureString($sectionText,$lvl+1, $offset + $last_sb) ;
+			} else {
+				$structureString = $structureString . "(" . getStructureString($sectionText,$lvl+1, $offset + $last_sb) . ")" ;
+			} 
+				
+			$last_sb = $sb ;
+		}
 		
-		my $last_pb = 0 ;
-		
-		for my $pb (@paragraphBreaks) {
+		if ($last_sb > 0) {
+			# this text had sections, and there is still text after the last section marker to deal with
 			
-			my $paragraphText = substr($text, $last_pb, $pb-$last_pb) ;
-			my @sentenceBreaks = getSentenceBreaks($paragraphText) ;
+			my $sectionText = substr($content, $last_sb) ; 
+			$structureString = $structureString . "(" . getStructureString($sectionText,$lvl+1, $offset + $last_sb) . ")" ; 
+		} else {
+			# this text didn't have any sections, so lets split it into paragraphs and sentences
+					
+			my @paragraphBreaks = getParagraphBreaks($content) ;
+			push (@paragraphBreaks, length($content)) ;
 			
-			#positions of sentence breaks are relative to paragraph. make them relative to start of document
-			for (my $i=0 ; $i<@sentenceBreaks ; $i++) {
-				$sentenceBreaks[$i] += $offset + $last_pb ;
+			my $last_pb = 0 ;
+			
+			for my $pb (@paragraphBreaks) {
+				
+				my $paragraphText = substr($content, $last_pb, $pb-$last_pb) ;
+				my @sentenceBreaks = getSentenceBreaks($paragraphText) ;
+				
+				#positions of sentence breaks are relative to paragraph. make them relative to start of document
+				for (my $i=0 ; $i<@sentenceBreaks ; $i++) {
+					$sentenceBreaks[$i] += $offset + $last_pb ;
+				}
+				
+				#add start of paragraph
+				unshift(@sentenceBreaks, $offset+$last_pb) ;
+				
+				#add end of paragraph
+				push(@sentenceBreaks, $offset + $last_pb + length($paragraphText)) ;
+				
+				
+				$structureString = $structureString . "[" . join(",", @sentenceBreaks) . "]" ;
+				
+				$last_pb = $pb ;
 			}
-			
-			#add start of paragraph
-			unshift(@sentenceBreaks, $offset+$last_pb) ;
-			
-			#add end of paragraph
-			push(@sentenceBreaks, $offset + $last_pb + length($paragraphText)) ;
-			
-			
-			$structureString = $structureString . "[" . join(",", @sentenceBreaks) . "]" ;
-			
-			$last_pb = $pb ;
 		}
 	}
 		
