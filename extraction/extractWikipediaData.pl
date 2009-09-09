@@ -247,7 +247,7 @@ sub extractPageSummaryFromDump() {
 	my $pages = Parse::MediaWikiDump::Pages->new($dump_file) ;
 	my $page ;
 
-	while(defined($page = $pages->page)) {
+	while(defined($page = $pages->next())) {
 	
 		$pm->update($pages->current_byte) ;
 
@@ -385,7 +385,7 @@ sub extractRedirectSummaryFromDump {
 	my $pages = Parse::MediaWikiDump::Pages->new($dump_file) ;
 	my $page ;
 
-	while(defined($page = $pages->page)) {
+	while(defined($page = $pages->next())) {
 
 		$pm->update($pages->current_byte) ;
 
@@ -498,9 +498,9 @@ sub extractCoreSummariesFromDump {
 	my $page ;
 	
 	my %anchors = () ;  #\"anchor\":id -> (freq:flag)
-	my $anchorCount = 0 ;
+	my $anchorDestCount = 0 ;
 
-	while(defined($page = $pages->page)) {
+	while(defined($page = $pages->next())) {
 	
 		$pm->update($pages->current_byte) ;
 			
@@ -514,7 +514,7 @@ sub extractCoreSummariesFromDump {
 		my $namespace_key = $namespaces{lc($namespace)} ;
 		
 		
-		#my %seenAnchors = () ;
+		my %seenAnchors = () ;
 		   
 		# check if namespace is valid
 		if ($page->namespace ne "" && defined $namespace_key) {
@@ -539,10 +539,15 @@ sub extractCoreSummariesFromDump {
 			my $text = $$textRef ;
 			
 			my $stripped_text = Stripper::stripAllButLinks($text, " ") ;
+			if (length($stripped_text) != length($text)) {
+				logProblem("Stripped version of $id:$title is not the same length as the original") ;
+			}
+			
 						
 			#gather structure
-			#my $structure = Splitter::getStructureString($stripped_text) ;
-			#print STRUCTURE "$id,\"$structure\"\n" ;
+			my $text_noNonArticleLinks = Stripper::stripNonArticleInternalLinks($stripped_text, " ") ;
+			my $structure = Splitter::getStructureString($text_noNonArticleLinks) ;
+			print STRUCTURE "$id,\"$structure\"\n" ;
 
 			#gather links
 			my @linkRegions = Stripper::gatherInternalLinks(\$stripped_text) ;
@@ -603,29 +608,33 @@ sub extractCoreSummariesFromDump {
 						if (defined $target_id) {
 							print PAGELINK "$id,$target_id,$start\n" ;
 
-							#if (not $seenAnchors{"$anchor_text:$target_id"}) {
-								# we have not seen this anchor -> destination combination in this document before.
-							
-								#save this anchor:dest combination as a two element array, with count as first element, and flag (0) as seccond
-								my $ref = $anchors{"$anchor_text:$target_id"} ;
-								my @array ;
-					
-								if (defined $ref) {
-									@array = @{$ref} ;
-								}else {
-									@array = (0,0) ;
-									$anchorCount ++ ;
-								}
+							#save this anchor:dest combination as a three element array, with total count as first element, distinct count as 2nd element and flag (0) as third
+							my $ref = $anchors{"$anchor_text:$target_id"} ;
+							my @array ;
+				
+							if (defined $ref) {
+								@array = @{$ref} ;
+							}else {
+								@array = (0,0,0) ;
+								$anchorDestCount ++ ;
+							}
+ 
+ 							#increment total count
+	 						$array[0] = $array[0] + 1 ;
+	 						
+	 						if (not $seenAnchors{"$anchor_text:$target_id"}) {
+	 							#increment distinct count
+	 							$array[1] = $array[1] + 1 ;
+	 							$seenAnchors{"$anchor_text:$target_id"} = 1 ;
+	 						}
 	 
-		 						$array[0] = $array[0] + 1 ;
-		 
-								$anchors{"$anchor_text:$target_id"} = \@array ;
-								
-								logProblem("saving $anchor_text:$target_id, $array[0]") ;
-								
-								logProblem("anchor hash size: " . keys( %anchors ) . "\n");  
-								
-								#$seenAnchors{"$anchor_text:$target_id"} = 1 ;
+							$anchors{"$anchor_text:$target_id"} = \@array ;
+							
+							logProblem("saving $anchor_text:$target_id, $array[0]") ;
+							
+							logProblem("anchor hash size: " . keys( %anchors ) . "\n");  
+							
+							#$seenAnchors{"$anchor_text:$target_id"} = 1 ;
 						} else {
 							logProblem("could not resolve page link to $target_title") ;
 						}
@@ -710,11 +719,11 @@ sub extractCoreSummariesFromDump {
 				if (defined $ref) {
 					#this has already been used as an anchor, needs to be flagged.
 					@array = @{$ref} ;
-					$array[1] = $flag ;					
+					$array[2] = $flag ;					
 				}else {
-					#this has never been used as an anchor
-					$anchorCount ++ ;
-					@array = (0,$flag) ;
+					#this has never been used as an anchor, needs to be added.
+					@array = (0,0,$flag) ;
+					$anchorDestCount++ ;
 				}
 	 
 	 			$anchors{"$page_title:$page_id"} = \@array ;
@@ -729,8 +738,7 @@ sub extractCoreSummariesFromDump {
 	logProblem("anchor hash size after adding titles and redirects: " . keys( %anchors ) . "\n");  
 	
 	#now we need to save the anchors we have gathered
-	
-	$pm = ProgressMonitor->new($anchorCount, " - saving anchors") ;
+	$pm = ProgressMonitor->new($anchorDestCount, " - saving anchors") ;
 	
 	open(ANCHOR, "> $data_dir/anchor.csv") ;
 	binmode(ANCHOR, ':utf8');
@@ -743,7 +751,7 @@ sub extractCoreSummariesFromDump {
 			my $target_id = $2 ;
 			
 			my @array = @{$ref} ;
-			print ANCHOR "\"".escape($anchor)."\",$target_id,$array[0],$array[1]\n" ;
+			print ANCHOR "\"".escape($anchor)."\",$target_id,$array[0],$array[1],$array[2]\n" ;
 		}
 		$pm->update() ; 
 	}
