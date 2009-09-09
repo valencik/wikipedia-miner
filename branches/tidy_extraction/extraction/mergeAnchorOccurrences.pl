@@ -1,183 +1,158 @@
 	#!/usr/bin/perl -w
 
-	use strict ;
-	no warnings 'utf8';
+=head1 NAME
 
-	binmode(STDOUT, ':utf8');
+MergeAnchorOccurrences - Perl script for merging counts produced by extractAnchorOccurrences.pl 
 
-	my $data_dir = shift(@ARGV) or die "You must specify a writable data directory containing 'anchor.csv' and the various anchorOccurance files produced by extractAnchorOccurances\n" ;
-	my $file_count = int shift(@ARGV) or die "You must specify the number of files the data was split data into \n" ;
+=head1 DESCRIPTION
+
+This script merges the files produced by ...
+
+=cut
 	
-	# check that all files are there ===============================================================================================
+use strict ;
+
+use Parse::MediaWikiDump;	
+use Getopt::Long ;
+use File::Basename;
+
+
+use ProgressMonitor ;
+use Stripper ;
+
+binmode(STDOUT, ':utf8');
+
+#get options ===============================================================================================
+
+my $passes ;
+
+GetOptions("passes=i"=>\$passes);
+
+if (!defined $passes) {
+	die "You must specify passes=<num> ; the number of passes that the extractAnchorOccurrences task was split into.\n" ;
+}
+
+#get data directory and dump file ==========================================================================
+
+my $data_dir = shift(@ARGV) or die " - you must specify a writable directory containing a single WikiMedia dump file\n" ;
+
+for (my $i = 1 ; $i<=$passes ; $i++) {
 	
-	for (my $i = 0 ; $i<$file_count ; $i++) {
+	my $file = "$data_dir/anchor_occurrence_$i.csv" ;
 	
-		my $file = "$data_dir/anchor_occurance_$i.csv" ;
-		
-		if (not -e $file) {
-			die "'$file' is missing\n" ;
-		}
+	if (not -e $file) {
+		die "'$file' is missing\n" ;
 	}
+}
 	
-	# read anchors =================================================================================================================
+# read anchors =================================================================================================================
 	
-	my %link_counts = () ;
-	my %occ_counts = () ;
+my %anchorCounts = () ;
+	
+open(ANCHOR, "$data_dir/anchor.csv") || die "'$data_dir/anchor.csv' is missing\n" ;
+binmode(ANCHOR, ':utf8') ;
 
-	open(ANCHOR, "$data_dir/anchor.csv") || die "'$data_dir/anchor.csv' is missing\n" ;
-	binmode(ANCHOR, ':utf8') ;
+my $pm = ProgressMonitor->new(-s "$data_dir/anchor.csv", "Loading anchor vocabulary") ;
+my $parts_done = 0 ;
 
-	my $start_time = time  ;
-	my $parts_total = -s "$data_dir/anchor.csv";
+my $anchors = 0 ;
+
+while (defined(my $line=<ANCHOR>)) {
+	$parts_done = $parts_done + length $line ;
+
+	chomp($line) ;
+	
+	if ($line =~ m/\"(.+?)\",(\d+),(\d+),(\d+),(\d+)/) {
+		my $anchor = $1 ;
+		my $id = $2 ;
+			
+		my $totalLinkCount = $3 ;
+		my $distinctLinkCount = $4 ;
+			
+		print ("$anchor,$totalLinkCount,$distinctLinkCount\n")	 ;
+			
+		my $arrayRef = $anchorCounts{$anchor} ;
+			
+		if (defined $arrayRef) {
+			#we have seen this anchor before, but now it is going to a new destination. Need to merge the occurrence counts
+			my @counts = @{$arrayRef} ;
+				
+			#total counts can simply be added together
+			$counts[0] = $counts[0] + $totalLinkCount ;
+				
+			#distinct counts can't technically be added together, but close enough (assuming one sense per anchor per document)
+			$counts[1] = $counts[1] + $distinctLinkCount ;
+				
+			$anchorCounts{$anchor} = \@counts ;
+		} else {
+			my @counts = ($totalLinkCount, $distinctLinkCount, 0, 0) ;
+			$anchorCounts{$anchor} = \@counts ;
+			$anchors++ ;
+		}			
+	}
+	    
+	$pm->update($parts_done) ;
+}
+close ANCHOR ;
+$pm->done() ;
+	
+# read occurrence counts ==========================================================================================================
+	
+for (my $i = 1 ; $i<=$passes ; $i++) {
+	
+	my $file = "$data_dir/anchor_occurrence_$i.csv" ;
+		
+	open(OCCURRENCES, $file) ;
+	binmode(OCCURRENCES, ':utf8') ;
+
+	$pm = ProgressMonitor->new(-s $file, "Merging anchor occurrences (pass $i of $passes)") ;
 	my $parts_done = 0 ;
 
-	while (defined(my $line=<ANCHOR>)) {
-	  $parts_done = $parts_done + length $line ;
-
-	  chomp($line) ;
-	    
-	  if ($line =~ m/\"(.+?)\",(\d+),(\d+)(,\d+)?/) {
+	while (defined(my $line=<OCCURRENCES>)) {
+		$parts_done = $parts_done + length $line ;
+	  	
+		if ($line =~ m/^\"(.+?)\",(\d+),(\d+)$/) {
 			my $anchor = $1 ;
-			my $id = $2 ;
-			my $count = $3 ;
+			my $totalOccurrenceCount = $2 ;
+			my $distinctOccurrenceCount = $3 ;
 			
-			my $linkCount = $link_counts{$anchor} ;
+			my $arrayRef = $anchorCounts{$anchor} ;
 			
-			if (defined $linkCount) {
-				$link_counts{$anchor} = $linkCount + $count ;
-			} else {
-				$link_counts{$anchor} = $count ;
-			}
-			
-			$occ_counts{$anchor} = 0 ;
-	  }
-	  print_progress("loading anchors", $start_time, $parts_done, $parts_total) ;
-	}
-	close ANCHOR ;
-
-	print_progress("loading anchors", $start_time, $parts_total, $parts_total) ;
-	print "\n" ;
-	
-	# read occurance counts ==========================================================================================================
-	
-	for (my $i = 0 ; $i<$file_count ; $i++) {
-	
-		my $file = "$data_dir/anchor_occurance_$i.csv" ;
-		
-		open(OCCURANCES, $file) ;
-		binmode(OCCURANCES, ':utf8') ;
-		
-		my $start_time = time  ;
-		my $parts_total = -s $file ;
-		my $parts_done = 0 ;
-		
-		while (defined(my $line=<OCCURANCES>)) {
-	  	$parts_done = $parts_done + length $line ;
-	  	
-	  	if ($line =~ m/^\"(.+?)\",(\d+)$/) {
-	  		my $anchor = $1 ;
-				my $count = $2 ;
+			if (defined $arrayRef) {
+				my @counts = @{$arrayRef} ;
 				
-				my $occCount = $occ_counts{$anchor} ;
-	  	
-	  		if (defined $occCount) {
-					$occ_counts{$anchor} = $occCount + $count ;
-				} else {
-					$occ_counts{$anchor} = $count ;
-				}
+				#total counts can simply be added together
+				$counts[2] = $counts[2] + $totalOccurrenceCount ;
+				
+				#distinct counts can't technically be added together, but close enough (assuming one sense per anchor per document)
+				$counts[3] = $counts[3] + $distinctOccurrenceCount ;
+				
+				$anchorCounts{$anchor} = \@counts ;
+			} 
 	  	}
-	  	print_progress("merging anchor occurances (pass ".($i+1)." of $file_count)", $start_time, $parts_done, $parts_total) ;
-	  }
-		print_progress("merging anchor occurances (pass ".($i+1)." of $file_count)", $start_time, $parts_total, $parts_total) ;
-		print "\n" ;
+		$pm->update($parts_done) ;
+	}
+	
+	$pm->done() ;	
+	close OCCURRENCES ;
+}
+	
+# print occurrence counts ==========================================================================================================
+	
+$pm = ProgressMonitor->new($anchors, "Saving merged anchor occurrences") ;
+
+open(OCCURRENCES, "> $data_dir/anchor_occurrence.csv") ;
+binmode(OCCURRENCES, ':utf8');
+
+$parts_done = 0 ;
+
+while (my ($anchor, $arrayRef) = each(%anchorCounts) ) {
+	$parts_done++ ;
 		
-		close OCCURANCES ;
-	}
-	
-	# print occurance counts ==========================================================================================================
-	
-	$start_time = time ;
-
-	open(OCCURANCES, "> $data_dir/anchor_occurance.csv") ;
-	binmode(OCCURANCES, ':utf8');
-
-	$parts_total = scalar keys %occ_counts ; 
-	$parts_done = 0 ;
-
-	while (my ($anchor, $occCount) = each(%occ_counts) ) {
-		$parts_done++ ;
+	my @counts = @{$arrayRef} ;
 		
-		my $linkCount = $link_counts{$anchor} ;
-		
-		if (defined $linkCount) {
-    	print OCCURANCES "\"$anchor\",$linkCount,$occCount\n" ;
-    }
-    print_progress("saving merged anchor occurances", $start_time, $parts_done, $parts_total) ;
-	}
-
-	print_progress("saving merged anchor occurances", $start_time, $parts_total, $parts_total) ;
-	print "\n" ;
-
-	close(OCCURANCES) ;
-	
-	
-	
-	
-	# displaying progress ============================================================================================================
-
-	my $msg ;
-	my $last_report_time ;
-	
-	sub format_percent {
-    return sprintf("%.2f",($_[0] * 100))."%" ;
-	}
-
-	sub format_time {
-    my @t = gmtime($_[0]) ;
-
-    my $hr = $t[2] + (24*$t[7]) ;
-    my $min = $t[1] ;
-    my $sec = $t[0] ;
-	
-    return sprintf("%02d:%02d:%02d",$hr, $min, $sec) ; 
-	}
-
-	sub print_progress {
-	
-    my $message = shift ;
-    my $start_time = shift ;
-    my $parts_done = shift ;
-    my $parts_total = shift ;
-    
-    if (not defined $last_report_time) {
-    	$last_report_time = $start_time
-    }
-    
-    if (time == $last_report_time && $parts_done < $parts_total) {
-			#do not report if we reported less than a second ago, unless we have finished.
-			return ;
-		}
-
-    my $work_done = $parts_done/$parts_total ;    
-    my $time_elapsed = time - $start_time ;
-    my $time_expected = (1/$work_done) * $time_elapsed ;
-    my $time_remaining = $time_expected - $time_elapsed ;
-    $last_report_time = time ;
-
-		#clear 
-    if (defined $msg) {
-			$msg =~ s/./\b/g ;
-			print $msg ;
-    }
-    
-    #flush output, so we definitely see this message
-    $| = 1 ;
-    
-    if ($parts_done >= $parts_total) {
-    	$msg = $message.": done in ".format_time($time_elapsed)."                          " ;
-    } else {
-    	$msg = $message.": ".format_percent($work_done)." in ".format_time($time_elapsed).", ETA:".format_time($time_remaining) ;
-    }
-    
-    print $msg ;
-	}
+    	print OCCURRENCES "\"$anchor\",$counts[0],$counts[1],$counts[2],$counts[3]\n" ;
+   	$pm->update($parts_done) ;
+}
+$pm->done() ;
+close(OCCURRENCES) ;
