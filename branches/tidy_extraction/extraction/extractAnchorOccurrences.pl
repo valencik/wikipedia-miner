@@ -147,10 +147,13 @@ if($log) {
 	Stripper::setLogfile("$data_dir/occurrences.log") ;
 }
 
+open(NGRAMS, "> $data_dir/ngrams.txt") ;
+binmode(NGRAMS, ':utf8') ;
 
-# get the vocabulary of anchors that we are interested in ==============================================
 
-my %anchorFreq = () ;			 #anchor text -> freq
+# get the vocabulary of ngrams that we are interested in ==============================================
+
+my %ngramCounts = () ;			 #ngram text -> array where first element = total count and 2nd = distinct count
 
 open(ANCHOR, "$data_dir/anchor.csv") || die "'$data_dir/anchor.csv' could not be found. You must run extractWikipediaData.pl first!\n" ;
 binmode(ANCHOR, ':utf8') ;
@@ -163,12 +166,12 @@ while (defined(my $line=<ANCHOR>)) {
 
 	chomp($line) ;
 		
-	if ($line =~ m/\"(.+?)",(\d+),(\d+)(,\d+)?/) {
+	if ($line =~ m/\"(.+?)",(\d+),(\d+)(,\d+),(\d+)/) {
 		my $anchor = unescape($1) ;
-		my $id = $2 ;
-		my $count = $3 ;
 		
-		$anchorFreq{$anchor} = 0 ;
+		my @array = (0,0) ;
+		
+		$ngramCounts{$anchor} = \@array  ;
 	}
 	$pm->update($parts_done) ;
 }
@@ -177,14 +180,14 @@ close ANCHOR ;
 $pm->done() ; 
 
 
-# now measure how many wikipedia articles they are found in =============================================
+# now measure how many wikipedia articles the ngrams are found in =============================================
 
 $pm = ProgressMonitor->new(-s $dump_file, "Gathering anchor occurances") ;
 
 my $pages = Parse::MediaWikiDump::Pages->new($dump_file) ;
 my $page ;
 
-while(defined($page = $pages->page)) {
+while(defined($page = $pages->next())) {
 
 	$pm->update($pages->current_byte) ;
 
@@ -215,6 +218,7 @@ while(defined($page = $pages->page)) {
 			my $textRef = $page->text ;
 			my $text = $$textRef ;
 			
+			#print NGRAMS "$text\n" ;
 			
 			$text = Stripper::stripToPlainText($text) ;
 			
@@ -223,6 +227,8 @@ while(defined($page = $pages->page)) {
 			$text =~ s/\n\s*\n/\n\n/g ; #collapse whitespace if it is the only thing found between two linebreaks
 			$text =~ s/(?<!\n)\n(?!\n)/ /g ;  #replace isolated line breaks with spaces			
 			$text =~ s/ {2,}/ /g ;  #collapse multiple spaces
+			
+			#print NGRAMS "$text\n" ;
 			
 			#now process text one line at a time
 			while($text =~ m/(.*?)\n/gi) {		
@@ -240,13 +246,15 @@ $pm->done() ;
 open(OCCURRENCES, "> $data_dir/anchor_occurrence_".$passIndex.".csv") ;
 binmode(OCCURRENCES, ':utf8');
 
-$pm = ProgressMonitor->new(scalar keys %anchorFreq, "Saving anchor occurrences") ; 
+$pm = ProgressMonitor->new(scalar keys %ngramCounts, "Saving anchor occurrences") ; 
 $parts_done = 0 ;
 
-while (my ($anchor, $freq) = each(%anchorFreq) ) {
+while (my ($ngram, $arrayRef) = each(%ngramCounts) ) {
 	$pm->update() ;
+	
+	my @counts = @{$arrayRef} ;
 
-	print OCCURRENCES "\"$anchor\",$freq\n" ;
+	print OCCURRENCES "\"$ngram\",$counts[0],$counts[1]\n" ;
 }
 
 $pm->done() ;
@@ -268,43 +276,53 @@ close(OCCURRENCES) ;
 sub gather_ngrams {
 	
 	my $text = shift ;
-	$text = "\$ $text \$" ;
+	
+	#print NGRAMS "$text\n" ;
+	
+	$text = " $text " ;
 	
 	my $ref = shift ;
 	my %ngrams_seen = %$ref ;	
 	
 	#gather all positions where ngrams could possibly split on
 	my @splits = () ;
-	while ($text =~ m/([\s\{\}\(\)\[\]\<\>\\\"\'\.\,\!\;\:\-\_\#\@\%\^\&\*\~\|])/g) {	
-		push(@splits, pos($text) -1) ;
+	while ($text =~ m/\W/g) {	
+		push(@splits, pos($text)) ;
 	}
 	
 	for (my $i=0 ; $i<scalar(@splits) ; $i++) {
 
-		my $startIndex = $splits[$i] + 1 ;
+		my $startIndex = $splits[$i]  ;
 		
 		for (my $j=min($i + $max_ngram_length, scalar(@splits)-1) ; $j > $i ; $j--) {
 			my $currIndex = $splits[$j] ;	
-			my $ngram = substr($text, $startIndex, $currIndex-$startIndex) ;
-			$ngram =~ s/^\s+|\s+$//g;
+			my $ngram = substr($text, $startIndex, $currIndex-$startIndex-1) ;
 			
-			if ($ngram eq "") { 
-				next ; 
+			if ($ngram =~ m/^\s+/ or $ngram =~ m/\s+$/ or $ngram eq "" ) {
+				next ;
 			}
+			
+			#print NGRAMS " - '$ngram'\n" ;
 			
 			if (length($ngram)==1 && substr($text, $startIndex-1, 1) eq "'") {
 				next ;
 			} 
 			
-			if (defined $ngrams_seen{$ngram}) {
-				next ;
-			}
-		  	
-		  	my $freq = $anchorFreq{$ngram} ;
 			
-		  	if (defined $freq) {
-				$anchorFreq{$ngram} = $freq + 1 ;
-		  	}
+			my $countsRef = $ngramCounts{$ngram} ;
+			
+			if (defined $countsRef) {
+				
+				my @counts = @{$countsRef} ;
+				
+				$counts[0] ++ ;
+				
+				if (not defined $ngrams_seen{$ngram}) {
+					$counts[1] ++ ;
+				}
+				
+				$ngramCounts{$ngram} = \@counts ;
+			} 
 		  	
 		  	$ngrams_seen{$ngram} = 1 ;
 		}
