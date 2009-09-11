@@ -2,7 +2,8 @@
 
 =head1 NAME
 
-ExtractAnchorOccurrences - Perl script for extracting the number of times anchors occur in Wikipedia 
+ExtractStructureAndAnchorOccurrences - Perl script for extracting structure (section, paragraph and section) markers 
+and the number of times anchors occur in Wikipedia 
 
 =head1 DESCRIPTION
 
@@ -38,6 +39,7 @@ use File::Basename;
 
 use ProgressMonitor ;
 use Stripper ;
+use Splitter ;
 
 binmode(STDOUT, ':utf8');
 
@@ -48,9 +50,11 @@ my $passes ;
 my $passIndex ; 
 my $log ;
 my $languageFile ;
+my $abbreviationFile ;
+my $dictionaryFile ;
 my $max_ngram_length = 10 ;
 
-GetOptions("passes=i"=>\$passes, "passIndex=i"=>\$passIndex, 'log' => \$log, "languageFile=s"=>\$languageFile);
+GetOptions("passes=i"=>\$passes, "passIndex=i"=>\$passIndex, 'log' => \$log, "languageFile=s"=>\$languageFile, "abbreviationFile=s"=>\$abbreviationFile, "dictionaryFile=s"=>\$dictionaryFile);
 
 if (!defined $passes) {
 	die "You must specify passes=<num> ; the number of passes this task will be split into.\n" ;
@@ -74,6 +78,17 @@ if (not defined $languageFile) {
 	$languageFile = "./languages.xml" ;
 } 
 print " - language dependant variables will be loaded from \"$languageFile\"\n" ;
+
+if (not defined $abbreviationFile) {
+	$abbreviationFile = "./splitter.abv" ;
+}
+Splitter::loadAbbreviations($abbreviationFile) ;
+
+if (not defined $dictionaryFile) {
+	$dictionaryFile = "./splitter.dict" ;
+}
+Splitter::loadDictionary($dictionaryFile) ;
+
 
 
 #get data directory and dump file ==========================================================================
@@ -147,9 +162,6 @@ if($log) {
 	Stripper::setLogfile("$data_dir/occurrences.log") ;
 }
 
-open(NGRAMS, "> $data_dir/ngrams.txt") ;
-binmode(NGRAMS, ':utf8') ;
-
 
 # get the vocabulary of ngrams that we are interested in ==============================================
 
@@ -180,12 +192,14 @@ close ANCHOR ;
 $pm->done() ; 
 
 
-# now measure how many wikipedia articles the ngrams are found in =============================================
+# now measure how many wikipedia articles the ngrams are found in, and gather structure at the same time ===================================
 
-$pm = ProgressMonitor->new(-s $dump_file, "Gathering anchor occurances") ;
+$pm = ProgressMonitor->new(-s $dump_file, "Gathering anchor occurances and structural elements") ;
 
 my $pages = Parse::MediaWikiDump::Pages->new($dump_file) ;
 my $page ;
+
+open(STRUCTURE, "> $data_dir/structure_".$passIndex.".csv") ;
 
 while(defined($page = $pages->next())) {
 
@@ -194,7 +208,6 @@ while(defined($page = $pages->next())) {
 	my $id = int($page->id) ;
 	my $title = $page->title ;
 	
-	Stripper::setCurrDoc("$id:$title") ;
 	
 	if ($id % $passes == ($passIndex-1)) {
 		#only process pages that are valid for this pass
@@ -212,26 +225,32 @@ while(defined($page = $pages->next())) {
 		#only process articles
 		if ($namespace_key==0 and not defined $page->redirect) {
 			
+			Stripper::setCurrDoc("$id:$title") ;
+			
+			my $textRef = $page->text ;
+			
+			#gather structure
+			my $textForStructure = Stripper::stripAllButLinks($$textRef, " ") ;
+			$textForStructure = Stripper::stripNonArticleInternalLinks($textForStructure, " ") ;
+			my $structure = Splitter::getStructureString($textForStructure) ;
+			print STRUCTURE "$id,\"$structure\"\n" ;
+			
+			#gather ngrams
+			my $textForNgrams = Stripper::stripToPlainText($$textRef) ;
+			
 			#only interested in first ngram occurance in each document.
 			my %ngrams_seen = () ;
 			
-			my $textRef = $page->text ;
-			my $text = $$textRef ;
-			
-			#print NGRAMS "$text\n" ;
-			
-			$text = Stripper::stripToPlainText($text) ;
-			
 			#it is a little tricky to decide wheither an ngram can span a line break. 
 
-			$text =~ s/\n\s*\n/\n\n/g ; #collapse whitespace if it is the only thing found between two linebreaks
-			$text =~ s/(?<!\n)\n(?!\n)/ /g ;  #replace isolated line breaks with spaces			
-			$text =~ s/ {2,}/ /g ;  #collapse multiple spaces
+			$textForNgrams =~ s/\n\s*\n/\n\n/g ; #collapse whitespace if it is the only thing found between two linebreaks
+			$textForNgrams =~ s/(?<!\n)\n(?!\n)/ /g ;  #replace isolated line breaks with spaces			
+			$textForNgrams =~ s/ {2,}/ /g ;  #collapse multiple spaces
 			
 			#print NGRAMS "$text\n" ;
 			
 			#now process text one line at a time
-			while($text =~ m/(.*?)\n/gi) {		
+			while($textForNgrams =~ m/(.*?)\n/gi) {		
 				gather_ngrams($1, \%ngrams_seen) ;	
 			}
 		}
