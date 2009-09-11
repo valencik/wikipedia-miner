@@ -32,14 +32,23 @@ if (!defined $passes) {
 	die "You must specify passes=<num> ; the number of passes that the extractAnchorOccurrences task was split into.\n" ;
 }
 
-#get data directory and dump file ==========================================================================
+#get data directory and check ==========================================================================
 
-my $data_dir = shift(@ARGV) or die " - you must specify a writable directory containing a single WikiMedia dump file\n" ;
+my $data_dir = shift(@ARGV) or die " - you must specify a writable directory containing output files from extractWikipediaData.pl and extractStructureAndAnchorOccurrences.pl\n" ;
+
+my $anchorFile = "$data_dir/anchor.csv" ;
+if (not -e $anchorFile) {
+	die "'$anchorFile' is missing\n" ;
+}
 
 for (my $i = 1 ; $i<=$passes ; $i++) {
 	
 	my $file = "$data_dir/anchor_occurrence_$i.csv" ;
+	if (not -e $file) {
+		die "'$file' is missing\n" ;
+	}
 	
+	$file = "$data_dir/structure_$i.csv" ;
 	if (not -e $file) {
 		die "'$file' is missing\n" ;
 	}
@@ -49,10 +58,10 @@ for (my $i = 1 ; $i<=$passes ; $i++) {
 	
 my %anchorCounts = () ;
 	
-open(ANCHOR, "$data_dir/anchor.csv") || die "'$data_dir/anchor.csv' is missing\n" ;
+open(ANCHOR, $anchorFile) ;
 binmode(ANCHOR, ':utf8') ;
 
-my $pm = ProgressMonitor->new(-s "$data_dir/anchor.csv", "Loading anchor vocabulary") ;
+my $pm = ProgressMonitor->new(-s $anchorFile, "Loading anchor vocabulary") ;
 my $parts_done = 0 ;
 
 my $anchors = 0 ;
@@ -68,8 +77,6 @@ while (defined(my $line=<ANCHOR>)) {
 			
 		my $totalLinkCount = $3 ;
 		my $distinctLinkCount = $4 ;
-			
-		print ("$anchor,$totalLinkCount,$distinctLinkCount\n")	 ;
 			
 		my $arrayRef = $anchorCounts{$anchor} ;
 			
@@ -95,7 +102,37 @@ while (defined(my $line=<ANCHOR>)) {
 }
 close ANCHOR ;
 $pm->done() ;
+
+# read and merge structure strings ===============================================================
+
+open (STRUCTURE_OUT , "> $data_dir/structure.csv") ;
+
+for (my $i = 1 ; $i<=$passes ; $i++) {
 	
+	my $file = "$data_dir/structure_$i.csv" ;
+		
+	open(STRUCTURE_IN, $file) ;
+
+	$pm = ProgressMonitor->new(-s $file, "Merging structure elements (pass $i of $passes)") ;
+	my $parts_done = 0 ;
+
+	while (defined(my $line=<STRUCTURE_IN>)) {
+		$parts_done = $parts_done + length $line ;
+		
+		print STRUCTURE_OUT $line ;
+		
+		$pm->update($parts_done) ;
+	}
+	
+	$pm->done() ;	
+	close STRUCTURE_IN ;
+}
+
+close STRUCTURE_OUT ;
+
+
+
+
 # read occurrence counts ==========================================================================================================
 	
 for (my $i = 1 ; $i<=$passes ; $i++) {

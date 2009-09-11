@@ -19,7 +19,6 @@ use Getopt::Long ;
 use File::Basename;
 
 use ProgressMonitor ;
-use Splitter ;
 use Stripper ;
 
 
@@ -34,10 +33,9 @@ binmode(STDOUT, ':utf8');
 my $passes = 2 ; 
 my $log ;
 my $languageFile ;
-my $abbreviationFile ;
-my $dictionaryFile ;
 
-GetOptions("passes=i"=>\$passes, 'log' => \$log, "languageFile=s"=>\$languageFile, "abbreviationFile=s"=>\$abbreviationFile, "dictionaryFile=s"=>\$dictionaryFile);
+
+GetOptions("passes=i"=>\$passes, 'log' => \$log, "languageFile=s"=>\$languageFile) ;
 
 print " - data will be split into $passes passes for memory-intesive operations. Try using more passes if you run into problems.\n" ;
 
@@ -49,16 +47,6 @@ if (not defined $languageFile) {
 	$languageFile = "./languages.xml" ;
 } 
 print " - language dependant variables will be loaded from \"$languageFile\"\n" ;
-
-if (not defined $abbreviationFile) {
-	$abbreviationFile = "./splitter.abv" ;
-}
-Splitter::loadAbbreviations($abbreviationFile) ;
-
-if (not defined $dictionaryFile) {
-	$dictionaryFile = "./splitter.dict" ;
-}
-Splitter::loadDictionary($dictionaryFile) ;
 
 
 
@@ -492,7 +480,6 @@ sub extractCoreSummariesFromDump {
 	open (TRANSLATION, "> $data_dir/translation.csv") ;
 	binmode(TRANSLATION, ':utf8') ;
 	open (EQUIVALENCE, "> $data_dir/equivalence.csv") ;
-	open (STRUCTURE, "> $data_dir/structure.csv") ;
 	
 	my $pages = Parse::MediaWikiDump::Pages->new($dump_file);
 	my $page ;
@@ -542,12 +529,6 @@ sub extractCoreSummariesFromDump {
 			if (length($stripped_text) != length($text)) {
 				logProblem("Stripped version of $id:$title is not the same length as the original") ;
 			}
-			
-						
-			#gather structure
-			my $text_noNonArticleLinks = Stripper::stripNonArticleInternalLinks($stripped_text, " ") ;
-			my $structure = Splitter::getStructureString($text_noNonArticleLinks) ;
-			print STRUCTURE "$id,\"$structure\"\n" ;
 
 			#gather links
 			my @linkRegions = Stripper::gatherInternalLinks(\$stripped_text) ;
@@ -661,7 +642,6 @@ sub extractCoreSummariesFromDump {
 	close CATLINK ;
 	close TRANSLATION ;
 	close EQUIVALENCE ;
-	close STRUCTURE ;
 	
 	logProblem("anchor hash size after gathering all links: " . keys( %anchors ) . "\n");  
 	
