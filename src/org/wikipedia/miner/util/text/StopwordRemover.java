@@ -70,16 +70,19 @@ public class StopwordRemover extends TextProcessor {
 	 * @return the processed string
 	 */	
 	public String processText(String text) {
-		String t = text ;
-		String t2 = "" ;
+		StringBuffer processedText = new StringBuffer() ;
 		
-		String[] terms = t.split(" ") ;
-		for(int i=0;i<terms.length; i++)
-			if (!stopwords.contains(terms[i]))
-				t2 = t2 + cleaner.processText(terms[i]) + " " ;
+		String[] terms = text.split(" ") ;
+		for(int i=0;i<terms.length; i++) {
+			if (!stopwords.contains(terms[i])) {
+				processedText.append(cleaner.processText(terms[i])) ;
+				processedText.append(" ") ;
+			}
+		}
 		
-		return t2.trim() ;	
+		return processedText.toString().trim() ;	
 	}
+	                                        
 }
 
 
