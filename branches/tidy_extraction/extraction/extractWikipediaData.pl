@@ -473,270 +473,273 @@ sub extractCoreSummaries {
 	
 sub extractCoreSummariesFromDump {
 	
-	my $pm = ProgressMonitor->new(-s $dump_file, "extracting core summaries from dump file") ;
+	print("extracting core summaries from dump file\n") ;
 	
 	open (PAGELINK, "> $data_dir/pagelink.csv") ;
 	open (CATLINK, "> $data_dir/categorylink.csv") ;
 	open (TRANSLATION, "> $data_dir/translation.csv") ;
 	binmode(TRANSLATION, ':utf8') ;
 	open (EQUIVALENCE, "> $data_dir/equivalence.csv") ;
+	open(ANCHOR, "> $data_dir/anchor.csv") ;
+	binmode(ANCHOR, ':utf8');
 	
-	my $pages = Parse::MediaWikiDump::Pages->new($dump_file);
-	my $page ;
-	
-	my %anchors = () ;  #\"anchor\":id -> (freq:flag)
-	my $anchorDestCount = 0 ;
-
-	while(defined($page = $pages->next())) {
-	
-		$pm->update($pages->current_byte) ;
+	for (my $pass = 0 ; $pass<$passes ; $pass++) {
+		
 			
-		my $id = int($page->id) ;
-		my $title = $page->title ;
-		
-		Stripper::setCurrDoc("$id:$title") ;
-		
-		
-		my $namespace = $page->namespace;
-		my $namespace_key = $namespaces{lc($namespace)} ;
-		
-		
-		my %seenAnchors = () ;
-		   
-		# check if namespace is valid
-		if ($page->namespace ne "" && defined $namespace_key) {
-			$title = substr $title, (length $page->namespace) + 1;
-		} else {
-			$namespace = "" ;
-			$namespace_key = 0 ;
-		}
-
-		if ($namespace_key==14) {
-			#find this category's equivalent article
-			my $equivalent_id = resolve_link(normalizeTitle($title), 0) ;
-
-			if (defined $equivalent_id) {
-				print EQUIVALENCE "$id,$equivalent_id\n" ;
-			}
-		}
+		my $pm = ProgressMonitor->new(-s $dump_file, " - pass ".($pass+1)." of $passes") ;	
 	
-		if (($namespace_key==0 or $namespace_key==14) and not defined $page->redirect) {
+		my $pages = Parse::MediaWikiDump::Pages->new($dump_file);
+		my $page ;
+				
+		my %anchors = () ; 
+		my $anchorDestCount = 0 ;
+	
+		while(defined($page = $pages->next())) {
+		
+			$pm->update($pages->current_byte) ;
+				
+			my $id = int($page->id) ;
+			my $title = $page->title ;
+			
+			Stripper::setCurrDoc("$id:$title") ;
+		
+		
+			my $namespace = $page->namespace;
+			my $namespace_key = $namespaces{lc($namespace)} ;
+			
+			my %seenAnchors = () ;
+			   
+			# check if namespace is valid
+			if ($page->namespace ne "" && defined $namespace_key) {
+				$title = substr $title, (length $page->namespace) + 1;
+			} else {
+				$namespace = "" ;
+				$namespace_key = 0 ;
+			}
+
+			if ($namespace_key==14 && $pass==0) {
+				#find this category's equivalent article
+				my $equivalent_id = resolve_link(normalizeTitle($title), 0) ;
+	
+				if (defined $equivalent_id) {
+					print EQUIVALENCE "$id,$equivalent_id\n" ;
+				}
+			}
+	
+			if (($namespace_key==0 or $namespace_key==14) and not defined $page->redirect) {
+						
+				my $textRef = $page->text ;	
+				my $text = $$textRef ;
+				
+				my $stripped_text = Stripper::stripAllButLinks($text, " ") ;
+				if (length($stripped_text) != length($text)) {
+					logProblem("Stripped version of $id:$title is not the same length as the original") ;
+				}
+	
+				#gather links
+				my @linkRegions = Stripper::gatherInternalLinks(\$stripped_text) ;
+				@linkRegions = Stripper::collapseRegionList(\@linkRegions) ;
+				
+				my $i = @linkRegions ;
+		
+				for (my $i=0 ; $i<scalar(@linkRegions) ; $i++) {
 					
-			my $textRef = $page->text ;	
-			my $text = $$textRef ;
-			
-			my $stripped_text = Stripper::stripAllButLinks($text, " ") ;
-			if (length($stripped_text) != length($text)) {
-				logProblem("Stripped version of $id:$title is not the same length as the original") ;
-			}
-
-			#gather links
-			my @linkRegions = Stripper::gatherInternalLinks(\$stripped_text) ;
-			@linkRegions = Stripper::collapseRegionList(\@linkRegions) ;
-			
-			my $i = @linkRegions ;
-	
-			for (my $i=0 ; $i<scalar(@linkRegions) ; $i++) {
-				
-				my $start = $linkRegions[$i][0] ;
-				my $end = $linkRegions[$i][1] ;
-						
-				my $link_markup = substr($stripped_text, $start+2, ($end-$start)-4) ;
-				
-				#print LINKLOG " - - link: '$link_markup' @ $start\n" ;
-				#logProblem("link: $link_markup in $id:$title @ $start\n") ;
-		
-				my $target_lang ="";
-				if ($link_markup =~ m/^([a-z]{1}.+?):(.+)/) {
-					#check that someone hasnt put a valid namespace here
-					if (not defined $namespaces{lc($1)}) {
-						$target_lang = $1 ;
-						$link_markup = $2 ;
+					my $start = $linkRegions[$i][0] ;
+					my $end = $linkRegions[$i][1] ;
+							
+					my $link_markup = substr($stripped_text, $start+2, ($end-$start)-4) ;
+								
+					my $target_lang ="";
+					if ($link_markup =~ m/^([a-z]{1}.+?):(.+)/) {
+						#check that someone hasnt put a valid namespace here
+						if (not defined $namespaces{lc($1)}) {
+							$target_lang = $1 ;
+							$link_markup = $2 ;
+						}
 					}
-				}
 		
-				my $target_namespace = "" ; 
-				my $target_ns_key = 0 ;
-				if ($link_markup =~ m/^(.+?):(.+)/) {
-					$target_namespace = lc($1) ;
-					$target_ns_key = $namespaces{$target_namespace} ;
-					if (defined $target_ns_key) {
+					my $target_namespace = "" ; 
+					my $target_ns_key = 0 ;
+					if ($link_markup =~ m/^(.+?):(.+)/) {
 						$target_namespace = lc($1) ;
-						$link_markup = $2 ;
-					} else {
-						$target_namespace = "" ;
-						$target_ns_key = 0 ;
+						$target_ns_key = $namespaces{$target_namespace} ;
+						if (defined $target_ns_key) {
+							$target_namespace = lc($1) ;
+							$link_markup = $2 ;
+						} else {
+							$target_namespace = "" ;
+							$target_ns_key = 0 ;
+						}
 					}
-				}
 		
-				my $target_title = "";
-				my $anchor_text = "" ;
-				if ($link_markup =~ m/^(.+?)\|(.+)/) {
-					$target_title = normalizeTitle($1) ;
-					$anchor_text = $2 ;
-				} else {
-					$target_title = normalizeTitle($link_markup) ;
-					$anchor_text = $link_markup ;
-				}
+					my $target_title = "";
+					my $anchor_text = "" ;
+					if ($link_markup =~ m/^(.+?)\|(.+)/) {
+						$target_title = normalizeTitle($1) ;
+						$anchor_text = $2 ;
+					} else {
+						$target_title = normalizeTitle($link_markup) ;
+						$anchor_text = $link_markup ;
+					}
 	
-				if ($target_lang ne "") {
-					print TRANSLATION "$id,\"".escape($target_lang)."\",\"".escape($target_title)."\"\n" ;
-				} else {
-					if ($target_ns_key==0) {
-						#page link
-						my $target_id = resolve_link($target_title, $target_ns_key) ;
+					if ($target_lang ne "") {
 						
-						if (defined $target_id) {
-							print PAGELINK "$id,$target_id,$start\n" ;
-
-							#save this anchor:dest combination as a three element array, with total count as first element, distinct count as 2nd element and flag (0) as third
-							my $ref = $anchors{"$anchor_text:$target_id"} ;
-							my @array ;
-				
-							if (defined $ref) {
-								@array = @{$ref} ;
-							}else {
-								@array = (0,0,0) ;
-								$anchorDestCount ++ ;
-							}
- 
- 							#increment total count
-	 						$array[0] = $array[0] + 1 ;
-	 						
-	 						if (not $seenAnchors{"$anchor_text:$target_id"}) {
-	 							#increment distinct count
-	 							$array[1] = $array[1] + 1 ;
-	 							$seenAnchors{"$anchor_text:$target_id"} = 1 ;
-	 						}
+						if ($pass == 0) {
+							print TRANSLATION "$id,\"".escape($target_lang)."\",\"".escape($target_title)."\"\n" ;
+						}
+					} else {
+						if ($target_ns_key==0) {
+							#page link
+							my $target_id = resolve_link($target_title, $target_ns_key) ;
+							
+							if (defined $target_id) {
+								
+								if ($pass == 0) {
+									print PAGELINK "$id,$target_id,$start\n" ;
+								}
+	
+								if ($target_id % $passes == $pass) {
+	
+									#save this anchor:dest combination as a three element array, with total count as first element, distinct count as 2nd element and flag (0) as third
+									my $ref = $anchors{"$anchor_text:$target_id"} ;
+									my @array ;
+						
+									if (defined $ref) {
+										@array = @{$ref} ;
+									}else {
+										@array = (0,0,0) ;
+										$anchorDestCount ++ ;
+									}
 	 
-							$anchors{"$anchor_text:$target_id"} = \@array ;
-							
-							logProblem("saving $anchor_text:$target_id, $array[0]") ;
-							
-							logProblem("anchor hash size: " . keys( %anchors ) . "\n");  
-							
-							#$seenAnchors{"$anchor_text:$target_id"} = 1 ;
-						} else {
-							logProblem("could not resolve page link to $target_title") ;
+		 							#increment total count
+			 						$array[0] = $array[0] + 1 ;
+			 						
+			 						if (not $seenAnchors{"$anchor_text:$target_id"}) {
+			 							#increment distinct count
+			 							$array[1] = $array[1] + 1 ;
+			 							$seenAnchors{"$anchor_text:$target_id"} = 1 ;
+			 						}
+			 
+									$anchors{"$anchor_text:$target_id"} = \@array ;
+								}
+								
+							} else {
+								logProblem("could not resolve page link to $target_title") ;
+							}
 						}
-					}
-			
-					if ($target_ns_key==14) {
-						#category link
-						my $parent_id = resolve_link($target_title, $target_ns_key) ;
-			
-						if (defined $parent_id) {
-							print CATLINK "$parent_id,$id\n" ;
-						} else {
-							logProblem("could not resolve category link to $target_title") ;
+				
+						if ($target_ns_key==14 && $pass==0) {
+							#category link
+							my $parent_id = resolve_link($target_title, $target_ns_key) ;
+				
+							if (defined $parent_id) {
+								print CATLINK "$parent_id,$id\n" ;
+							} else {
+								logProblem("could not resolve category link to $target_title") ;
+							}
 						}
-					}
-				} 
+					
+					} 
+				}
 			}
 		}
+	
+		$pm->done() ;
+	
+		#now flag any anchor:dest combinations that are mirrored by redirects or article titles, and add titles and redirects if they havent been used as anchors yet.
+		
+		$pm = ProgressMonitor->new(-s "$data_dir/page.csv", " - - adding titles and redirects to anchor summary") ;
+		my $parts_done = 0 ;
+		
+		open (PAGE, "$data_dir/page.csv") ;
+		binmode (PAGE, ':utf8') ;
+		
+		while (defined (my $line = <PAGE>)) {
+			$parts_done = $parts_done + length $line ;	
+			chomp($line) ;
+		
+			if ($line =~ m/^(\d+),\"(.+)\",(\d+)$/) {
+				
+				my $page_id = int $1 ;				
+				my $page_title = $2 ;
+				my $page_type = int $3 ;				
+					
+				my $flag = 0 ;
+					
+				if ($page_type == 3) {
+					#this is a redirect, need to resolve it
+					
+					my %redirects_seen = () ;
+					while (defined($page_id) and defined($redirects{$page_id})){
+								
+						if (defined $redirects_seen{$page_id}) {
+							$page_id = undef ;
+							last ;
+						} else {
+							$redirects_seen{$page_id} = 1 ;
+							$page_id = $redirects{$page_id} ;
+						}
+					}
+					
+					if (defined $page_id) {
+						$flag = 1 ;				
+					}
+				}
+						
+				if ($page_type == 1) {
+					#this is a page title
+					$flag = 2 ;
+				}
+				
+					
+				if ($flag > 0 && $page_id % $passes == $pass) {
+					my $ref = $anchors{"$page_title:$page_id"} ;
+					my @array ;
+						
+					if (defined $ref) {
+						#this has already been used as an anchor, needs to be flagged.
+						@array = @{$ref} ;
+						$array[2] = $flag ;					
+					}else {
+						#this has never been used as an anchor, needs to be added.
+						@array = (0,0,$flag) ;
+						$anchorDestCount++ ;
+					}
+		 
+		 			$anchors{"$page_title:$page_id"} = \@array ;
+				}
+			}
+			$pm->update($parts_done) ;
+		}
+		
+		$pm->done() ;
+		close PAGE ;
+	
+		#now we need to save the anchors we have gathered
+		$pm = ProgressMonitor->new($anchorDestCount, " - - saving anchors") ;
+			
+		while (my ($key, $ref) = each(%anchors)) {
+			$parts_done++ ;
+		
+			if ($key =~ m/(.+?):(\d+)/) {
+				my $anchor = $1 ;
+				my $target_id = $2 ;
+				
+				my @array = @{$ref} ;
+				print ANCHOR "\"".escape($anchor)."\",$target_id,$array[0],$array[1],$array[2]\n" ;
+			}
+			$pm->update() ; 
+		}
+		$pm->done() ;
 	}
-
-	$pm->done() ;
-
+	
+	
+	
+	
 	close PAGELINK ;
 	close CATLINK ;
 	close TRANSLATION ;
 	close EQUIVALENCE ;
-	
-	logProblem("anchor hash size after gathering all links: " . keys( %anchors ) . "\n");  
-	
-	
-	#now flag any anchor:dest combinations that are mirrored by redirects or article titles, and add titles and redirects if they havent been used as anchors yet.
-	
-	$pm = ProgressMonitor->new(-s "$data_dir/page.csv", " - adding titles and redirects to anchor summary") ;
-	my $parts_done = 0 ;
-	
-	open (PAGE, "$data_dir/page.csv") ;
-	binmode (PAGE, ':utf8') ;
-	
-	while (defined (my $line = <PAGE>)) {
-		$parts_done = $parts_done + length $line ;	
-		chomp($line) ;
-	
-		if ($line =~ m/^(\d+),\"(.+)\",(\d+)$/) {
-			
-			my $page_id = int $1 ;
-			my $page_title = $2 ;
-			my $page_type = int $3 ;				
-				
-			my $flag = 0 ;
-				
-			if ($page_type == 3) {
-				#this is a redirect, need to resolve it
-					
-				my %redirects_seen = () ;
-				while (defined($page_id) and defined($redirects{$page_id})){
-							
-					if (defined $redirects_seen{$page_id}) {
-						$page_id = undef ;
-						last ;
-					} else {
-						$redirects_seen{$page_id} = 1 ;
-						$page_id = $redirects{$page_id} ;
-					}
-				}
-				
-				if (defined $page_id) {
-					$flag = 1 ;				
-				}
-			}
-					
-			if ($page_type == 1) {
-				#this is a page title
-				$flag = 2 ;
-			}
-				
-				
-			if ($flag > 0) {
-				my $ref = $anchors{"$page_title:$page_id"} ;
-				my @array ;
-					
-				if (defined $ref) {
-					#this has already been used as an anchor, needs to be flagged.
-					@array = @{$ref} ;
-					$array[2] = $flag ;					
-				}else {
-					#this has never been used as an anchor, needs to be added.
-					@array = (0,0,$flag) ;
-					$anchorDestCount++ ;
-				}
-	 
-	 			$anchors{"$page_title:$page_id"} = \@array ;
-			}
-		}
-		$pm->update($parts_done) ;
-	}
-		
-	$pm->done() ;
-	close PAGE ;
-	
-	logProblem("anchor hash size after adding titles and redirects: " . keys( %anchors ) . "\n");  
-	
-	#now we need to save the anchors we have gathered
-	$pm = ProgressMonitor->new($anchorDestCount, " - saving anchors") ;
-	
-	open(ANCHOR, "> $data_dir/anchor.csv") ;
-	binmode(ANCHOR, ':utf8');
-
-	while (my ($key, $ref) = each(%anchors)) {
-		$parts_done++ ;
-	
-		if ($key =~ m/(.+?):(\d+)/) {
-			my $anchor = $1 ;
-			my $target_id = $2 ;
-			
-			my @array = @{$ref} ;
-			print ANCHOR "\"".escape($anchor)."\",$target_id,$array[0],$array[1],$array[2]\n" ;
-		}
-		$pm->update() ; 
-	}
-	$pm->done() ;
-		
 	close(ANCHOR) ;	
 }
 	
