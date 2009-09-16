@@ -148,8 +148,6 @@ sub getStructureString {
 	$start =~ s/\n/ /g ;
 	#print " - Section content start: $start\n" ;
 	
-	
-	#print "<<<<<<<$content>>>>>>>\n" ;
 		
 	#recursively gather structure strings from subsections in content 
 	my @sectionBreaks = getSectionBreaks($content, $lvl) ;
@@ -281,10 +279,13 @@ sub getSectionBreaks {
 	
 	my $text = shift ;
 	my $level = shift ;
+	
+	#print("looking for section breaks $level\n") ;
+	
 		
 	my @sectionBreaks = () ;
 	
-	while ($text =~ m/(?<!=)=={$level}\s*((?<!=).*?(?!=))\s*=={$level}(?!=)/g) {
+	while ($text =~ m/(?<=\n)=={$level}(.*?)=={$level}(?!=)/g) {
 		push(@sectionBreaks, $-[0]) ;
 		#print "found sb $1\n" ;
 	}
