@@ -97,77 +97,111 @@ sub getStructureString {
 		$offset = 0 ;
 	}
 	
-	if ($text =~ m/^(\s*={2,}\s*([^=]+)\s*={2,})?\s*(.*?)\s*$/s) {
+	my $titleStart ;
+	my $titleEnd ;
 	
-		my $title = $2 ;
-		my $content = $3 ;
+	my $contentStart = 0;
+	my $contentEnd = length($text);
+	
+	my $start = substr($text, 0, 100) ;
+	$start =~ s/\n/ /g ;
+	
+	#print "Section start: $start\n" ;
+	
+	if ($text =~ m/^\s*={2,}\s*(.+?)\s*={2,}\s*/) {
 		
-		#print("sectionTitle:$2\n\n") ;
-		#print("sectionText:$3\n\n") ;
+		$titleStart = $-[1] ;
+		$titleEnd = $+[1] ;
 		
+		#print " - Section title: $1\n" ;
 		
-		if (defined $title) {
-			#create a paragraph marker to show where to find section title
-			
-			$structureString = $structureString . "[" . ($offset + $-[2]) . "," . ($offset + $+[2]) . "]" ; 
+		$contentStart = $+[0] ;
+		
+		if ($text =~ m/\s+$/) {
+			$contentEnd = $+[0] ;
 		}
 		
-		#skip ahead to ignore leading whitespace
-		$offset = $offset + $-[3] ;
 		
+	} else {
 		
-		
-		#recursively gather structure strings from subsections in content 
-		my @sectionBreaks = getSectionBreaks($content, $lvl) ;
-			
-		my $last_sb = 0 ;
-		for my $sb (@sectionBreaks) {
-				
-			my $sectionText = substr($content, $last_sb, $sb - $last_sb) ; 
-					
-			if ($last_sb == 0) {
-				$structureString = $structureString . getStructureString($sectionText,$lvl+1, $offset + $last_sb) ;
-			} else {
-				$structureString = $structureString . "(" . getStructureString($sectionText,$lvl+1, $offset + $last_sb) . ")" ;
-			} 
-				
-			$last_sb = $sb ;
+		if ($text =~ m/^(\s+)/) {
+			$contentStart = $+[0] ;
 		}
 		
-		if ($last_sb > 0) {
-			# this text had sections, and there is still text after the last section marker to deal with
+		if ($text =~ m/(\s+)$/) {
+			$contentEnd = $-[0] ;
+		}
+	}
+	
+	if (defined $titleStart) {
+		#create a paragraph marker to show where to find section title
 			
-			my $sectionText = substr($content, $last_sb) ; 
-			$structureString = $structureString . "(" . getStructureString($sectionText,$lvl+1, $offset + $last_sb) . ")" ; 
+		$structureString = $structureString . "[" . ($offset + $titleStart) . "," . ($offset + $titleEnd) . "]" ; 
+	}
+		
+	#skip ahead to ignore leading whitespace
+	$offset = $offset + $contentStart ;
+		
+	my $content = substr($text, $contentStart, $contentEnd - $contentStart) ;
+	
+	$start = substr($content, 0, 100) ;
+	$start =~ s/\n/ /g ;
+	#print " - Section content start: $start\n" ;
+	
+	
+	#print "<<<<<<<$content>>>>>>>\n" ;
+		
+	#recursively gather structure strings from subsections in content 
+	my @sectionBreaks = getSectionBreaks($content, $lvl) ;
+	#print (" - subsections: @sectionBreaks\n") ;
+			
+	my $last_sb = -1 ;
+	for my $sb (@sectionBreaks) {
+	
+		if ($last_sb < 0) {
+			my $sectionText = substr($content, 0, $sb) ;
+			$structureString = $structureString . getStructureString($sectionText,$lvl+1, $offset) ;
 		} else {
-			# this text didn't have any sections, so lets split it into paragraphs and sentences
+			my $sectionText = substr($content, $last_sb, $sb - $last_sb) ;
+			$structureString = $structureString . "(" . getStructureString($sectionText,$lvl+1, $offset + $last_sb) . ")" ;
+		} 
+				
+		$last_sb = $sb ;
+	}
+		
+	if ($last_sb >= 0) {
+		# this text had sections, and there is still text after the last section marker to deal with
+			
+		my $sectionText = substr($content, $last_sb) ; 
+		$structureString = $structureString . "(" . getStructureString($sectionText,$lvl+1, $offset + $last_sb) . ")" ; 
+	} else {
+		# this text didn't have any sections, so lets split it into paragraphs and sentences
 					
-			my @paragraphBreaks = getParagraphBreaks($content) ;
-			push (@paragraphBreaks, length($content)) ;
+		my @paragraphBreaks = getParagraphBreaks($content) ;
+		push (@paragraphBreaks, length($content)) ;
 			
-			my $last_pb = 0 ;
+		my $last_pb = 0 ;
 			
-			for my $pb (@paragraphBreaks) {
+		for my $pb (@paragraphBreaks) {
 				
-				my $paragraphText = substr($content, $last_pb, $pb-$last_pb) ;
-				my @sentenceBreaks = getSentenceBreaks($paragraphText) ;
+			my $paragraphText = substr($content, $last_pb, $pb-$last_pb) ;
+			my @sentenceBreaks = getSentenceBreaks($paragraphText) ;
 				
-				#positions of sentence breaks are relative to paragraph. make them relative to start of document
-				for (my $i=0 ; $i<@sentenceBreaks ; $i++) {
-					$sentenceBreaks[$i] += $offset + $last_pb ;
-				}
-				
-				#add start of paragraph
-				unshift(@sentenceBreaks, $offset+$last_pb) ;
-				
-				#add end of paragraph
-				push(@sentenceBreaks, $offset + $last_pb + length($paragraphText)) ;
-				
-				
-				$structureString = $structureString . "[" . join(",", @sentenceBreaks) . "]" ;
-				
-				$last_pb = $pb ;
+			#positions of sentence breaks are relative to paragraph. make them relative to start of document
+			for (my $i=0 ; $i<@sentenceBreaks ; $i++) {
+				$sentenceBreaks[$i] += $offset + $last_pb ;
 			}
+			
+			#add start of paragraph
+			unshift(@sentenceBreaks, $offset+$last_pb) ;
+			
+			#add end of paragraph
+			push(@sentenceBreaks, $offset + $last_pb + length($paragraphText)) ;
+			
+			
+			$structureString = $structureString . "[" . join(",", @sentenceBreaks) . "]" ;
+			
+			$last_pb = $pb ;
 		}
 	}
 		
@@ -247,11 +281,12 @@ sub getSectionBreaks {
 	
 	my $text = shift ;
 	my $level = shift ;
-	
+		
 	my @sectionBreaks = () ;
 	
-	while ($text =~ m/(?<!=)=={$level}\s*([^=]+?)\s*=={$level}(?!=)/g ) {
+	while ($text =~ m/(?<!=)=={$level}\s*((?<!=).*?(?!=))\s*=={$level}(?!=)/g) {
 		push(@sectionBreaks, $-[0]) ;
+		#print "found sb $1\n" ;
 	}
 	
 	return @sectionBreaks ;	
