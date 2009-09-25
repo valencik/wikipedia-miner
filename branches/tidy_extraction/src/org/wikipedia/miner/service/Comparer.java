@@ -293,72 +293,11 @@ public class Comparer {
 								xmlSnippet.setAttribute("sourceTitle", ml.getTitle()) ;
 								xmlSnippets.appendChild(xmlSnippet) ;
 							}
-							
 						}
-					}
-					
-				}
-				
-			}
-			
-			
-			
-			
-			
+					}	
+				}	
+			}	
 		}
-		
-		
-		
-		//details of links coming in to these articles
-		/*
-		SortedVector<Article> linksIn1 = art1.getLinksIn();
-		SortedVector<Article> linksIn2 = art2.getLinksIn() ; 
-		
-		TreeSet<Article> linksInShared = new TreeSet<Article>() ;
-		for (Article art: linksIn1) {
-			if (linksIn2.contains(id))
-				linksInShared.add(id) ;
-		}
-		
-		for (Integer id: linksInShared) {
-			linksIn1.remove(id) ;
-			linksIn2.remove(id) ;
-		}
-		
-		Element xmlLinksIn = wms.doc.createElement("LinksIn") ; 
-		xmlLinksIn.appendChild(getLinkListElement(linksInShared, "SharedLink", linkLimit)) ;
-		xmlLinksIn.appendChild(getLinkListElement(linksIn1, "Link1", linkLimit)) ;
-		xmlLinksIn.appendChild(getLinkListElement(linksIn2, "Link2", linkLimit)) ;
-		response.appendChild(xmlLinksIn) ;
-		
-		//details of links going out from these articles
-		
-		TreeSet<Integer> linksOut1 = new TreeSet<Integer>() ;
-		for (Integer link:art1.getLinksOutIds()) 
-			linksOut1.add(link) ;
-		
-		TreeSet<Integer> linksOut2 = new TreeSet<Integer>() ;
-		for (Integer link:art2.getLinksOutIds()) 
-			linksOut2.add(link) ;
-		
-		TreeSet<Integer> linksOutShared = new TreeSet<Integer>() ;
-		for (Integer id: linksOut1) {
-			if (linksOut2.contains(id))
-				linksOutShared.add(id) ;
-		}
-		
-		for (Integer id: linksOutShared) {
-			linksOut1.remove(id) ;
-			linksOut2.remove(id) ;
-		}
-		
-		Element xmlLinksOut = wms.doc.createElement("LinksOut") ; 
-		xmlLinksOut.appendChild(getLinkListElement(linksOutShared, "SharedLink", linkLimit)) ;
-		xmlLinksOut.appendChild(getLinkListElement(linksOut1, "Link1", linkLimit)) ;
-		xmlLinksOut.appendChild(getLinkListElement(linksOut2, "Link2", linkLimit)) ;
-		response.appendChild(xmlLinksOut) ;
-		
-		*/
 		
 		return response ;
 	}
