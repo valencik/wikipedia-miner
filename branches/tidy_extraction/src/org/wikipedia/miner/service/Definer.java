@@ -24,8 +24,6 @@ import org.w3c.dom.*;
 import org.wikipedia.miner.model.* ;
 import org.wikipedia.miner.util.* ;
 
-import com.sleepycat.je.DatabaseException;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.Authenticator;
@@ -49,70 +47,101 @@ import javax.servlet.ServletException;
 public class Definer {
 
 	private WikipediaMinerServlet wms ;
-	private MarkupStripper stripper = new MarkupStripper() ;
+	private MarkupStripper ms = new MarkupStripper() ;
+	private EmphasisResolver er = new EmphasisResolver() ;
 	
 	/**
 	 * Only first sentences are used for definitions.
 	 */
-	public static int LENGTH_SHORT = 0 ;
+	public static final int LENGTH_SHORT = 0 ;
 	
 	/**
 	 * First paragraphs are used for definitions.
 	 */
-	public static int LENGTH_LONG = 1 ;
+	public static final int LENGTH_LONG = 1 ;
 	
 	/**
-	 * Definitions are provided in plain text
+	 * Formatting (bold, italic) will be removed
 	 */
-	public static int FORMAT_PLAIN = 0 ;
+	public static final int FORMAT_PLAIN = 0 ;
 	/**
-	 * Definitions are provided in MediaWiki markup. Only links and basic formatting (bold and italic) will be shown.
+	 * Formatting (bold, italic) will be in standard wiki syntax
 	 */
-	public static int FORMAT_WIKI = 1 ;
+	public static final int FORMAT_WIKI = 1 ;
 	/**
-	 * Definitions are provided in HTML markup. Only links and basic formatting (bold and italic) will be shown.
+	 * Formatting (bold, italic) will be in HTML markup
 	 */
-	public static int FORMAT_HTML = 2 ;
+	public static final int FORMAT_HTML = 2 ;
+	
+	
+	
+	
+	
+	
 	
 	/**
-	 * If using FORMAT_HTML, links will be reverted to plain text
+	 * Definitions are provided in escaped HTML markup. Only links and basic formatting (bold and italic) will be shown.
 	 */
-	public static int LINK_NONE = 0 ;
+	//public static int FORMAT_ESCAPED_HTML = 3 ;
 	/**
-	 * If using FORMAT_HTML, links will refer directly to the relevant wikipedia article.
+	 * Definitions are provided in modified MediaWiki markup, with article ids provided for links.
 	 */
-	public static int LINK_DIRECT = 1 ;
+	//public static int FORMAT_WIKI_IDS = 4 ;
+	
+	
+	
+	
 	/**
-	 * If using FORMAT_HTML, links will refer to the result of calling the WikipediaMiner searcher service.
+	 * Links will be reverted to plain text
 	 */
-	public static int LINK_TOOLKIT = 2 ;
+	public static final int LINK_NONE = 0 ;
+	/**
+	 * Links will refer directly to the relevant wikipedia article
+	 */
+	public static final int LINK_WIKIPEDIA = 1 ;
+	/**
+	 * Links will refer to the WikipediaMiner searcher service. 
+	 */
+	public static final int LINK_TOOLKIT = 2 ;
+	/**
+	 * Links will be in standard mediawiki syntax
+	 */
+	public static final int LINK_WIKI = 3 ;
+	/**
+	 * links will be formatted as [[id|anchor]]
+	 */
+	public static final int LINK_IDS = 4 ;
 	
-	int defaultLength = LENGTH_SHORT ;
-	int defaultFormat = FORMAT_HTML ;
-	int defaultLinkDestination = LINK_DIRECT ;
-	
-	Pattern fb_imagePattern = Pattern.compile("\"image\"\\:\\[(.*?)\\]") ;
-	Pattern fb_idPattern = Pattern.compile("\"id\"\\:\"(.*?)\"") ;
+
+	private Pattern fb_imagePattern = Pattern.compile("\"image\"\\:\\[(.*?)\\]") ;
+	private Pattern fb_idPattern = Pattern.compile("\"id\"\\:\"(.*?)\"") ;
 	
 	/**
 	 * @return the default length of definitions (LENGTH_SHORT).
 	 */
 	public int getDefaultLength() {
-		return defaultLength;
+		return LENGTH_SHORT;
 	}
 
 	/**
-	 * @return the default format of definitions (FORMAT_HTML).
+	 * @return the default format of definitions .
 	 */
 	public int getDefaultFormat() {
-		return defaultFormat;
+		return FORMAT_HTML ;
 	}
 
 	/**
-	 * @return the default destination of links (LINK_DIRECT)
+	 * @return the default format of links
 	 */
-	public int getDefaultLinkDestination() {
-		return defaultLinkDestination;
+	public int getDefaultLinkFormat(int format) {
+		
+		switch (format) {
+			case FORMAT_PLAIN: return LINK_NONE ;
+			case FORMAT_WIKI: return LINK_WIKI ;
+			case FORMAT_HTML: return LINK_WIKIPEDIA ;
+		}
+			
+		return LINK_NONE ;
 	}
 	
 	/**
@@ -190,16 +219,16 @@ public class Definer {
 		
 		Element paramFormat = wms.doc.createElement("Parameter") ;
 		paramFormat.setAttribute("name", "format") ;
-		paramFormat.appendChild(wms.doc.createTextNode("The desired format: <em>" + FORMAT_PLAIN + "</em> (plain text), <em>" + FORMAT_WIKI + "</em> (mediawiki markup), or <em>" + FORMAT_HTML + "</em> (html)")) ;
+		paramFormat.appendChild(wms.doc.createTextNode("The desired format for bold and italics: <em>" + FORMAT_PLAIN + "</em> (plain text), <em>" + FORMAT_WIKI + "</em> (mediawiki markup), or <em>" + FORMAT_HTML + "</em> (html)")) ;
 		paramFormat.setAttribute("optional", "true") ;
 		paramFormat.setAttribute("default", String.valueOf(getDefaultFormat())) ; 
 		description.appendChild(paramFormat) ;
 		
 		Element paramLink = wms.doc.createElement("Parameter") ;
-		paramLink.setAttribute("name", "linkDestination") ;
-		paramLink.appendChild(wms.doc.createTextNode("The destination of links when using html format, <em>" + LINK_NONE + "</em> (none, links revert to plain text), <em>" + LINK_DIRECT + "</em> (to wikipedia), or <em>" + LINK_TOOLKIT + "</em> (to the Wikipedia Miner search service)")) ;
+		paramLink.setAttribute("name", "linkFormat") ;
+		paramLink.appendChild(wms.doc.createTextNode("The desired format for links <em>" + LINK_NONE + "</em> (none, links revert to plain text), <em>" + LINK_WIKIPEDIA + "</em> (html links to wikipedia), or <em>" + LINK_TOOLKIT + "</em> (html links to the Wikipedia Miner search service), <em>" + LINK_WIKI + "</em> (MediaWiki syntax), <em>" + LINK_IDS + "<em> (modified MediaWiki syntax [[id|anchor]]")) ;
 		paramLink.setAttribute("optional", "true") ;
-		paramLink.setAttribute("default", String.valueOf(getDefaultLinkDestination())) ; 
+		paramLink.setAttribute("default", "none, html links to wikipedia, or standard MediaWiki syntax, depending on format") ; 
 		description.appendChild(paramLink) ;
 		
 		Element paramGetImages = wms.doc.createElement("Parameter") ;
@@ -232,14 +261,14 @@ public class Definer {
 	 * @param pageId the id of the wikipedia page to define.
 	 * @param length the desired length of the definition (either LENGTH_SHORT or LENGTH_LONG)
 	 * @param format the desired format of the definition (FORMAT_PLAIN, FORMAT_WIKI, FORMAT_HTML)
-	 * @param linkDestination the desired destination of links if using FORMAT_HTML (LINK_NONE, LINK_DIRECT, LINK_TOOLKIT)
+	 * @param linkFormat the desired destination of links if using FORMAT_HTML (LINK_NONE, LINK_DIRECT, LINK_TOOLKIT)
 	 * @param getImages true if you want to retrieve URLs for relevant images from freebase, otherwise false
 	 * @param maxImageWidth the maximum width of the images, in pixels. 
 	 * @param maxImageHeight the maximum width of the images, in pixels. 
 	 * @return the definition.
 	 * @throws Exception
 	 */
-	public Element getDefinition(int pageId, int length, int format, int linkDestination, boolean getImages, int maxImageWidth, int maxImageHeight) throws Exception {
+	public Element getDefinition(int pageId, int length, int format, int linkFormat, boolean getImages, int maxImageWidth, int maxImageHeight, boolean escapeDefinition) throws Exception {
 		
 		Element response = wms.doc.createElement("DefinitionResponse") ;
 		
@@ -257,13 +286,22 @@ public class Definer {
 		}	
 		
 		response.setAttribute("title", page.getTitle()) ;
+		
+		String definition = null ;
 				
 		if (length==LENGTH_SHORT) 
-			response.appendChild(wms.createElement("Definition", formatDefinition(page.getFirstSentence(), format, linkDestination))) ;
-				
-		if (length==LENGTH_LONG) 
-			response.appendChild(wms.createElement("Definition", formatDefinition(page.getFirstParagraph(), format, linkDestination))) ;
+			definition = format(page.getFirstSentence(), format, linkFormat) ;
 		
+		if (length==LENGTH_LONG) 
+			definition = format(page.getFirstParagraph(), format, linkFormat) ;
+		
+		if (escapeDefinition) {
+			Element d = wms.doc.createElement("Definition") ;
+			d.appendChild(wms.doc.createTextNode(definition)) ;
+			response.appendChild(d) ;
+		} else {			
+			response.appendChild(wms.createElement("Definition", definition)) ;
+		}
 		
 		if (getImages) {
 			//get image urls from freebase
@@ -295,7 +333,7 @@ public class Definer {
 	}
 	
 	
-	private String resolveFormatTags(String markup) {
+	protected String resolveFormatTags(String markup) {
 		
 		//replace bold tags
 		Pattern p = Pattern.compile("'''([^']*?)'''", Pattern.DOTALL) ;
@@ -337,26 +375,37 @@ public class Definer {
 	}
 	
 	
-	protected String formatDefinition(String definition, int format, int linkDestination){
-				
+	protected String format(String markup, int format, int linkFormat){
+		
+		markup = ms.stripAllButLinksAndEmphasis(markup, null) ;
+		markup = ms.stripNonArticleInternalLinks(markup, null) ;
+		
+		//first deal with bold and italic stuff
+		
 		if (format == FORMAT_PLAIN) {
-			definition = stripper.stripInternalLinks(definition, null) ; 
-			definition = definition.replaceAll("'{2,}", "") ; 
+			markup = ms.stripInternalLinks(markup, null) ;
 		}
 		
 		if (format == FORMAT_HTML) {
-			definition = resolveFormatTags(definition) ; 
-			definition = resolveFormatTags(definition) ; 
+			markup = er.resolveEmphasis(markup) ;
+		}
+		
+		if (format != FORMAT_WIKI) 
+			markup = markup.replace("'{2,}", "") ;
+		
+		// deal with links
+		
+		if (linkFormat != LINK_WIKI) {
 			
 			//replace links
 			Pattern p = Pattern.compile("\\[\\[(.*?)\\]\\]", Pattern.DOTALL) ;
-			Matcher m = p.matcher(definition) ;
+			Matcher m = p.matcher(markup) ;
 			
 			int lastPos = 0 ;
 			StringBuffer sb = new StringBuffer() ;
 			
 			while(m.find()) {
-				sb.append(definition.substring(lastPos, m.start())) ;
+				sb.append(markup.substring(lastPos, m.start())) ;
 				
 				String link = m.group(1) ;
 				String anchor ;
@@ -374,29 +423,39 @@ public class Definer {
 				
 				Article art = wms.wikipedia.getArticleByTitle(dest) ;
 				
-				if (art == null || linkDestination == LINK_NONE) {
+				if (art == null || linkFormat == LINK_NONE) {
 					sb.append(anchor) ;
 				} else {
-							
-					if (linkDestination == LINK_DIRECT) 
-						sb.append("<a href=\"http://www.en.wikipedia.org/wiki/" + art.getTitle() + "\">") ;
-					else
-						sb.append("<a href=\"" + wms.context.getInitParameter("service_name") + "?task=search&id=" + art.getId() + "&term=" + art.getTitle() + "\">") ;
+					switch(linkFormat) {
 					
-					sb.append(anchor) ;
-					sb.append("</a>") ;
+					case LINK_WIKIPEDIA:
+						sb.append("<a href=\"http://www.en.wikipedia.org/wiki/" + art.getTitle() + "\">") ;
+						sb.append(anchor) ;
+						sb.append("</a>") ;
+						break ;
+					case LINK_TOOLKIT:
+						sb.append("<a href=\"" + wms.context.getInitParameter("service_name") + "?task=search&id=" + art.getId() + "&term=" + art.getTitle() + "\">") ;
+						sb.append(anchor) ;
+						sb.append("</a>") ;
+						break ;
+					case LINK_IDS:
+						sb.append("[[" + art.getId() + "|" + anchor + "]]") ; 
+						break ;
+					}
 				}
 				lastPos = m.end() ;		
 			}
 			
-			sb.append(definition.substring(lastPos)) ;
-			definition = sb.toString() ;
+			sb.append(markup.substring(lastPos)) ;
+			markup = sb.toString() ;
 		}
 		
-		definition = definition.replaceAll("\\[\\[", "") ;
-		definition = definition.replaceAll("\\]\\]", "") ;
+		if (linkFormat != LINK_WIKI && linkFormat != LINK_IDS) {
+			markup = markup.replaceAll("\\[\\[", "") ;
+			markup = markup.replaceAll("\\]\\]", "") ;
+		}
 		
-		return definition ;
+		return markup ;
 	}	                
 	
 	private String getHtml(String url) throws Exception {

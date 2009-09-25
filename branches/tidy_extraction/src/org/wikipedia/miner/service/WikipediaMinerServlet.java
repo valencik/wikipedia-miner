@@ -76,17 +76,17 @@ public class WikipediaMinerServlet extends HttpServlet {
 		tp = null ; //new CaseFolder() ; 
 
 		try {
-			
+
 			//TODO: get from context parameters
 			File dataDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
 			File indexDir = new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
-			
+
 			wikipedia = new Wikipedia(dataDir, indexDir) ;
-				
+
 			//	new Wikipedia(context.getInitParameter("mysql_server"), context.getInitParameter("mysql_database"), context.getInitParameter("mysql_user"), context.getInitParameter("mysql_password")) ;
 		} catch (Exception e) {
-			
-			
+
+
 			throw new ServletException("Could not connect to wikipedia database.") ;
 		}
 
@@ -95,14 +95,14 @@ public class WikipediaMinerServlet extends HttpServlet {
 		definer = new Definer(this) ;
 		comparer = new Comparer(this) ;
 		searcher = new Searcher(this) ;
-		
+
 		try {
 			wikifier = new Wikifier(this) ;
-			
+
 		} catch (Exception e) {
 			System.err.println("Could not initialize wikifier") ;			
 		}
-		
+
 		/*
 		try {
 			File dataDirectory = new File(context.getInitParameter("data_directory")) ;
@@ -128,7 +128,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 			transformersByName.put("search", buildTransformer("search", xsltDirectory, tf)) ;
 			transformersByName.put("compare", buildTransformer("compare", xsltDirectory, tf)) ;
 			transformersByName.put("wikify", buildTransformer("wikify", xsltDirectory, tf)) ;
-			
+
 			Transformer serializer = TransformerFactory.newInstance().newTransformer();
 			serializer.setOutputProperty(OutputKeys.INDENT, "yes");
 			serializer.setOutputProperty(OutputKeys.METHOD,"xml");
@@ -170,11 +170,11 @@ public class WikipediaMinerServlet extends HttpServlet {
 
 			String task = request.getParameter("task") ;
 
-			
+
 
 
 			Element data = null ;
-			
+
 
 			//process help request
 			if (request.getParameter("help") != null) 
@@ -189,18 +189,20 @@ public class WikipediaMinerServlet extends HttpServlet {
 
 			//process definition request
 			if (data==null && task.equals("define")) {
-				int id = resolveIntegerArg(request.getParameter("id"), -1) ; 
+				int id = resolveIntegerArg(request.getParameter("id"), -1) ;
 				int length = resolveIntegerArg(request.getParameter("length"), definer.getDefaultLength()) ;
-				int format = resolveIntegerArg(request.getParameter("format"), definer.getDefaultFormat()) ; 
-				int maxImageWidth = resolveIntegerArg(request.getParameter("maxImageWidth"), definer.getDefaultMaxImageWidth()) ; 
+				int format = resolveIntegerArg(request.getParameter("format"), definer.getDefaultFormat()) ;
+				int maxImageWidth = resolveIntegerArg(request.getParameter("maxImageWidth"), definer.getDefaultMaxImageWidth()) ;
 				int maxImageHeight = resolveIntegerArg(request.getParameter("maxImageHeight"), definer.getDefaultMaxImageHeight()) ;
-				int linkDestination = resolveIntegerArg(request.getParameter("linkDestination"), definer.getDefaultLinkDestination()) ;
+				int linkFormat = resolveIntegerArg(request.getParameter("linkFormat"), definer.getDefaultLinkFormat(format)) ;
+				boolean escapeDefinition = resolveBooleanArg(request.getParameter("escapeDefinition"), false) ;
 				boolean getImages = resolveBooleanArg(request.getParameter("getImages"), false) ;
 
-				data = definer.getDefinition(id, length, format, linkDestination, getImages, maxImageWidth, maxImageHeight) ;				
+				data = definer.getDefinition(id, length, format, linkFormat, getImages, maxImageWidth, maxImageHeight, escapeDefinition) ;
 			}
 
-			
+
+
 			//all of the remaining tasks require data to be cached, so lets make sure that is finished before continuing.
 			//if (!cachingThread.isOk())
 			//	throw new ServletException("Could not cache wikipedia data") ;
@@ -214,7 +216,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 				data.setAttribute("progress", df.format(progress)) ;
 				task = "loading" ;
 			}*/
-			
+
 			//process search request
 			if (data==null && task.equals("search")) {
 				String term = request.getParameter("term") ;
@@ -227,7 +229,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 				else
 					data = searcher.doSearch(Integer.parseInt(id), linkLimit) ;
 			}
-			
+
 			//process compare request
 			if (data==null && task.equals("compare")) {
 				String term1 = request.getParameter("term1");
@@ -235,14 +237,14 @@ public class WikipediaMinerServlet extends HttpServlet {
 				int linkLimit = resolveIntegerArg(request.getParameter("linkLimit"), comparer.getDefaultMaxLinkCount()) ;	
 				boolean getSenses = resolveBooleanArg(request.getParameter("getSenses"), false) ;
 				boolean getSnippets = resolveBooleanArg(request.getParameter("getSnippets"), false) ;
-				
+
 
 				data = comparer.getRelatedness(term1, term2, getSenses, getSnippets, linkLimit) ;
 			}
-			
+
 			//process wikify request
 			if (data==null && task.equals("wikify")) {
-				
+
 				if (this.wikifier == null) 
 					throw new ServletException("Wikifier is not available. You must configure the servlet so that it has access to link detection and disambiguation models.") ;
 
@@ -265,7 +267,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 					return ;
 				}
 			}
-			
+
 			if (data==null)
 				throw new Exception("Unknown Task") ;
 
@@ -338,7 +340,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 
 			if (task.equals("define")) 
 				return definer.getDescription() ;
-			
+
 			if (task.equals("compare")) 
 				return comparer.getDescription() ;
 
@@ -347,14 +349,14 @@ public class WikipediaMinerServlet extends HttpServlet {
 
 			if (task.equals("wikify")) 
 				return wikifier.getDescription() ;
-			 
+
 		}
 
 		Element description = doc.createElement("Description") ;
 
 		description.appendChild(createElement("Details", "<p>This servlet provides a range of services for mining information from Wikipedia. Further details depend on what you want to do.</p>"
 				+ "<p>You can <a href=\"" + context.getInitParameter("service_name") + "?task=search&help\">search for pages</a>, <a href=\"" + context.getInitParameter("service_name") + "?task=compare&help\">measure how terms or articles related to each other</a>, <a href=\"" + context.getInitParameter("service_name") + "?task=define&help\">obtain short definitions from articles</a>, and <a href=\"" + context.getInitParameter("service_name") + "?task=wikify&help\">detect topics in web pages</a>.</p>")) ; 		
-	
+
 		Element paramTask = createElement("Parameter", "Specifies what you want to do: can be <em>search</em>, <em>compare</em>, <em>define</em>, or <em>wikify</em>") ;
 		paramTask.setAttribute("name", "task") ;
 		description.appendChild(paramTask) ;
