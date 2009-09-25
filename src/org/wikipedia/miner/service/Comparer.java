@@ -175,7 +175,7 @@ public class Comparer {
 			String firstSentence = null;
 			try { 
 				firstSentence = sense1.getFirstSentence() ;
-				firstSentence = wms.definer.formatDefinition(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+				firstSentence = wms.definer.format(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 			} catch (Exception e) {} ;
 			
 			if (firstSentence != null) 
@@ -193,7 +193,7 @@ public class Comparer {
 			firstSentence = null;
 			try { 
 				firstSentence = sense2.getFirstSentence() ;
-				firstSentence = wms.definer.formatDefinition(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+				firstSentence = wms.definer.format(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 			} catch (Exception e) {} ;
 			
 			if (firstSentence != null) 
@@ -221,6 +221,7 @@ public class Comparer {
 					int[] sb = sense2.getSentenceBoundsSurrounding(pos) ;
 					if (sb != null) {
 						String sentence = content2.substring(sb[0], sb[1]) ;
+						sentence = wms.definer.format(sentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 						
 						Element xmlSnippet = wms.doc.createElement("Snippet");
 						xmlSnippet.appendChild(wms.doc.createTextNode(sentence)) ;
@@ -238,6 +239,7 @@ public class Comparer {
 					int[] sb = sense1.getSentenceBoundsSurrounding(pos) ;
 					if (sb != null) {
 						String sentence = content1.substring(sb[0], sb[1]) ;
+						sentence = wms.definer.format(sentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 						
 						Element xmlSnippet = wms.doc.createElement("Snippet");
 						xmlSnippet.appendChild(wms.doc.createTextNode(sentence)) ;
@@ -283,6 +285,7 @@ public class Comparer {
 									mlContent = ml.getContent() ;
 								
 								String sentence = mlContent.substring(sb[0], sb[1]) ;
+								sentence = wms.definer.format(sentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 								
 								Element xmlSnippet = wms.doc.createElement("Snippet");
 								xmlSnippet.appendChild(wms.doc.createTextNode(sentence)) ;

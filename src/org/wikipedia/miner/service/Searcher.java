@@ -162,7 +162,7 @@ public class Searcher {
 			String firstSentence = null;
 			try { 
 				firstSentence = sense.getFirstSentence() ;
-				firstSentence = wms.definer.formatDefinition(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+				firstSentence = wms.definer.format(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 			} catch (Exception e) {} ;
 			
 			if (firstSentence != null) 
@@ -224,7 +224,7 @@ public class Searcher {
 		String firstParagraph = null;
 		try { 
 			firstParagraph = article.getFirstParagraph() ;
-			firstParagraph =  wms.definer.formatDefinition(firstParagraph, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+			firstParagraph =  wms.definer.format(firstParagraph, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 		} catch (Exception e) {};
 		
 		if (firstParagraph != null) 
@@ -370,7 +370,7 @@ public class Searcher {
 		String firstParagraph = null;
 		try { 
 			firstParagraph = category.getFirstParagraph() ;
-			firstParagraph = wms.definer.formatDefinition(firstParagraph, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+			firstParagraph = wms.definer.format(firstParagraph, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 		} catch (Exception e) {};
 		
 		if (firstParagraph != null) 
@@ -409,7 +409,7 @@ public class Searcher {
 		String firstParagraph = null;
 		try { 
 			firstParagraph = disambig.getFirstParagraph() ;
-			firstParagraph = wms.definer.formatDefinition(firstParagraph, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+			firstParagraph = wms.definer.format(firstParagraph, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 		} catch (Exception e) {};
 		
 		if (firstParagraph != null) 
@@ -512,7 +512,7 @@ public class Searcher {
 			return "This is a disambiguation page, created to list the possible senses of the page's title\n" ;
 		} else {
 			try {			
-				return wms.definer.formatDefinition(page.getFirstSentence(), Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+				return wms.definer.format(page.getFirstSentence(), Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 			} catch (Exception e) {
 				return "" ;
 			} 
