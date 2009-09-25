@@ -682,8 +682,9 @@ public Section getStructureRoot() {
 		
 		
 		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/simple/20080620") ;
+		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/simple/20080620") ;
 		
-		Wikipedia w = new Wikipedia(berkeleyDir) ;
+		Wikipedia w = new Wikipedia(berkeleyDir, luceneDir) ;
 		
 		Article china = w.getMostLikelyArticle("China", null) ;
 		

@@ -52,8 +52,8 @@ public class Wikipedia {
 	 * @param password	the users password (null if anonymous)
 	 * @throws Exception if there is a problem connecting to the database, or if the database is not complete.
 	 */
-	public Wikipedia(File databaseDirectory) throws Exception{
-		environment = new WikipediaEnvironment(databaseDirectory, false) ; 
+	public Wikipedia(File databaseDirectory, File indexDirectory) throws Exception{
+		environment = new WikipediaEnvironment(databaseDirectory, indexDirectory, false) ; 
 	}
 	
 	public Wikipedia(WikipediaEnvironment environment) {
@@ -340,7 +340,9 @@ public class Wikipedia {
 	public static void main(String[] args) throws Exception {
 		
 		File dataDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
-		Wikipedia self = new Wikipedia(dataDir) ;
+		File indexDir = new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
+		
+		Wikipedia self = new Wikipedia(dataDir, indexDir) ;
 		
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );			
 				

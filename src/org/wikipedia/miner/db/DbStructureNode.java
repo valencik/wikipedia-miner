@@ -5,6 +5,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.wikipedia.miner.model.Wikipedia;
+
 public class DbStructureNode implements Comparable<DbStructureNode>{
 
 	private int start ;
@@ -205,7 +207,10 @@ public class DbStructureNode implements Comparable<DbStructureNode>{
 	public static void main(String[] args) throws Exception{
 		
 		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/simple/20080620") ;
-		WikipediaEnvironment we = new WikipediaEnvironment(berkeleyDir, false) ;
+		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/simple/20080620") ;
+		
+
+		WikipediaEnvironment we = new WikipediaEnvironment(berkeleyDir, luceneDir, false) ;
 		
 		String text = we.getPageContent(5072) ;
 		DbStructureNode struct = we.getPageStructure(5072) ;

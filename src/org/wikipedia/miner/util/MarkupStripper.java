@@ -240,6 +240,13 @@ public class MarkupStripper {
 
 		return stripRegions(markup, regions, replacement) ;
 	}
+	
+	public String stripSectionHeaders(String markup, Character replacement) {
+		
+		Vector<int[]> regions = this.gatherSectionHeaders(markup) ;
+		return stripRegions(markup, regions, replacement) ;
+		
+	}
 
 	/**
 	 * Convenience method which combines both of the above methods - i.e. returns a copy of the
