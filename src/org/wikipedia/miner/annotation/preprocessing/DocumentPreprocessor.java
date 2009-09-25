@@ -20,6 +20,8 @@
 package org.wikipedia.miner.annotation.preprocessing;
 
 import java.io.*;
+import java.util.Arrays;
+import java.util.Vector;
 import java.util.regex.*;
 import org.wikipedia.miner.annotation.preprocessing.PreprocessedDocument.RegionTag;
 import org.wikipedia.miner.util.* ;
@@ -123,27 +125,30 @@ public abstract class DocumentPreprocessor {
 		return sb.toString() ;
 	}
 	
-	protected SortedVector<RegionTag> getRegionTags(String markup) {
-		SortedVector<RegionTag> regionTags = new SortedVector<RegionTag>() ;
+	protected RegionTag[] getRegionTags(String markup) {
+		Vector<RegionTag> regionTags = new Vector<RegionTag>() ;
 		
 		if (openPattern != null) {
 			Matcher m = openPattern.matcher(markup) ;
 			while (m.find()) 
-				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_OPEN), false) ;
+				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_OPEN)) ;
 		}
 		
 		if (closePattern != null) {
 			Matcher m = closePattern.matcher(markup) ;
 			while (m.find()) 
-				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_CLOSE), false) ;
+				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_CLOSE)) ;
 		}
 				
 		if (splitPattern != null) {
 			Matcher m = splitPattern.matcher(markup) ;
 			while (m.find()) 
-				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_SPLIT), false) ;
+				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_SPLIT)) ;
 		}
 		
-		return regionTags ;
+		RegionTag[] rts = regionTags.toArray(new RegionTag[regionTags.size()]) ;
+		Arrays.sort(rts) ;
+		
+		return rts ;
 	}
 }

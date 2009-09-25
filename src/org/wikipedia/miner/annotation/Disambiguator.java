@@ -17,7 +17,7 @@
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-
+//TODO:Check how many times we are calling anchor.getSenses(). Seems a lot, seems inefficient.
 package org.wikipedia.miner.annotation;
 
 import gnu.trove.TIntHashSet;
@@ -72,14 +72,16 @@ public class Disambiguator {
 
 		init(wikipedia, textProcessor, 0.02, 0.03, 25) ;
 		
-		if (!wikipedia.getDatabase().arePagesCached())
-			System.err.println("Disambiguator | Warning: pages have not been cached, so this will run significantly slower than it needs to.") ;
 		
-		if (tp != null && !wikipedia.getDatabase().areAnchorsCached(tp))
-			System.err.println("Disambiguator | Warning: anchors have not been cached, so this will run significantly slower than it needs to.") ;
+		//TODO: suss out caching
+		//if (!wikipedia.getDatabase().arePagesCached())
+		//	System.err.println("Disambiguator | Warning: pages have not been cached, so this will run significantly slower than it needs to.") ;
 		
-		if (!wikipedia.getDatabase().areInLinksCached())
-			System.err.println("Disambiguator | Warning: links into pages have not been cached, so this will run significantly slower than it needs to.") ;
+		//if (tp != null && !wikipedia.getDatabase().areAnchorsCached(tp))
+		//	System.err.println("Disambiguator | Warning: anchors have not been cached, so this will run significantly slower than it needs to.") ;
+		
+		//if (!wikipedia.getDatabase().areInLinksCached())
+		//	System.err.println("Disambiguator | Warning: links into pages have not been cached, so this will run significantly slower than it needs to.") ;
 	}
 
 	/**
@@ -171,7 +173,7 @@ public class Disambiguator {
 			Article art = null;
 			
 			try{ 
-				art = new Article(wikipedia.getDatabase(), id) ;
+				art = new Article(wikipedia.getEnvironment(), id) ;
 			} catch (Exception e) {
 				System.err.println("Warning: " + id + " is not a valid article") ;
 			}
@@ -305,8 +307,8 @@ public class Disambiguator {
 
 			//System.out.println(linkText + ", " + anchorText + ", " + destText) ;
 			
-			Anchor anchor = new Anchor(anchorText, tp, wikipedia.getDatabase()) ;
-			int senseCount = anchor.getSenses().size() ;
+			Anchor anchor = new Anchor(wikipedia.getEnvironment(), anchorText, tp) ;
+			int senseCount = anchor.getSenses().length ;
 			Article dest = wikipedia.getArticleByTitle(destText) ;
 			
 			//if (dest == null) {
@@ -316,7 +318,7 @@ public class Disambiguator {
 			if (dest != null && senseCount >= 1) {
 				TopicReference ref = new TopicReference(anchor, dest.getId(), new Position(0, 0)) ;
 
-				if (senseCount == 1 || anchor.getSenses().first().getProbability() >= (1-minSenseProbability))
+				if (senseCount == 1 || anchor.getSenses()[0].getProbability() >= (1-minSenseProbability))
 					unambigAnchors.add(anchor) ;
 				else
 					ambigRefs.add(ref) ;
@@ -397,10 +399,9 @@ public class Disambiguator {
 	 * @param snippetLength the portion of each article that should be considered for testing (see ArticleCleaner).  
 	 * @param rc a cache in which relatedness measures will be saved so they aren't repeatedly calculated. Make this null if using extremely large testing sets, so that caches will be reset from document to document, and won't grow too large.
 	 * @return Result a result (including recall, precision, f-measure) of how well the classifier did.   
-	 * @throws SQLException if there is a problem with the WikipediaMiner database.
 	 * @throws Exception if there is a problem with the classifier
 	 */
-	public Result<Integer> test(ArticleSet testSet, int snippetLength, RelatednessCache rc) throws SQLException, Exception{
+	public Result<Integer> test(ArticleSet testSet, int snippetLength, RelatednessCache rc) throws Exception{
 
 		if (classifier == null) 
 			throw new WekaException("You must build (or load) classifier first.") ;
@@ -411,7 +412,7 @@ public class Disambiguator {
 		ProgressNotifier pn = new ProgressNotifier(testSet.getArticleIds().size(), "Testing") ;
 		for (int id: testSet.getArticleIds()) {
 			try {
-				art = new Article(wikipedia.getDatabase(), id) ;
+				art = new Article(wikipedia.getEnvironment(), id) ;
 			} catch (Exception e) {
 				System.err.println("Warning: " + id + " is not a valid article") ;
 			} ;
@@ -454,15 +455,15 @@ public class Disambiguator {
 
 			destText = Character.toUpperCase(destText.charAt(0)) + destText.substring(1) ;     // Get first char and capitalize
 
-			Anchor anchor = new Anchor(anchorText, tp, wikipedia.getDatabase()) ;
-			int senseCount = anchor.getSenses().size() ;
+			Anchor anchor = new Anchor(wikipedia.getEnvironment(), anchorText, tp) ;
+			int senseCount = anchor.getSenses().length ;
 			Article dest = wikipedia.getArticleByTitle(destText) ;
 
 			if (senseCount > 0 && dest != null) {
 
 				goldStandard.add(dest.getId()) ;
 
-				if (senseCount == 1 || anchor.getSenses().first().getProbability() >= (1-minSenseProbability)) { 
+				if (senseCount == 1 || anchor.getSenses()[0].getProbability() >= (1-minSenseProbability)) { 
 					unambigAnchors.add(anchor) ;
 					disambiguatedLinks.add(dest.getId()) ;
 				} else {
@@ -498,10 +499,10 @@ public class Disambiguator {
 				Instance i = new Instance(1.0, values) ;
 				i.setDataset(header) ;
 
-				double prob = classifier.distributionForInstance(i)[0] ;
+				float prob = (float)classifier.distributionForInstance(i)[0] ;
 
 				if (prob>0.5) {
-					Article art = new Article(wikipedia.getDatabase(), sense.getId()) ;
+					Article art = new Article(wikipedia.getEnvironment(), sense.getId()) ;
 					art.setWeight(prob) ;
 					validSenses.add(art) ;					
 				}
@@ -543,11 +544,10 @@ public class Disambiguator {
 				String ngram = s.substring(startIndex, currIndex) ;
 
 				if (! (ngram.length()==1 && s.substring(startIndex-1, startIndex).equals("'"))&& !ngram.trim().equals("")) {
-					Anchor anchor = new Anchor(wikipedia.getDatabase().addEscapes(ngram), tp, wikipedia.getDatabase()) ;
-
+					Anchor anchor = new Anchor(wikipedia.getEnvironment(), ngram, tp) ;
 
 					if (anchor.getLinkProbability() > minLinkProbability)
-						if (anchor.getSenses().size() == 1 || anchor.getSenses().first().getProbability() >= (1-minSenseProbability)) 
+						if (anchor.getSenses().length == 1 || anchor.getSenses()[0].getProbability() >= (1-minSenseProbability)) 
 							unambigAnchors.add(anchor) ;
 				}	
 			}
@@ -613,10 +613,12 @@ public class Disambiguator {
 		File dataDirectory = new File("/research/wikipediaminer/data/en/20080727") ;
 		ProgressNotifier pn = new ProgressNotifier(4) ;
 		
+		/*
 		TIntHashSet ids = wikipedia.getDatabase().getValidPageIds(dataDirectory, 2, pn) ;
 		wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;
 		wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 2, pn) ;
 		wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
+		*/
 		
 		//gather article sets for training and testing		
 		ArticleSet trainSet = new ArticleSet(new File("data/articleSets/trainingIds.csv")) ;

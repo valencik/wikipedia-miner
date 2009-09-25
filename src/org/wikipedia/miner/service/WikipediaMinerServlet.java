@@ -57,6 +57,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 	protected Wikipedia wikipedia ;
 	private CacherThread cachingThread ;
 
+	protected TextProcessor tp ;
 	protected Comparer comparer ;
 	protected Searcher searcher ;
 	protected Definer definer ;
@@ -72,11 +73,15 @@ public class WikipediaMinerServlet extends HttpServlet {
 		super.init(config);
 		context = config.getServletContext() ;
 
-		TextProcessor tp = new CaseFolder() ; 
+		tp = null ; //new CaseFolder() ; 
 
 		try {
-			wikipedia = new Wikipedia(context.getInitParameter("mysql_server"), context.getInitParameter("mysql_database"), context.getInitParameter("mysql_user"), context.getInitParameter("mysql_password")) ;
+			wikipedia = new Wikipedia(new File("/Users/dmilne/Research/wikipedia/databases/en/20090822")) ;
+				
+			//	new Wikipedia(context.getInitParameter("mysql_server"), context.getInitParameter("mysql_database"), context.getInitParameter("mysql_user"), context.getInitParameter("mysql_password")) ;
 		} catch (Exception e) {
+			
+			
 			throw new ServletException("Could not connect to wikipedia database.") ;
 		}
 
@@ -87,12 +92,13 @@ public class WikipediaMinerServlet extends HttpServlet {
 		searcher = new Searcher(this) ;
 		
 		try {
-			wikifier = new Wikifier(this, tp) ;
+			wikifier = new Wikifier(this) ;
 			
 		} catch (Exception e) {
 			System.err.println("Could not initialize wikifier") ;			
 		}
 		
+		/*
 		try {
 			File dataDirectory = new File(context.getInitParameter("data_directory")) ;
 
@@ -104,7 +110,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 			cachingThread.start() ;
 		} catch (Exception e) {
 			throw new ServletException("Could not locate wikipedia data directory.") ;
-		}
+		}*/
 
 		try {
 			TransformerFactory tf = TransformerFactory.newInstance();
@@ -191,9 +197,10 @@ public class WikipediaMinerServlet extends HttpServlet {
 
 			
 			//all of the remaining tasks require data to be cached, so lets make sure that is finished before continuing.
-			if (!cachingThread.isOk())
-				throw new ServletException("Could not cache wikipedia data") ;
+			//if (!cachingThread.isOk())
+			//	throw new ServletException("Could not cache wikipedia data") ;
 
+			/*
 			double progress = cachingThread.getProgress() ;
 			if (data==null && (progress < 1 || task.equals("progress"))) {
 				//still caching up data, not ready to return a response yet.
@@ -201,7 +208,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 				data = doc.createElement("loading") ;
 				data.setAttribute("progress", df.format(progress)) ;
 				task = "loading" ;
-			}
+			}*/
 			
 			//process search request
 			if (data==null && task.equals("search")) {
@@ -221,9 +228,11 @@ public class WikipediaMinerServlet extends HttpServlet {
 				String term1 = request.getParameter("term1");
 				String term2 = request.getParameter("term2") ;
 				int linkLimit = resolveIntegerArg(request.getParameter("linkLimit"), comparer.getDefaultMaxLinkCount()) ;	
-				boolean details = resolveBooleanArg(request.getParameter("details"), comparer.getDefaultShowDetails()) ;
+				boolean getSenses = resolveBooleanArg(request.getParameter("getSenses"), false) ;
+				boolean getSnippets = resolveBooleanArg(request.getParameter("getSnippets"), false) ;
+				
 
-				data = comparer.getRelatedness(term1, term2, details, linkLimit) ;
+				data = comparer.getRelatedness(term1, term2, getSenses, getSnippets, linkLimit) ;
 			}
 			
 			//process wikify request
@@ -413,14 +422,14 @@ public class WikipediaMinerServlet extends HttpServlet {
 			pn = new ProgressNotifier(5) ;
 
 			try {
-				TIntHashSet ids = wikipedia.getDatabase().getValidPageIds(dataDirectory, 3, pn) ;
-				wikipedia.getDatabase().cacheParentIds(dataDirectory, pn) ;
-				wikipedia.getDatabase().cacheGenerality(dataDirectory, ids, null) ;
-				wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;
-				wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 3, pn) ;
-				wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
+				//TIntHashSet ids = wikipedia.getDatabase().getValidPageIds(dataDirectory, 3, pn) ;
+				//wikipedia.getDatabase().cacheParentIds(dataDirectory, pn) ;
+				//wikipedia.getDatabase().cacheGenerality(dataDirectory, ids, null) ;
+				//wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;
+				//wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 3, pn) ;
+				//wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
 
-				ids = null ;
+				//ids = null ;
 			} catch (Exception e) {
 				ok = false ;
 
@@ -435,13 +444,14 @@ public class WikipediaMinerServlet extends HttpServlet {
 	 */
 	public boolean checkConnection() {
 
+		/*
 		if (!wikipedia.getDatabase().checkConnection()) {	
 			try {
 				wikipedia.getDatabase().connect() ;
 			} catch (Exception e) {
 				return false ;
 			}
-		}
+		}*/
 		return true ;
 	}
 

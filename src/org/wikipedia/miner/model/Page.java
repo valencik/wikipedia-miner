@@ -21,9 +21,13 @@ package org.wikipedia.miner.model;
 
 import java.io.*;
 import java.sql.*;
+import java.util.Arrays;
 import java.util.Vector;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import org.wikipedia.miner.model.WikipediaDatabase.CachedPage;
+import org.wikipedia.miner.db.*;
+import org.wikipedia.miner.db.WikipediaEnvironment.Statistic;
 import org.wikipedia.miner.util.*;
 
 
@@ -38,36 +42,36 @@ import org.wikipedia.miner.util.*;
  */
 public abstract class Page implements Comparable<Page>{
 
-	protected WikipediaDatabase database ;
+	protected WikipediaEnvironment environment ;
 
 	protected int id ;
-	protected int type ;
+	
+	protected short type ;
 	protected String title ;
+	protected boolean detailsSet ;
+	
 
-	protected String titleWithoutScope ;
-	protected String scope ;
-
-	protected double weight = -1 ;
+	protected float weight = -1 ;
 
 	/**
 	 * the page type corresponding to Articles
 	 */
-	public static final int ARTICLE = 1 ;
+	public static final short ARTICLE = 1 ;
 
 	/**
 	 * the page type corresponding to Categories
 	 */
-	public static final int CATEGORY = 2 ;
+	public static final short CATEGORY = 2 ;
 
 	/**
 	 * the page type corresponding to Redirects
 	 */
-	public static final int REDIRECT = 3 ;
+	public static final short REDIRECT = 3 ;
 
 	/**
 	 * the page type corresponding to DisambiguationPages
 	 */
-	public static final int DISAMBIGUATION = 4 ;
+	public static final short DISAMBIGUATION = 4 ;
 
 	/**
 	 * Initialises a newly created Page so that it represents the page given by <em>id</em>, <em>title</em> and <em>type</em>.
@@ -79,92 +83,42 @@ public abstract class Page implements Comparable<Page>{
 	 * @param	title	the (case dependent) title of the page
 	 * @param	type	the type of the page (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
 	 */
-	public Page(WikipediaDatabase database, int id, String title, int type)  {
-		this.database = database ;
+	public Page(WikipediaEnvironment environment, int id, String title, short type)  {
+		this.environment = environment ;
 		this.id = id ;
 		this.title = title ;
 		this.type = type ;
+		this.detailsSet = true ;
 	}
 
 	/**
-	 * Initializes a newly created Page so that it represents the page given by <em>id</em>.
+	 * Initializes a newly created Page so that it represents the page given by <em>id</em>. This is also an efficient
+	 * constructor, since 
 	 * 
 	 * @param	database	an active WikipediaDatabase
 	 * @param	id	the unique identifier of the Wikipedia page
-	 * @throws SQLException if there is a problem with the Wikipedia database.
+	 * @ if there is a problem with the Wikipedia database.
 	 */
-	public Page(WikipediaDatabase database, int id) throws SQLException{
-		this.database = database ;
+	public Page(WikipediaEnvironment environment, int id) {
+		this.environment = environment ;
 		this.id = id ;
-
-		boolean detailsSet = false ;
-
-		if (database.arePagesCached()) {
-			CachedPage p = database.cachedPages.get(id) ;
-
-			if (p != null) {
-				this.title = p.title ;
-				this.type = p.type ;
-				detailsSet = true ;
-			}
-		} else {
-			Statement stmt = database.createStatement() ;
-			ResultSet rs = stmt.executeQuery("SELECT page_title, page_type FROM page WHERE page_id=" + id) ;
-
-			if (rs.first()) {
-				try {
-					title = new String(rs.getBytes(1), "UTF-8") ;
-				} catch (Exception e) {} ;	
-
-				type = rs.getInt(2) ;
-
-				detailsSet = true ;
-			}
-
-			rs.close() ;
-			stmt.close();
-		}
-
-		if (!detailsSet)
-			throw new SQLException("No page defined for id:" + id) ;	
+		this.detailsSet = false ;
 	}
-
-	/**
-	 * Initialises a newly created Page so that it represents the page given by <em>title</em> and <em>type</em>.
-	 * 
-	 * @param	database	an active WikipediaDatabase
-	 * @param	title	the (case sensitive) title of the page.
-	 * @param    type 	the type of the page (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
-	 * @throws 	SQLException	if no page is defined for the given title and type 
-	 */
-	public Page(WikipediaDatabase database, String title, int type) throws SQLException{
-		this.database = database ;
-		this.title = title ;
-		this.type = type ;
-
-		boolean detailsSet = false ;
-
-		Statement stmt = database.createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT page_id FROM page WHERE page_title=\"" + title + "\" AND page_type=" + type) ;
-
-		if (rs.first()) {
-			id = rs.getInt(1) ;
-			detailsSet = true ;
-		}
-
-		rs.close() ;
-		stmt.close();
-
-		if (!detailsSet)
-			throw new SQLException("No page defined for title:" + title + " and type:" + type) ;
+	
+	public boolean exists() {
+		if (!detailsSet) 
+			setDetails() ;
+		
+		return (title == null) ;
 	}
-
+	
+	
 	/**
 	 * Sets the weight by which this page will be compared to others.
 	 * 
 	 * @param weight  the weight by which this page will be compared to others.
 	 */
-	public void setWeight(double weight) {
+	public void setWeight(float weight) {
 		this.weight = weight ;
 	}
 
@@ -173,7 +127,7 @@ public abstract class Page implements Comparable<Page>{
 	 * 
 	 * @return the weight by which this page is compared to others.
 	 */	
-	public double getWeight() {
+	public float getWeight() {
 		return weight ;
 	}
 
@@ -195,7 +149,7 @@ public abstract class Page implements Comparable<Page>{
 			return 0 ;
 
 		if (p.weight >= 0 && weight >= 0 && p.weight != weight)
-			return -1 * (new Double(weight)).compareTo(p.weight) ;
+			return -1 * (new Float(weight)).compareTo(p.weight) ;
 
 		return (new Integer(id)).compareTo(p.getId()) ;
 	}
@@ -206,17 +160,17 @@ public abstract class Page implements Comparable<Page>{
 	 * @return a string representation of the page
 	 */
 	public String toString() {
-		String s = id + ": " + title ;
+		String s = getId() + ": " + getTitle() ;
 		return s ;
 	}
 
 	/**
-	 * Returns the database in which details of this page is stored.
+	 * Returns the database environment in which details of this page is stored.
 	 * 
-	 * @return the database
+	 * @return the database environment
 	 */
-	protected WikipediaDatabase getWikipediaDatabase() {
-		return database;
+	protected WikipediaEnvironment getEnvironment() {
+		return environment;
 	}
 
 	/**
@@ -234,6 +188,8 @@ public abstract class Page implements Comparable<Page>{
 	 * @return the title
 	 */
 	public String getTitle() {
+		if (!detailsSet) setDetails() ;
+		
 		return title;
 	}
 
@@ -242,41 +198,35 @@ public abstract class Page implements Comparable<Page>{
 	 * 
 	 * @return	the type of the page
 	 */
-	public int getType() {
+	public short getType() {
+		if (!detailsSet) setDetails() ;
+		
 		return type;
 	}
 
+	private void setDetails() {
+		DbPage pd = environment.getPageDetails(id) ;
+		
+		title = pd.getTitle() ;
+		type = pd.getType() ;
+		detailsSet = true ;
+	}
+	
 	/**
 	 * Returns the generality of the page (a function of how far down the category tree it is located).
 	 * 
 	 * @return	the generality of the page
-	 * @throws SQLException if there is a problem with the Wikipedia database
+	 * @ if there is a problem with the Wikipedia database
 	 */
-	public double getGenerality() throws SQLException {
+	public float getGenerality() {
 
-		int depth = -1 ;
-
-		if (database.cachedGenerality != null) {
-			if (database.cachedGenerality.containsKey(id))
-				depth = database.cachedGenerality.get(id) ;
-		} else {
-			Statement stmt = database.createStatement() ;
-			ResultSet rs = stmt.executeQuery("SELECT gn_depth FROM generality WHERE gn_id=" + id) ;
-
-			if (rs.first()) {
-				try {
-					depth = rs.getInt(1) ; 
-				} catch (Exception e) {} ;
-			}
-
-			rs.close() ;
-			stmt.close() ;
-		}
-
-		if (depth < 0) {
+		Integer depth = environment.getDepth(id) ;
+		int maxDepth = environment.getStatisticValue(Statistic.MAX_DEPTH) ;
+		
+		if (depth == null) {
 			return -1 ;
 		} else {
-			return 1-((double)depth/database.getMaxPageDepth()) ; 
+			return 1-((float)depth/maxDepth) ; 
 		}
 	}
 
@@ -285,34 +235,13 @@ public abstract class Page implements Comparable<Page>{
 	 * get the parts you are interested in. 
 	 * 
 	 * @return	content of the page, in raw media wiki format.
-	 * @throws	SQLException if page content has not been stored in the database. 
 	 */
-	public String getContent() throws SQLException {
+	public String getContent() {
 
-		if (!database.isContentImported()) {
-			throw new SQLException("Page content has not been imported") ;
-		} else {
-			String content = null ;
-
-			Statement stmt = database.createStatement() ;
-			ResultSet rs = stmt.executeQuery("SELECT co_content FROM content WHERE co_id=" + id) ;
-
-			if (rs.first()) {
-				try {
-					content = new String(rs.getBytes(1), "UTF-8") ;
-				} catch (Exception e) {} ;
-			}
-
-			rs.close() ;
-			stmt.close() ;
-
-			if (content != null) {
-				//content.replaceAll("\\{","{") ;
-				//content.replaceAll("\\}","}") ;
-			}
-			return content ;
-		}
+		return environment.getPageContent(id) ;
 	}
+	
+	
 
 	/**
 	 * Returns the first sentence from the content of this page, cleaned of all markup except links and 
@@ -323,53 +252,29 @@ public abstract class Page implements Comparable<Page>{
 	 * @param paragraph this is more efficient if you have already gathered the firstParagraph. If not, just use null.
 	 * @param ss this is more efficient if you have already constructed a sentence splitter. If not, just use null.
 	 * @return the first sentence on this page.
-	 * @throws SQLException if page content has not been imported, or if there is another problem with the Wikipedia database
+	 * @ if page content has not been imported, or if there is another problem with the Wikipedia database
 	 * @throws Exception if there is a problem splitting the text into sentences.
 	 */
-	public String getFirstSentence(String paragraph, SentenceSplitter ss) throws SQLException, Exception {
-		if (!database.isContentImported()) 
-			throw new SQLException("Page content has not been imported") ;
-
-		if (database.areDefinitionsSummarized()) {
-			String fs = "" ;
-			
-			Statement stmt = database.createStatement() ;
-			ResultSet rs = stmt.executeQuery("SELECT df_firstSentence FROM definition WHERE df_id=" + id) ;
-
-			if (rs.first()) {
-				try {
-					fs = new String(rs.getBytes(1), "UTF-8") ;
-				} catch (Exception e) {} ;	
-			}
-
-			rs.close() ;
-			stmt.close() ;
-
-			return fs ;	
-		}
-
-		if (paragraph==null)
-			paragraph = getFirstParagraph() ;
-
-		if (paragraph.equals(""))
-			return "" ;
-
-		if (ss==null)
-			ss = new SentenceSplitter() ;
+	public String getFirstSentence() {
 		
-		StringBuffer sb = new StringBuffer() ;
-
-		Vector<String> sentences = ss.getSentences(paragraph, SentenceSplitter.MULTIPLE_NEWLINES) ;
-
-		for (String sentence:sentences) {
-			sb.append(sentence.trim()) ;
-
-			if (sb.length() > 30)
-				break ;
+		String content = getContent() ;
+		
+		DbStructureNode struct = environment.getPageStructure(id) ;
+		
+		if (struct == null)
+			return null ;
+		
+		while (struct.getChildren() != null) {
+			struct = struct.getChildren()[0] ;
 		}
-
-		return sb.toString() ;
-
+		
+		int[] sentenceBreaks = struct.getSentenceBreaks() ;
+		if (sentenceBreaks == null)
+			return null ;
+	
+		String sentence = content.substring(sentenceBreaks[0], sentenceBreaks[1]) ;
+		
+		return sentence ;
 	}
 
 	/**
@@ -379,63 +284,30 @@ public abstract class Page implements Comparable<Page>{
 	 * article, disambiguation page or category was written.
 	 * 
 	 * @return the first paragraph on this page.
-	 * @throws SQLException if page content has not been imported, or if there is another problem with the Wikipedia database
+	 * @ if page content has not been imported, or if there is another problem with the Wikipedia database
 	 */
-	public String getFirstParagraph() throws SQLException {
-		if (!database.isContentImported()) 
-			throw new SQLException("Page content has not been imported") ;
-
-		String fp = null ;
+	public String getFirstParagraph()  {
 		
-		if (database.areDefinitionsSummarized()) {
-			
-			Statement stmt = database.createStatement() ;
-			ResultSet rs = stmt.executeQuery("SELECT df_firstParagraph FROM definition WHERE df_id=" + id) ;
-
-			if (rs.first()) {
-				try {
-					fp = new String(rs.getBytes(1), "UTF-8") ;
-				} catch (Exception e) {} ;	
-			}
-
-			rs.close() ;
-			stmt.close() ;
-		}
-
-		if (fp == null) {
+		String content = getContent() ;
 		
-			String content = getContent() ;
-
-			content = content.replaceAll("={2,}(.+)={2,}", "\n") ; //clear section headings completely - not just formating, but content as well.			
-			content = MarkupStripper.stripTemplates(content) ;
-			content = MarkupStripper.stripImages(content) ;
-			content = MarkupStripper.stripExternalLinks(content) ;
-			content = MarkupStripper.stripIsolatedLinks(content) ;
-			content = MarkupStripper.stripTables(content) ;
-			content = MarkupStripper.stripHTML(content) ;
-			content = MarkupStripper.stripMagicWords(content) ;
-			content = MarkupStripper.stripListItems(content) ;
-			content = MarkupStripper.stripOrphanedBrackets(content) ;
-			content = MarkupStripper.stripIndentedStart(content) ;
-			content = MarkupStripper.stripExcessNewlines(content) ;
-	
-			fp = "" ;
-			int pos = content.indexOf("\n\n") ;
-	
-			while (pos>=0) {
-				fp = content.substring(0, pos) ;
-	
-				if (pos > 150) 
-					break ;
-	
-				pos = content.indexOf("\n\n", pos+2) ;
-			}
-	
-			fp = fp.replaceAll("\n", " ") ;
-			fp = fp.replaceAll("\\s+", " ") ;  //turn all whitespace into spaces, and collapse them.
-			fp = fp.trim();
+		if (content == null) return null ;
+		
+		DbStructureNode struct = environment.getPageStructure(id) ;
+		
+		if (struct == null)
+			return null ;
+		
+		while (struct.getChildren() != null) {
+			struct = struct.getChildren()[0] ;
 		}
-		return fp ;
+		
+		int[] sentenceBreaks = struct.getSentenceBreaks() ;
+		if (sentenceBreaks == null)
+			return null ;
+	
+		String paragraph = content.substring(sentenceBreaks[0], sentenceBreaks[sentenceBreaks.length-1]) ;
+		
+		return paragraph ;
 	}
 
 	/**
@@ -445,10 +317,14 @@ public abstract class Page implements Comparable<Page>{
 	 * @return the title without scope text
 	 */
 	public String getTitleWithoutScope() {
-		if (titleWithoutScope==null)
-			setTitleParts() ;
-
-		return titleWithoutScope ;	
+		
+		Pattern p = Pattern.compile("(.*)\\((.*)\\)") ;
+		Matcher m = p.matcher(this.getTitle()) ;
+		
+		if (m.matches())
+			return m.group(1) ;
+		else
+			return this.getTitle();
 	}
 
 	/**
@@ -460,24 +336,13 @@ public abstract class Page implements Comparable<Page>{
 	 * @return the parenthesisText, or null if none is found.
 	 */
 	public String getScope() {
-		if (titleWithoutScope==null) 
-			setTitleParts() ;
-
-		return scope ;	
-	}
-
-	private void setTitleParts() {
-
-		int pos1 = title.lastIndexOf('(') ;
-		int pos2 = title.lastIndexOf(')') ;
-
-		if (pos1 > 0 && pos2==title.length()-1) {
-			titleWithoutScope = title.substring(0, pos1).trim() ;
-			scope = title.substring(pos1+1, pos2).trim() ;
-		} else {
-			titleWithoutScope = title ;
-			scope = null ;
-		}
+		Pattern p = Pattern.compile("(.*)\\((.*)\\)") ;
+		Matcher m = p.matcher(this.getTitle()) ;
+		
+		if (m.matches())
+			return m.group(2) ;
+		else
+			return null;
 	}
 
 	/**
@@ -485,7 +350,7 @@ public abstract class Page implements Comparable<Page>{
 	 * 
 	 * @param args an array of arguments for connecting to a wikipedia datatabase: server and database names at a minimum, and optionally a username and password
 	 * @throws Exception if there is a problem with the wikipedia database.
-	 */
+	 *//*
 	public static void main(String[] args) throws Exception{
 		Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
 
@@ -506,17 +371,42 @@ public abstract class Page implements Comparable<Page>{
 			System.out.println(" - generality: " + art.getGenerality()) ;
 			System.out.println("") ;
 
-			if (wikipedia.getDatabase().isContentImported()) {
-				//System.out.println("Page Content: \n") ;
-				//System.out.println(art.getContent()) ;
-
-				System.out.println(art.getFirstSentence(null, null)) ;
-				System.out.println() ;
-				System.out.println(art.getFirstParagraph()) ;
-			}
+			System.out.println(art.getContent()) ;
 		}
-	}
+	}*/
 
+	/**
+	 * Instantiates the appropriate subclass of Page given the supplied parameters
+	 * 
+	 * @param database an active Wikipedia database
+	 * @param id the id of the page
+	 * @return the instantiated page, which can be safely cast as appropriate
+	 */
+	public static Page createPage(WikipediaEnvironment environment, int id) {
+
+		Page p = null ;
+		
+		DbPage pd = environment.getPageDetails(id) ;
+
+		switch (pd.getType()) {
+		case Page.ARTICLE:
+			p = new Article(environment, id, pd.getTitle()) ;
+			break ;
+		case Page.REDIRECT:
+			p = new Redirect(environment, id, pd.getTitle()) ;
+			break ;
+		case Page.DISAMBIGUATION:
+			p = new Disambiguation(environment, id, pd.getTitle()) ;
+			break ;
+		case Page.CATEGORY:
+			p = new Category(environment, id, pd.getTitle()) ;
+			break ;
+		}
+
+		return p ;
+	}
+	
+	
 	/**
 	 * Instantiates the appropriate subclass of Page given the supplied parameters
 	 * 
@@ -526,22 +416,22 @@ public abstract class Page implements Comparable<Page>{
 	 * @param type the type of the page (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
 	 * @return the instantiated page, which can be safely cast as appropriate
 	 */
-	public static Page createPage(WikipediaDatabase database, int id, String title, int type) {
+	public static Page createPage(WikipediaEnvironment environment, int id, String title, int type) {
 
 		Page p = null ;
 
 		switch (type) {
 		case Page.ARTICLE:
-			p = new Article(database, id, title) ;
+			p = new Article(environment, id, title) ;
 			break ;
 		case Page.REDIRECT:
-			p = new Redirect(database, id, title) ;
+			p = new Redirect(environment, id, title) ;
 			break ;
 		case Page.DISAMBIGUATION:
-			p = new Disambiguation(database, id, title) ;
+			p = new Disambiguation(environment, id, title) ;
 			break ;
 		case Page.CATEGORY:
-			p = new Category(database, id, title) ;
+			p = new Category(environment, id, title) ;
 			break ;
 		}
 

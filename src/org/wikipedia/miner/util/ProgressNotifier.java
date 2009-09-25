@@ -74,6 +74,11 @@ public class ProgressNotifier {
 		tasksDone = -1 ;
 	}
 	
+	
+	public void setMinReportProgress(double val) {
+		minReportProgress = val ;
+	}
+	
 	/**
 	 * Sets the minimum time between display messages. The default is 1 second. 
 	 * 

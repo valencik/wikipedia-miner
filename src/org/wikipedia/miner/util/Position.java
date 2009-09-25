@@ -27,8 +27,7 @@ package org.wikipedia.miner.util;
  */
 public class Position {
 
-	private int start ;
-	private int end ;
+	private int[] p ;
 
 	/**
 	 * Initializes a new position with the given start and end indexes.
@@ -37,8 +36,9 @@ public class Position {
 	 * @param end the end index of this posion
 	 */
 	public Position(int start, int end) {
-		this.start = start ;
-		this.end = end ;
+		p = new int[2] ;
+		p[0] = start ;
+		p[1] = end ;
 	}
 
 	/**
@@ -48,24 +48,24 @@ public class Position {
 	 * @return true if the positions overlap, false otherwise.
 	 */
 	public boolean overlaps(Position pos) {
-		return !(end <= pos.start || start >= pos.end) ;
+		return !(p[1] <= pos.getStart() || p[0] >= pos.getEnd()) ;
 	}
 
 	/**
 	 * @return the start index of this position
 	 */
 	public int getStart() {
-		return start;
+		return p[0];
 	}
 
 	/**
 	 * @return the end index of this position
 	 */
 	public int getEnd() {
-		return end;
+		return p[1];
 	}
 	
 	public String toString() {
-		return "(" + start + "," + end + ")" ;		
+		return "(" + p[0] + "," + p[1] + ")" ;		
 	}
 }

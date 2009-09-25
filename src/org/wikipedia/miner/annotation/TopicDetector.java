@@ -21,13 +21,14 @@
 package org.wikipedia.miner.annotation;
 
 import java.io.*;
-import java.sql.*;
 import java.util.*;
 import java.util.regex.*;
 
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.annotation.preprocessing.*;
+
+import com.sleepycat.je.DatabaseException;
 
 /**
  * This class detects topics that occur in plain text, using Disambiguator to resolve ambiguous terms and phrases. 
@@ -75,8 +76,10 @@ public class TopicDetector {
 				stopwords.add(line.trim()) ;			
 		}
 		
-		if (!wikipedia.getDatabase().isGeneralityCached()) 
-			System.err.println("TopicDetector | Warning: generality has not been cached, so this will run significantly slower than it needs to.") ;
+		
+		//TODO: suss out generality
+		//if (!wikipedia.getDatabase().isGeneralityCached()) 
+		//	System.err.println("TopicDetector | Warning: generality has not been cached, so this will run significantly slower than it needs to.") ;
 	}
 	
 	/**
@@ -131,10 +134,10 @@ public class TopicDetector {
 		return topics ;
 	}
 	
-	private void calculateRelatedness(Collection<Topic> topics, RelatednessCache cache) throws SQLException{
+	private void calculateRelatedness(Collection<Topic> topics, RelatednessCache cache)  {
 		
 		for (Topic topicA: topics) {
-			double avgRelatedness = 0 ;
+			float avgRelatedness = 0 ;
 			
 			for (Topic topicB: topics) {
 				if (!topicA.equals(topicB)) {
@@ -149,7 +152,7 @@ public class TopicDetector {
 	
 	
 	
-	private Vector<TopicReference> getReferences(String text) throws SQLException{
+	private Vector<TopicReference> getReferences(String text) throws DatabaseException{
 
 		Vector<TopicReference> references = new Vector<TopicReference>() ;
 		//int sentenceStart = 0 ;
@@ -180,7 +183,7 @@ public class TopicDetector {
 					String ngram = s.substring(startIndex, currIndex) ;
 
 					if (! (ngram.length()==1 && s.substring(startIndex-1, startIndex).equals("'"))&& !ngram.trim().equals("") && !stopwords.contains(ngram.toLowerCase())) {
-						Anchor anchor = new Anchor(wikipedia.getDatabase().addEscapes(ngram), disambiguator.getTextProcessor(), wikipedia.getDatabase()) ;
+						Anchor anchor = new Anchor(wikipedia.getEnvironment(), ngram, disambiguator.getTextProcessor()) ;
 
 						if (anchor.getLinkProbability() >= disambiguator.getMinLinkProbability()) {
 							Position pos = new Position(startIndex-2, currIndex-2) ;
@@ -205,9 +208,9 @@ public class TopicDetector {
 		for (TopicReference ref:references) {
 			Anchor anchor = ref.getAnchor() ;
 			
-			SortedVector<Anchor.Sense> senses = anchor.getSenses() ;
-			if (senses.size() > 0) {				
-				if (senses.size() == 1 || senses.first().getProbability() > 1-disambiguator.getMinSenseProbability())
+			Anchor.Sense[] senses = anchor.getSenses() ;
+			if (senses.length > 0) {				
+				if (senses.length == 1 || senses[0].getProbability() > 1-disambiguator.getMinSenseProbability())
 					unambigAnchors.add(anchor) ;	
 			}		
 		}
@@ -216,11 +219,10 @@ public class TopicDetector {
 		//Vector<String> contextSentences = ss.getSentences(, SentenceSplitter.MULTIPLE_NEWLINES) ; 
 		for (TopicReference ref:getReferences(contextText)){
 			Anchor anchor = ref.getAnchor() ;
-			SortedVector<Anchor.Sense> senses = anchor.getSenses() ;
-			if (senses.size() > 0) {
-				if (senses.size() == 1 || senses.first().getProbability() > 1-disambiguator.getMinSenseProbability()) {
+			Anchor.Sense[] senses = anchor.getSenses() ;
+			if (senses.length > 0) {				
+				if (senses.length == 1 || senses[0].getProbability() > 1-disambiguator.getMinSenseProbability())
 					unambigAnchors.add(anchor) ;	
-				}
 			}
 		}
 		
@@ -249,10 +251,10 @@ public class TopicDetector {
 					if (!allowDisambiguations && sense.getType() == Page.DISAMBIGUATION)
 						continue ;
 
-					double relatedness = context.getRelatednessTo(sense) ;
-					double commonness = sense.getProbability() ;
+					float relatedness = context.getRelatednessTo(sense) ;
+					float commonness = sense.getProbability() ;
 
-					double disambigProb = disambiguator.getProbabilityOfSense(commonness, relatedness, context) ;
+					float disambigProb = (float)disambiguator.getProbabilityOfSense(commonness, relatedness, context) ;
 
 					//System.out.println(" - sense " + sense + ", " + disambigProb) ;
 					
@@ -305,9 +307,9 @@ public class TopicDetector {
 	private class CachedSense implements Comparable<CachedSense>{
 		
 		int id ;
-		double commonness ;
-		double relatedness ;
-		double disambigConfidence ;
+		float commonness ;
+		float relatedness ;
+		float disambigConfidence ;
 
 		/**
 		 * Initializes a new CachedSense
@@ -317,7 +319,7 @@ public class TopicDetector {
 		 * @param relatedness the relatedness of this sense to the surrounding unambiguous topics
 		 * @param disambigConfidence the probability that this sense is valid, as defined by the disambiguator.
 		 */
-		public CachedSense(int id, double commonness, double relatedness, double disambigConfidence) {
+		public CachedSense(int id, float commonness, float relatedness, float disambigConfidence) {
 			this.id = id ;
 			this.commonness = commonness ;
 			this.relatedness = relatedness ;

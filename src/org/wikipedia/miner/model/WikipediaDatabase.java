@@ -1,5 +1,4 @@
 /*
- *    WikipediaDatabase.java
  *    Copyright (C) 2007 David Milne, d.n.milne@gmail.com
  *
  *    This program is free software; you can redistribute it and/or modify
@@ -10,6 +9,7 @@
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
  *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    WikipediaDatabase.java
  *    GNU General Public License for more details.
  *
  *    You should have received a copy of the GNU General Public License
@@ -1464,83 +1464,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 		}
 	}
 	
-	/**
-	 * Summarizes first paragraphs and first sentences so short definitions can be obtained efficiently. 
-	 * 
-	 * @throws SQLException 
-	 */
-	public void summarizeDefinitions() throws SQLException {
-		
-		if (!isContentImported())
-			throw new SQLException("You must import article content first!") ;
-		
-		int rows = this.getPageCount() ;
-		
-		ProgressNotifier pn = new ProgressNotifier(1) ;
-		pn.startTask(rows, "Summarizing definitions") ;
-		
-		Statement stmt = createStatement() ;
-		stmt.executeUpdate("DROP TABLE IF EXISTS definition") ;
-		stmt.close() ;
-		
-		stmt = createStatement() ;
-		stmt.executeUpdate("CREATE TABLE definition (" 
-				+ "df_id int(8) unsigned NOT NULL, "
-				+ "df_firstSentence mediumblob NOT NULL, "
-				+ "df_firstParagraph mediumblob NOT NULL, "
-				+ "PRIMARY KEY (df_id)) ENGINE=MyISAM DEFAULT CHARSET=utf8;") ;
-					
-		stmt.close() ;
-		
-		int currRow = 0 ;
-		
-		int chunkSize = 100 ;
-			
-		StringBuffer insertQuery = new StringBuffer() ;
-		SentenceSplitter ss = new SentenceSplitter() ;
-		
-		PageIterator i = new PageIterator(this) ;
-		while (i.hasNext()) {
-			Page p = i.next() ;
-			currRow ++ ;
-			
-			String paragraph = "" ;
-			String sentence = "" ;
-			
-			try {
-				paragraph = p.getFirstParagraph() ;
-				sentence = p.getFirstSentence(paragraph, ss) ;
-			} catch (Exception e) {
-				System.err.println(p + " " + e.getMessage()) ;
-			}
-			
-			insertQuery.append(" (" + p.getId() + ",\"" + addEscapes(sentence) + "\",\"" + addEscapes(paragraph) + "\"),") ;
-			
-			if (currRow%chunkSize == 0) {
-				if (insertQuery.length() > 0) {
-					insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
-					
-					stmt = createStatement() ;
-					stmt.setEscapeProcessing(false) ;
-					stmt.executeUpdate("INSERT IGNORE INTO definition VALUES" + insertQuery.toString() ) ;
-					stmt.close() ;
-					
-					insertQuery = new StringBuffer() ;
-				}
-				
-				pn.update(currRow) ;
-			}
-		}
-		
-		if (insertQuery.length() > 0) {
-			insertQuery.delete(insertQuery.length()-1, insertQuery.length()) ;
-						
-			stmt = createStatement() ;
-			stmt.setEscapeProcessing(false) ;
-			stmt.executeUpdate("INSERT IGNORE INTO definition VALUES" + insertQuery.toString() ) ;
-			stmt.close() ;
-		}
-	}	
+
 	
 	
 	/**

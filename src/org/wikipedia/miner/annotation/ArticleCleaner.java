@@ -20,7 +20,6 @@
 package org.wikipedia.miner.annotation;
 
 import org.wikipedia.miner.util.MarkupStripper;
-import org.wikipedia.miner.util.SentenceSplitter;
 import org.wikipedia.miner.model.Article;
 
 /**
@@ -43,14 +42,7 @@ public class ArticleCleaner {
 	 */
 	public static final int FIRST_PARAGRAPH = 2 ;
 	
-	private SentenceSplitter sentenceSplitter ;
-	
-	/**
-	 * Initializes a new ArticleCleaner
-	 */
-	public ArticleCleaner() {
-		this.sentenceSplitter = new SentenceSplitter() ;
-	}
+
 	
 	
 	/**
@@ -59,14 +51,14 @@ public class ArticleCleaner {
 	 * @return the content (or snippet) of the given article, with all markup removed except links to other articles.  
 	 * @throws Exception
 	 */
-	public String getMarkupLinksOnly(Article article, int snippetLength) throws Exception {
+	public static String getMarkupLinksOnly(Article article, int snippetLength) throws Exception {
 		
 		if (snippetLength == FIRST_SENTENCE || snippetLength == FIRST_PARAGRAPH) {
 			
 			String content ;
 			
 			if (snippetLength == FIRST_SENTENCE) 
-				content = article.getFirstSentence(null, sentenceSplitter) ;
+				content = article.getFirstSentence() ;
 			else
 				content = article.getFirstParagraph() ;
 			
@@ -104,14 +96,14 @@ public class ArticleCleaner {
 	 * @return the content of the given article, with all markup removed.  
 	 * @throws Exception
 	 */
-	public String getCleanedContent(Article article,  int snippetLength) throws Exception{
+	public static String getCleanedContent(Article article,  int snippetLength) throws Exception{
 		
 		if (snippetLength == FIRST_SENTENCE || snippetLength == FIRST_PARAGRAPH) {
 			
 			String content ;
 			
 			if (snippetLength == FIRST_SENTENCE) 
-				content = article.getFirstSentence(null, sentenceSplitter) ;
+				content = article.getFirstSentence() ;
 			else
 				content = article.getFirstParagraph() ;
 			

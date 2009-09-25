@@ -18,7 +18,7 @@
  */
 
 package org.wikipedia.miner.model;
-
+import org.wikipedia.miner.db.*;
 
 /**
  * This class represents an entry in a disambiguation page: a sense for the ambiguous term for which the disambiguation page was created.
@@ -41,8 +41,8 @@ public class SensePage extends Page{
 	 * @param index the position at which this sense was found on the disambiguation page 
 	 * @param scopeNote the supportive text that was used to describe this sense on the disambiguation page.  
 	 */
-	public SensePage(WikipediaDatabase database, int id, String title, int type, int index, String scopeNote) {
-		super(database, id, title, type) ;
+	public SensePage(WikipediaEnvironment environment, int id, String title, short type, int index, String scopeNote) {
+		super(environment, id, title, type) ;
 		this.index = index ;
 		this.scopeNote = scopeNote ;
 	}
@@ -73,10 +73,10 @@ public class SensePage extends Page{
 	 */
 	public Article getArticle() {
 		if (type == ARTICLE)
-			return new Article(database, id, title) ;
+			return new Article(environment, id, title) ;
 		
 		if (type == DISAMBIGUATION)
-			return new Disambiguation(database, id, title) ;
+			return new Disambiguation(environment, id, title) ;
 		
 		return null ;		
 	}

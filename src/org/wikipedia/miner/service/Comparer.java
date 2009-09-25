@@ -19,6 +19,8 @@
 
 package org.wikipedia.miner.service;
 
+import gnu.trove.TIntHashSet;
+
 import java.util.*;
 
 import org.w3c.dom.*;
@@ -123,7 +125,7 @@ public class Comparer {
 	 * @return an Element message of how the two terms relate to each other
 	 * @throws Exception
 	 */
-	public Element getRelatedness(String term1, String term2, boolean details, int linkLimit) throws Exception {
+	public Element getRelatedness(String term1, String term2, boolean getSenses, boolean getSnippets, int linkLimit) throws Exception {
 
 		Element response = wms.doc.createElement("RelatednessResponse") ;
 		
@@ -131,133 +133,186 @@ public class Comparer {
 			response.setAttribute("unspecifiedParameters", "true") ;
 			return response ;
 		}
-				
-		TextProcessor tp = new CaseFolder() ;
 
-		Anchor anchor1 = new Anchor(term1, tp, wms.wikipedia.getDatabase()) ;
-		SortedVector<Anchor.Sense> senses1 = anchor1.getSenses() ; 
+		Anchor anchor1 = new Anchor(wms.wikipedia.getEnvironment(), term1, wms.tp) ;
+		Anchor.Sense[] senses1 = anchor1.getSenses() ; 
 
-		if (senses1.size() == 0) {
+		if (senses1.length == 0) {
 			response.setAttribute("unknownTerm", term1) ; 
 			return response ;
 		}
 
-		Anchor anchor2 = new Anchor(term2, tp, wms.wikipedia.getDatabase()) ;
-		SortedVector<Anchor.Sense> senses2 = anchor2.getSenses() ; 
+		Anchor anchor2 = new Anchor(wms.wikipedia.getEnvironment(), term2, wms.tp) ;
+		Anchor.Sense[] senses2 = anchor2.getSenses() ; 
 
-		if (senses2.size() == 0) {
+		if (senses2.length == 0) {
 			response.setAttribute("unknownTerm", term2) ; 
 			return response ;
 		}
 		
 		response.setAttribute("term1", term1) ;
 		response.setAttribute("term2", term2) ;
+		
+		
+		Anchor.DisambiguatedSensePair disambiguatedSenses = anchor1.disambiguateAgainst(anchor2) ;
 
-		double sr = anchor1.getRelatednessTo(anchor2) ;
+		float sr = disambiguatedSenses.getRelatedness() ;
 
 		response.setAttribute("relatedness", wms.df.format(sr)) ;
-
-		if (!details)
-			return response ;
-
+		
+		Anchor.Sense sense1 = disambiguatedSenses.getSenseA() ;
+		Anchor.Sense sense2 = disambiguatedSenses.getSenseB() ;
+		
 		
 
-		//now we get the details of how this was calculated
+		if (getSenses) {
+			
+			Element xmlSense1 = wms.doc.createElement("Sense1");
+			xmlSense1.setAttribute("title", sense1.getTitle()) ;
+			xmlSense1.setAttribute("id", String.valueOf(sense1.getId())) ;		
+			xmlSense1.setAttribute("candidates", String.valueOf(senses1.length)) ;
+			
+			String firstSentence = null;
+			try { 
+				firstSentence = sense1.getFirstSentence() ;
+				firstSentence = wms.definer.formatDefinition(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+			} catch (Exception e) {} ;
+			
+			if (firstSentence != null) 
+				xmlSense1.appendChild(wms.createElement("FirstSentence", firstSentence)) ;
 
-		double minProb = 0.01 ;
-		double benchmark_relatedness = 0 ;
-		double benchmark_distance = 0.40 ;
-
-		SortedVector<CandidatePair> candidates = new SortedVector<CandidatePair>() ;
-
-		int sensesA = 0 ;
-		int sensesB = 0 ;
-
-		for (Anchor.Sense sense1: anchor1.getSenses()) {
-
-			if (sense1.getProbability() < minProb) break ;
-			sensesA++ ;
-			sensesB = 0 ;
-
-			for (Anchor.Sense sense2: anchor2.getSenses()) {
-
-				if (sense2.getProbability() < minProb) break ;
-				sensesB++ ;
-
-				double relatedness = sense1.getRelatednessTo(sense2) ;
-				double obviousness = (sense1.getProbability() + sense2.getProbability()) / 2 ;
-
-				if (relatedness > (benchmark_relatedness - benchmark_distance)) {
-
-					//System.out.println(" - - likely candidate " + candidate + ", r=" + relatedness + ", o=" + sense.getProbability()) ;
-					// candidate a likely sense
-					if (relatedness > benchmark_relatedness + benchmark_distance) {
-						//this has set a new benchmark of what we consider likely
-						//System.out.println(" - - new benchmark") ;
-						benchmark_relatedness = relatedness ;
-
-						candidates.clear() ;
+			response.appendChild(xmlSense1) ;
+			
+			
+			
+			Element xmlSense2 = wms.doc.createElement("Sense2");
+			xmlSense2.setAttribute("title", sense2.getTitle()) ;
+			xmlSense2.setAttribute("id", String.valueOf(sense2.getId())) ;
+			xmlSense2.setAttribute("candidates", String.valueOf(senses2.length)) ;
+			
+			firstSentence = null;
+			try { 
+				firstSentence = sense2.getFirstSentence() ;
+				firstSentence = wms.definer.formatDefinition(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+			} catch (Exception e) {} ;
+			
+			if (firstSentence != null) 
+				xmlSense2.appendChild(wms.createElement("FirstSentence", firstSentence)) ;
+			
+			response.appendChild(xmlSense2) ;
+		}
+			
+		
+		if (getSnippets) {
+			
+			Element xmlSnippets = wms.doc.createElement("SnippetList");
+			response.appendChild(xmlSnippets) ;
+			
+			String content1 = sense1.getContent() ;
+			String content2 = sense2.getContent() ;
+			
+			//TODO: clean content
+			
+			//look for snippets in sense2 which mention sense1
+			
+			int[] mentions = sense2.getLinkPositions(sense1) ;
+			if (mentions != null) {
+				for (Integer pos:mentions) {
+					int[] sb = sense2.getSentenceBoundsSurrounding(pos) ;
+					if (sb != null) {
+						String sentence = content2.substring(sb[0], sb[1]) ;
+						
+						Element xmlSnippet = wms.doc.createElement("Snippet");
+						xmlSnippet.appendChild(wms.doc.createTextNode(sentence)) ;
+						xmlSnippet.setAttribute("sourceId", String.valueOf(sense2.getId())) ;
+						xmlSnippet.setAttribute("sourceTitle", sense2.getTitle()) ;
+						xmlSnippets.appendChild(xmlSnippet) ;
 					}
-					candidates.add(new CandidatePair(sense1, sense2, relatedness, obviousness), false) ;
 				}
 			}
+			
+			//look for snippets in sense1 which mention sense2
+			mentions = sense1.getLinkPositions(sense2) ;
+			if (mentions != null) {
+				for (Integer pos:mentions) {
+					int[] sb = sense1.getSentenceBoundsSurrounding(pos) ;
+					if (sb != null) {
+						String sentence = content1.substring(sb[0], sb[1]) ;
+						
+						Element xmlSnippet = wms.doc.createElement("Snippet");
+						xmlSnippet.appendChild(wms.doc.createTextNode(sentence)) ;
+						xmlSnippet.setAttribute("sourceId", String.valueOf(sense1.getId())) ;
+						xmlSnippet.setAttribute("sourceTitle", sense1.getTitle()) ;
+						xmlSnippets.appendChild(xmlSnippet) ;
+					}
+				}
+			}
+			
+			//Build a list of pages that link to both sense1 and sense2, ordered by average relatedness to them
+			TreeSet<Article> mutualLinks = new TreeSet<Article>() ;
+			
+			TIntHashSet ids1 = new TIntHashSet() ;
+			for (Article a:sense1.getLinksIn()) 
+				ids1.add(a.getId()) ;
+			
+			for (Article a:sense2.getLinksIn()) {
+				if (ids1.contains(a.getId())) {
+					float weight = (a.getRelatednessTo(sense1) + a.getRelatednessTo(sense2))/2 ;
+					a.setWeight(weight) ;
+					
+					mutualLinks.add(a) ;
+				}
+			}
+			
+			for (Article ml:mutualLinks) {
+				
+				int[] lp1 = ml.getLinkPositions(sense1) ;
+				int[] lp2 = ml.getLinkPositions(sense2) ;
+				
+				String mlContent = null ;
+				
+				if (lp1 != null && lp2 != null) {
+					for (int p1:lp1) {
+						for (int p2:lp2) {
+							
+							int[] sb = ml.getSentenceBoundSurrounding(p1, p2) ;
+							
+							if (sb != null) {
+								
+								if (mlContent == null)
+									mlContent = ml.getContent() ;
+								
+								String sentence = mlContent.substring(sb[0], sb[1]) ;
+								
+								Element xmlSnippet = wms.doc.createElement("Snippet");
+								xmlSnippet.appendChild(wms.doc.createTextNode(sentence)) ;
+								xmlSnippet.setAttribute("sourceId", String.valueOf(ml.getId())) ;
+								xmlSnippet.setAttribute("sourceTitle", ml.getTitle()) ;
+								xmlSnippets.appendChild(xmlSnippet) ;
+							}
+							
+						}
+					}
+					
+				}
+				
+			}
+			
+			
+			
+			
+			
 		}
-
-		CandidatePair bestSenses = candidates.first() ;
-
 		
-		Article art1 = bestSenses.senseA ;
-		
-		Element xmlSense1 = wms.doc.createElement("Sense1");
-		
-		
-		xmlSense1.setAttribute("title", art1.getTitle()) ;
-		xmlSense1.setAttribute("id", String.valueOf(art1.getId())) ;		
-		xmlSense1.setAttribute("candidates", String.valueOf(senses1.size())) ;
-		
-		String firstSentence = null;
-		try { 
-			firstSentence = art1.getFirstSentence(null, null) ;
-			firstSentence = wms.definer.formatDefinition(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
-		} catch (Exception e) {} ;
-		
-		if (firstSentence != null) 
-			xmlSense1.appendChild(wms.createElement("FirstSentence", firstSentence)) ;
-
-		response.appendChild(xmlSense1) ;
-		
-		
-		Article art2 = bestSenses.senseB ;
-		
-		Element xmlSense2 = wms.doc.createElement("Sense2");
-		xmlSense2.setAttribute("title", art2.getTitle()) ;
-		xmlSense2.setAttribute("id", String.valueOf(art2.getId())) ;
-		xmlSense2.setAttribute("candidates", String.valueOf(senses2.size())) ;
-		
-		firstSentence = null;
-		try { 
-			firstSentence = art2.getFirstSentence(null, null) ;
-			firstSentence = wms.definer.formatDefinition(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
-		} catch (Exception e) {} ;
-		
-		if (firstSentence != null) 
-			xmlSense2.appendChild(wms.createElement("FirstSentence", firstSentence)) ;
-		
-		response.appendChild(xmlSense2) ;
 		
 		
 		//details of links coming in to these articles
+		/*
+		SortedVector<Article> linksIn1 = art1.getLinksIn();
+		SortedVector<Article> linksIn2 = art2.getLinksIn() ; 
 		
-		TreeSet<Integer> linksIn1 = new TreeSet<Integer>() ;
-		for (Integer link:art1.getLinksInIds()) 
-			linksIn1.add(link) ;
-		
-		TreeSet<Integer> linksIn2 = new TreeSet<Integer>() ;
-		for (Integer link:art2.getLinksInIds()) 
-			linksIn2.add(link) ;
-		
-		TreeSet<Integer> linksInShared = new TreeSet<Integer>() ;
-		for (Integer id: linksIn1) {
+		TreeSet<Article> linksInShared = new TreeSet<Article>() ;
+		for (Article art: linksIn1) {
 			if (linksIn2.contains(id))
 				linksInShared.add(id) ;
 		}
@@ -300,7 +355,7 @@ public class Comparer {
 		xmlLinksOut.appendChild(getLinkListElement(linksOut2, "Link2", linkLimit)) ;
 		response.appendChild(xmlLinksOut) ;
 		
-		
+		*/
 		
 		return response ;
 	}
@@ -316,7 +371,7 @@ public class Comparer {
 			if (count++ >= linkLimit) break ;
 			
 			try {
-				Article art = new Article(wms.wikipedia.getDatabase(), link) ;
+				Article art = new Article(wms.wikipedia.getEnvironment(), link) ;
 				
 				Element xmlLink = wms.doc.createElement(tag) ;
 				xmlLink.setAttribute("id", String.valueOf(art.getId())) ;

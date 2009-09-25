@@ -20,8 +20,6 @@
 
 package org.wikipedia.miner.annotation;
 
-import java.sql.SQLException;
-
 import org.wikipedia.miner.model.* ;
 import org.wikipedia.miner.util.*;
 
@@ -35,7 +33,6 @@ public class TopicReference implements Comparable<TopicReference>{
 	private Anchor anchor ;
 	private int topicId ;
 	private Position position ;
-	//private double disambigConfidence ;
 	
 	/**
 	 * Initializes a disambiguated topic reference.
@@ -48,7 +45,6 @@ public class TopicReference implements Comparable<TopicReference>{
 		this.anchor = anchor ;
 		this.topicId = topicId ;
 		this.position = position ;
-		//this.disambigConfidence = disambigConfidence ;
 	}
 	
 	/**
@@ -56,20 +52,17 @@ public class TopicReference implements Comparable<TopicReference>{
 	 * 
 	 * @param anchor the anchor from which the reference was mined
 	 * @param position the location (start and end character indices) from which this reference was mined
-	 * @throws SQLException if there is a problem with the Wikipedia database that the anchor was obtained from
 	 */
-	public TopicReference(Anchor anchor, Position position) throws SQLException{
+	public TopicReference(Anchor anchor, Position position) {
 		this.anchor = anchor ;
 		this.position = position ;
 		
-		SortedVector<Anchor.Sense> senses = anchor.getSenses() ;
+		Anchor.Sense[] senses = anchor.getSenses() ;
 		
-		if (senses.size() == 1) {
-			topicId = senses.first().getId() ;
-			//disambigConfidence = 1 ;
+		if (senses.length == 1) {
+			topicId = senses[0].getId() ;
 		} else {
 			topicId = 0 ;
-			//disambigConfidence = 0 ;
 		}
 	}
 		
@@ -108,11 +101,6 @@ public class TopicReference implements Comparable<TopicReference>{
 	public Position getPosition() {
 		return position ;
 	}
-	
-	//public double getDisambigConfidence() {
-	//	return disambigConfidence ;
-	//}
-	
 	
 	public int compareTo(TopicReference tr) {
 		

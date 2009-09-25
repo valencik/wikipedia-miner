@@ -19,14 +19,16 @@
 
 package org.wikipedia.miner.model;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.sql.*;
+import java.io.*;
 import java.util.*;
 
+import org.wikipedia.miner.db.* ;
+import org.wikipedia.miner.db.WikipediaEnvironment.Statistic;
 import org.wikipedia.miner.model.Article.AnchorText;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.util.text.*;
+
+import com.sleepycat.je.DatabaseException;
 
 
 /**
@@ -37,7 +39,7 @@ import org.wikipedia.miner.util.text.*;
  */
 public class Wikipedia {
 
-	private WikipediaDatabase database ;
+	private WikipediaEnvironment environment ;
 
 	/**
 	 * Initializes a newly created Wikipedia and attempts to make a connection to the mysql
@@ -50,15 +52,19 @@ public class Wikipedia {
 	 * @param password	the users password (null if anonymous)
 	 * @throws Exception if there is a problem connecting to the database, or if the database is not complete.
 	 */
-	public Wikipedia(String databaseServer, String databaseName, String userName, String password) throws Exception{
-		database = new WikipediaDatabase(databaseServer, databaseName, userName, password) ;
+	public Wikipedia(File databaseDirectory) throws Exception{
+		environment = new WikipediaEnvironment(databaseDirectory, false) ; 
+	}
+	
+	public Wikipedia(WikipediaEnvironment environment) {
+		this.environment = environment ;
 	}
 
 	/**
 	 * @return the Wikipedia database that this is connected to
 	 */
-	public WikipediaDatabase getDatabase() {
-		return database ;
+	public WikipediaEnvironment getEnvironment() {
+		return environment ;
 	}
 
 	/**
@@ -66,11 +72,9 @@ public class Wikipedia {
 	 * from which all other categories can be browsed.
 	 * 
 	 * @return the root (fundamental) category
-	 * @throws SQLException
 	 */
-	public Category getFundamentalCategory() throws SQLException {
-		//TODO: make this language independent somehow
-		return new Category(database, "Fundamental") ;
+	public Category getRootCategory() {
+		return new Category(environment, environment.getStatisticValue(Statistic.ROOT_ID)) ;
 	}
 
 	/**
@@ -79,39 +83,9 @@ public class Wikipedia {
 	 *  
 	 * @param id	the id of the Page to retrieve.
 	 * @return the Page referenced by the given id, or null if one does not exist. 
-	 * @throws SQLException if there is a problem with the wikipedia database.
 	 */
-	public Page getPageById(int id) throws SQLException {
-
-		String title = null ;
-		int type = 0 ;
-
-		Statement stmt = database.createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT page_title, page_type FROM page WHERE page_id=" + id) ;
-
-		if (rs.first()) {
-			try {
-				title = new String(rs.getBytes(1), "UTF-8") ;
-			} catch (Exception e) {} ;	
-
-			type = rs.getInt(2) ;
-		}
-
-		rs.close() ;
-		stmt.close();
-
-		switch (type) {
-		case Page.ARTICLE: 
-			return new Article(database, id, title) ;
-		case Page.REDIRECT: 
-			return new Redirect(database, id, title) ;
-		case Page.CATEGORY: 
-			return new Category(database, id, title) ;
-		case Page.DISAMBIGUATION: 
-			return new Disambiguation(database, id, title) ;
-		}
-
-		return null ;
+	public Page getPageById(int id) {
+		return Page.createPage(environment, id) ;
 	}
 
 	/**
@@ -127,17 +101,25 @@ public class Wikipedia {
 	public Article getArticleByTitle(String title) {
 		
 		title = title.substring(0,1).toUpperCase() + title.substring(1) ;
+		Anchor anchor = new Anchor(environment, title) ;
 		
-		try {
-			return new Article(database, title) ;			
-		} catch (Exception e) {};
+		Article fromTitle = null ;
+		Article fromRedirect = null ;
 		
-		try {
-			Redirect r = new Redirect(database, title) ;
-			return r.getTarget() ;			
-		} catch (Exception e) {};
+		for (Anchor.Sense sense:anchor.getSenses()) {
+			if (sense.matchesTitle()) {
+				fromTitle = sense ;
+				break ;
+			}
+			
+			if (sense.matchesRedirect())
+				fromRedirect = sense ;
+		}
 		
-		return null ;
+		if (fromTitle != null) 
+			return fromTitle ;
+		else
+			return fromRedirect ;
 	}
 	
 	/**
@@ -150,10 +132,8 @@ public class Wikipedia {
 	 */
 	public Category getCategoryByTitle(String title) {
 		
-		try {
-			return new Category(database, title) ;			
-		} catch (Exception e) {};
-				
+		//TODO
+		
 		return null ;
 	}
 
@@ -171,24 +151,25 @@ public class Wikipedia {
 	 * 
 	 * @return the most likely sense of the given term.
 	 * 
-	 * @throws SQLException if there is a problem with the Wikipedia database, or if it has not been prepared
+	 * @throws DatabaseException if the Wikipedia database has not been prepared
 	 * for the given text processor.
 	 */
-	public Article getMostLikelyArticle(String term, TextProcessor tp) throws SQLException{
+	public Article getMostLikelyArticle(String term, TextProcessor tp)throws DatabaseException{
 
-		if (tp != null)
-			database.checkTextProcessor(tp) ;
+		//TODO:check text processors
+		//if (tp != null)
+		//	database.checkTextProcessor(tp) ;
 
-		Anchor anch = new Anchor(term, tp, database) ;
+		Anchor anch = new Anchor(environment, term, tp) ;
 
 		if (anch == null) 
 			return null ;
 
 		Article article = null ;
 
-		for (Page sense:anch.getSenses()) {
+		for (Anchor.Sense sense:anch.getSenses()) {
 			if (sense.getType() == Page.ARTICLE) {
-				article = new Article(database, sense.getId(), sense.getTitle()) ;
+				article = sense ;
 				break ;
 			}
 		}
@@ -214,22 +195,20 @@ public class Wikipedia {
 	 * 
 	 * @return the SortedVector of all relevant Articles, ordered by commoness of the link being made.
 	 * 
-	 * @throws SQLException if there is a problem with the Wikipedia database
+	 * @throws DatabaseException if there is a problem with the Wikipedia database
 	 */
-	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp) throws SQLException{
+	public TreeSet<Article> getWeightedArticles(String term, TextProcessor tp) throws DatabaseException{
 
-		Anchor anch = new Anchor(term, tp, database) ;
-
-		if (anch == null) 
-			return null ;
-
-		SortedVector<Article> articles = new SortedVector<Article>() ;
+		//TODO:check text processor
+		
+		Anchor anch = new Anchor(environment, term, tp) ;
+		TreeSet<Article> articles = new TreeSet<Article>() ;
 
 		for (Anchor.Sense sense:anch.getSenses()) {
 			if (sense.getType() == Page.ARTICLE) {
-				Article article = new Article(database, sense.getId(), sense.getTitle()) ;
+				Article article = new Article(environment, sense.getId(), sense.getTitle()) ;
 				article.setWeight(sense.getProbability()) ;
-				articles.add(article, true) ;
+				articles.add(article) ; 
 			}
 		}
 
@@ -253,38 +232,35 @@ public class Wikipedia {
 	 * @param contextArticles	a collection of articles that relate to the intended meaning of the term.
 	 * @return the SortedVector of all relevant Articles, ordered how well-known they are and how they relate to context articles.
 	 * 
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @throws DatabaseException if there is a problem with the wikipedia database
 	 */
-	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp, Collection<Article> contextArticles) throws SQLException{
+	public TreeSet<Article> getWeightedArticles(String term, TextProcessor tp, Collection<Article> contextArticles) throws DatabaseException {
 
-		Anchor anch = new Anchor(term, tp, database) ;
-		SortedVector<Anchor.Sense> senses = anch.getSenses() ;
+		Anchor anch = new Anchor(environment, term, tp) ;
+		Anchor.Sense[] senses = anch.getSenses() ;
 
-		SortedVector<Article> articles = new SortedVector<Article>() ;
+		TreeSet<Article> articles = new TreeSet<Article>() ;
 
-		if (senses.size() == 0)
+		if (senses.length == 0)
 			return articles ;
 
-		if (senses.size() == 1){
-			Anchor.Sense sense = senses.first() ;
-			articles.add(new Article(database, sense.getId(), sense.getTitle()), true) ;
+		if (senses.length == 1){
+			articles.add(senses[0]) ;
 			return articles ;
 		}
 
-		for (Anchor.Sense sense: anch.getSenses()) {
+		for (Anchor.Sense sense:senses) {
+			Article candidate = new Article(environment, sense.getId()) ;
 
-			//if (sense.getType() == Page.ARTICLE) {
-			Article candidate = new Article(database, sense.getId(), sense.getTitle()) ;
-
-			double relatedness = 0 ;
-			double obviousness = sense.getProbability() ;
+			float relatedness = 0 ;
+			float obviousness = sense.getProbability() ;
 
 			for (Article context: contextArticles) {
-				double r = candidate.getRelatednessTo(context) ;
+				float r = candidate.getRelatednessTo(context) ;
 				relatedness = relatedness + r ;
 			}
 			candidate.setWeight(relatedness+obviousness) ;
-			articles.add(candidate, false) ;
+			articles.add(candidate) ;
 		}
 		return articles ;
 	}
@@ -306,9 +282,9 @@ public class Wikipedia {
 	 * 
 	 * @return the SortedVector of all relevant Articles, ordered by commonness of the link being made and relatedness to context articles.
 	 * 
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @throws DatabaseException if there is a problem with the wikipedia database
 	 */
-	public SortedVector<Article> getWeightedArticles(String term, TextProcessor tp, String[] contextTerms) throws SQLException{
+	public TreeSet<Article> getWeightedArticles(String term, TextProcessor tp, String[] contextTerms) throws DatabaseException{
 		System.out.print(" - context: " ) ;
 		Vector<Article> contextArticles = new Vector<Article>() ;
 
@@ -331,72 +307,26 @@ public class Wikipedia {
 	 * @param text the text to search for
 	 * @param tp an optional TextProcessor (may be null)
 	 * @return true if there is an anchor corresponding to the given text, otherwise false
-	 * @throws SQLException if there is a problem with the Wikipedia database
+	 * @throws DatabaseException if there is a problem with the Wikipedia database
 	 */
-	public boolean isAnchor(String text, TextProcessor tp) throws SQLException {
+	public boolean isAnchor(String text, TextProcessor tp) throws DatabaseException {
 		
-		if (database.areAnchorsCached(tp)) {
-			return database.cachedAnchors.containsKey(tp.processText(text)) ;
-		} else {
-			Statement stmt = database.createStatement() ;
-			ResultSet rs ;
-			
-			boolean isAnchor = false ;
-			
-			if (tp==null)
-				rs = stmt.executeQuery("SELECT an_to FROM anchor WHERE an_text=\"" + text + "\" LIMIT 1") ;
-			else 
-				rs = stmt.executeQuery("SELECT an_to FROM anchor_" + tp.getName() + " WHERE an_text=\"" + tp.processText(text) + "\" LIMIT 1") ;
-			
-			if (rs.first()) 
-				isAnchor = true ;
-			
-			rs.close() ;
-			stmt.close() ;
-			
-			return isAnchor ;			
-		}
+		return environment.getAnchor(text, tp)  != null ;
 	}
 	
 	/**
 	 * @return an iterator for all pages in the database, in order of ascending ids.
-	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
-	public PageIterator getPageIterator() throws SQLException{
-		return new PageIterator(database) ;
+	public PageIterator getPageIterator() {
+		return new PageIterator(environment) ;
 	}
 	
 	/**
 	 * @param pageType the type of page of interest (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
 	 * @return an iterator for all pages in the database of the given type, in order of ascending ids.
-	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
-	public PageIterator getPageIterator(int pageType) throws SQLException{
-		return new PageIterator(database, pageType) ;		
-	}
-	
-	/**
-	 * A convenience method that returns an instance of Wikipedia, initialized according to the given 
-	 * array of String arguments. 
-	 * 
-	 * @param args	an array at least 2 String arguments; the connection string of the wikipedia 
-	 * database server, the name of the Wikipedia database and (optionally, if anonymous access
-	 * is not allowed) a username and password.
-	 * @return the initialized Wikipedia instance.
-	 * @throws Exception if the arguments are invalid, or if there is a problem connecting to the database.
-	 */
-	public static Wikipedia getInstanceFromArguments(String[] args) throws Exception{
-				
-		if (args.length < 2) 
-			throw new Exception("You must specify at least a server and database. Username and password are optional") ;		
-		
-		if (args.length == 2)
-			return new Wikipedia(args[0], args[1], null, null) ;
-		
-		if (args.length == 3)
-			return new Wikipedia(args[0], args[1], args[2], null) ;
-				
-		return new Wikipedia(args[0], args[1], args[2], args[3]) ;
+	public PageIterator getPageIterator(short pageType) {
+		return new PageIterator(environment, pageType) ;		
 	}
 
 	/**
@@ -408,7 +338,9 @@ public class Wikipedia {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-		Wikipedia self = Wikipedia.getInstanceFromArguments(args) ;
+		
+		File dataDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
+		Wikipedia self = new Wikipedia(dataDir) ;
 		
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );			
 				
@@ -437,10 +369,10 @@ public class Wikipedia {
 			if (self.isAnchor(term, tp)) {
 				
 				System.out.println("All articles for \"" + term + "\":") ;
-				SortedVector<Article> articles = self.getWeightedArticles(term, tp) ;
+				TreeSet<Article> articles = self.getWeightedArticles(term, tp) ;
 
 				for (Article article: articles) 
-					System.out.println(" - " + article) ;
+					System.out.println(" - " + article + "," + article.getWeight()) ;
 
 				String cs = "" ;
 				String[] ca = new String[context.size()] ;
@@ -461,29 +393,37 @@ public class Wikipedia {
 				System.out.println(" - " + bestArticle) ;
 
 				System.out.println("\nDetails for Article " + bestArticle) ;
+				
+				System.out.println() ;
+				System.out.println(bestArticle.getFirstParagraph()) ;
 
 				System.out.println(" - Anchors:") ;
 				for (AnchorText at:bestArticle.getAnchorTexts()) {
-					System.out.println("   - " + at.getText() + " (used " + at.getCount() + " times)") ;
+					System.out.println("   - " + at.getText() + " (used " + at.getTotalCount() + " times)") ;
 				}
 
-				System.out.println(" - Redirects:") ;
+				System.out.println("\n - Redirects:") ;
 				for (Redirect r: bestArticle.getRedirects()) 
-					System.out.println("   - " + r) ;
+					System.out.println("\t" + r) ;
 
-				System.out.println(" - Translations:") ;
+				System.out.println("\n\n - Translations:") ;
 				HashMap<String,String> translations = bestArticle.getTranslations() ;
-				for (String lang:translations.keySet()){
-					System.out.println("   - " + lang + ", " + translations.get(lang)) ;
-				}
-
-				System.out.println(" - Parent categories:") ;
+				for (String lang:translations.keySet())
+					System.out.println("\t" + translations.get(lang) + " (" + lang + ")") ;
+				
+				System.out.println("\n\n - Parent categories:") ;
 				for (Category c: bestArticle.getParentCategories()) 
-					System.out.println("   - " + c) ;
-
-				System.out.println(" - Articles linked to:") ;
+					System.out.println("\t" + c) ;
+				
+				System.out.println("\n\n - Articles links out:") ;
 				for (Article a: bestArticle.getLinksOut()) 
-					System.out.println("   - " + a) ;
+					System.out.println("\t" + a) ;
+				
+				System.out.println("\n\n - Articles links in:") ;
+				for (Article a: bestArticle.getLinksIn()) 
+					System.out.println("\t" + a) ;
+				
+				System.out.println() ;
 			} else {
 				System.out.println("I have no idea what you are talking about") ;
 			}

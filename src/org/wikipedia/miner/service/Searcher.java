@@ -33,7 +33,7 @@ import org.wikipedia.miner.util.text.*;
 /**
  * @author David Milne
  * 
- * <p>This service provides searching facilities over wms.wikipedia via terms or page ids. </p>"
+ * <p>This service provides searching facilities over Wikipedia via terms or page ids. </p>"
  * <p> Searching via terms (or phrases) is done through article titles, redirects, and anchors (the terms used to link to each page). This method of searching encodes synonymy: you can find the article about <b>fixed-wing aircraft</b> by searching for <i>airplanes</i>, <i>aeroplanes</i> or <i>propeller aircraft</i>. It also encodes polysemy: you can tell that <b>plane</b> could also refer to a <i>theoretical surface of infinite area and zero depth</i>, or <i>a tool for shaping wooden surfaces</i>. </p> 
  * <p> Searching via terms will return either a list of candidate articles (if the term is ambiguous), or the details of a single article (if it is not). Searching via ids will return details of the appropriate page, which may be an Article, Category, Disambiguation, or Redirect</p>
  */
@@ -126,20 +126,19 @@ public class Searcher {
 			response.setAttribute("unspecifiedParameters", "true") ;
 			return response ;
 		}
+				
+		Anchor anchor = new Anchor(wms.wikipedia.getEnvironment(), term, wms.tp) ;
+		Anchor.Sense[] senses = anchor.getSenses() ; 
 		
-		TextProcessor tp = new CaseFolder() ;			
-		Anchor anchor = new Anchor(term, tp, wms.wikipedia.getDatabase()) ;
-		SortedVector<Anchor.Sense> senses = anchor.getSenses() ; 
-		
-		if (senses.size() == 0) {
+		if (senses.length == 0) {
 			response.setAttribute("unknownTerm", term) ; 
 			return response ;
 		}
 		
 		response.setAttribute("term", term) ;
 		
-		if (senses.size() == 1) {
-			return doSearch(senses.first().getId(), linkLimit) ;
+		if (senses.length == 1) {
+			return doSearch(senses[0].getId(), linkLimit) ;
 		}
 		
 		Element xmlSenses = wms.doc.createElement("SenseList") ;
@@ -162,7 +161,7 @@ public class Searcher {
 			
 			String firstSentence = null;
 			try { 
-				firstSentence = sense.getFirstSentence(null, null) ;
+				firstSentence = sense.getFirstSentence() ;
 				firstSentence = wms.definer.formatDefinition(firstSentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 			} catch (Exception e) {} ;
 			
@@ -212,7 +211,7 @@ public class Searcher {
 		return response ;
 	}
 	
-	private Element getArticleDetails(Page page, int linkLimit) throws SQLException{
+	private Element getArticleDetails(Page page, int linkLimit) {
 		
 		Article article = (Article)page ;
 		
@@ -232,8 +231,8 @@ public class Searcher {
 			xmlArt.appendChild(wms.createElement("FirstParagraph", firstParagraph)) ;
 		
 		
-		SortedVector<Redirect> redirects = article.getRedirects() ;
-		if (!redirects.isEmpty()) {
+		Redirect[] redirects = article.getRedirects() ;
+		if (redirects.length > 0) {
 			Element xmlRedirects = wms.doc.createElement("RedirectList") ;
 			
 			for (Redirect r: redirects) {
@@ -245,16 +244,16 @@ public class Searcher {
 			xmlArt.appendChild(xmlRedirects) ;
 		}
 		
-		SortedVector<AnchorText> anchorTexts = article.getAnchorTexts() ;
-		if (!anchorTexts.isEmpty()) {
+		AnchorText[] anchorTexts = article.getAnchorTexts() ;
+		if (anchorTexts.length > 0) {
 			Element xmlAnchors = wms.doc.createElement("AnchorList") ;
 			
 			int total = 0 ;
 			for (AnchorText at:anchorTexts) 
-				total += at.getCount() ;
+				total += at.getTotalCount() ;
 					
 			for (AnchorText at:anchorTexts) {
-				int c = at.getCount() ;
+				int c = at.getTotalCount() ;
 				
 				if (c > 0) {
 					Element xmlAnchor = wms.doc.createElement("Anchor") ;
@@ -285,8 +284,8 @@ public class Searcher {
 		}
 		
 
-		SortedVector<Category> cats = article.getParentCategories() ;
-		if (!cats.isEmpty()) {
+		Category[] cats = article.getParentCategories() ;
+		if (cats.length > 0) {
 			Category eq = article.getEquivalentCategory() ;
 			
 			Element xmlCats = wms.doc.createElement("CategoryList") ;
@@ -307,7 +306,7 @@ public class Searcher {
 			xmlArt.appendChild(xmlCats) ;
 		}
 		
-		int[] linksOut = article.getLinksOutIds() ;
+		Article[] linksOut = article.getLinksOut() ;
 		
 		if (linksOut.length > 0) {
 			
@@ -315,12 +314,10 @@ public class Searcher {
 			xmlLinks.setAttribute("size", String.valueOf(linksOut.length)) ;
 			int count = 0 ;
 			
-			for (int id: linksOut) {
+			for (Article link: linksOut) {
 				if (count++ == linkLimit) break ;
 				
-				try {
-					Article link = new Article(wms.wikipedia.getDatabase(), id) ;	
-				
+				//try {
 					Element xmlLink = wms.doc.createElement("LinkOut") ;
 				
 					xmlLink.setAttribute("id", String.valueOf(link.getId())) ;
@@ -328,12 +325,12 @@ public class Searcher {
 					xmlLink.setAttribute("relatedness", wms.df.format(link.getRelatednessTo(article))) ;
 										
 					xmlLinks.appendChild(xmlLink) ;
-				} catch (Exception e) {} ;
+				//} catch (Exception e) {} ;
 			}
 			xmlArt.appendChild(xmlLinks) ;
 		}
 		
-		int[] linksIn = article.getLinksInIds() ;
+		Article[] linksIn = article.getLinksIn() ;
 		
 		if (linksIn.length > 0) {
 			
@@ -341,12 +338,10 @@ public class Searcher {
 			xmlLinks.setAttribute("size", String.valueOf(linksIn.length)) ;
 			int count = 0 ;
 			
-			for (int id: linksIn) {
+			for (Article link: linksIn) {
 				if (count++ == linkLimit) break ;
 				
 				try {
-					Article link = new Article(wms.wikipedia.getDatabase(), id) ;	
-				
 					Element xmlLink = wms.doc.createElement("LinkIn") ;
 				
 					xmlLink.setAttribute("id", String.valueOf(link.getId())) ;
@@ -363,7 +358,7 @@ public class Searcher {
 	}
 	
 	
-	private Element getCategoryDetails(Page page, int linkLimit) throws SQLException{
+	private Element getCategoryDetails(Page page, int linkLimit) {
 		
 		Category category = (Category)page ;
 		
@@ -393,16 +388,16 @@ public class Searcher {
 			xmlCat.appendChild(xmlEq) ;
 		}
 		
-		xmlCat.appendChild(getCategoryListXml(category.getParentCategoryIds(), "ParentCategory", linkLimit)) ;
+		xmlCat.appendChild(getCategoryListXml(category.getParentCategories(), "ParentCategory", linkLimit)) ;
 		
-		xmlCat.appendChild(getCategoryListXml(category.getChildCategoryIds(), "ChildCategory", linkLimit)) ;		
+		xmlCat.appendChild(getCategoryListXml(category.getChildCategories(), "ChildCategory", linkLimit)) ;		
 		
-		xmlCat.appendChild(getArticleListXml(category.getChildArticleIds(), "ChildArticle", linkLimit)) ;
+		xmlCat.appendChild(getArticleListXml(category.getChildArticles(), "ChildArticle", linkLimit)) ;
 		
 		return xmlCat ;
 	}
 	
-	private Element getDisambiguationDetails(Page page) throws SQLException{
+	private Element getDisambiguationDetails(Page page){
 		
 		Disambiguation disambig = (Disambiguation)page ;
 		
@@ -422,7 +417,8 @@ public class Searcher {
 		
 		xmlDmb.setAttribute("description", getDescription(disambig)) ;
 	
-		
+		//TODO:
+		/*
 		Element xmlSenses = wms.doc.createElement("SenseList") ;
 		
 		for(SensePage sp:disambig.getSenses()) {
@@ -442,11 +438,12 @@ public class Searcher {
 			xmlSenses.appendChild(xmlSense) ;
 		}
 		xmlDmb.appendChild(xmlSenses) ;
+		*/
 		
 		return xmlDmb ;
 	}
 	
-	private Element getRedirectDetails(Page page) throws SQLException{
+	private Element getRedirectDetails(Page page) {
 		
 		Redirect redirect = (Redirect)page ;
 		
@@ -471,49 +468,40 @@ public class Searcher {
 	}
 	
 	
-	private Element getCategoryListXml(int[] categories, String tag, int linkLimit) {
+	private Element getCategoryListXml(Category[] categories, String tag, int linkLimit) {
 
 		Element xmlPages = wms.doc.createElement(tag + "List") ;
 		
 		int count = 0 ;
-		for (Integer id: categories) {
+		for (Category c: categories) {
 			
 			if (count++ > linkLimit) break ;
 			
-			try {
-				Category c = (Category) wms.wikipedia.getPageById(id) ;
-			
-				Element xmlPage = wms.doc.createElement(tag) ;
+			Element xmlPage = wms.doc.createElement(tag) ;
 
-				xmlPage.setAttribute("id", String.valueOf(c.getId())) ;
-				xmlPage.setAttribute("title", c.getTitle()) ;
+			xmlPage.setAttribute("id", String.valueOf(c.getId())) ;
+			xmlPage.setAttribute("title", c.getTitle()) ;
 
-				xmlPages.appendChild(xmlPage) ;
-			} catch (Exception e) {}
+			xmlPages.appendChild(xmlPage) ;
 		}
 		return xmlPages ;
 	}
 	
-	private Element getArticleListXml(int[] articles, String tag, int linkLimit) {
+	private Element getArticleListXml(Article[] articles, String tag, int linkLimit) {
 
 		Element xmlPages = wms.doc.createElement(tag + "List") ;
 		
 		int count = 0 ;
-		for (Integer id: articles) {
+		for (Article a: articles) {
 			
 			if (count++ > linkLimit) break ;
 			
-			try {
-				Article a = (Article) wms.wikipedia.getPageById(id) ;
-			
-				Element xmlPage = wms.doc.createElement(tag) ;
+			Element xmlPage = wms.doc.createElement(tag) ;
 
-				xmlPage.setAttribute("id", String.valueOf(a.getId())) ;
-				xmlPage.setAttribute("title", a.getTitle()) ;
+			xmlPage.setAttribute("id", String.valueOf(a.getId())) ;
+			xmlPage.setAttribute("title", a.getTitle()) ;
 
-				xmlPages.appendChild(xmlPage) ;
-				
-			} catch (Exception e) {}
+			xmlPages.appendChild(xmlPage) ;
 		}
 		return xmlPages ;
 	}
@@ -524,7 +512,7 @@ public class Searcher {
 			return "This is a disambiguation page, created to list the possible senses of the page's title\n" ;
 		} else {
 			try {			
-				return wms.definer.formatDefinition(page.getFirstSentence(null, null), Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+				return wms.definer.formatDefinition(page.getFirstSentence(), Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
 			} catch (Exception e) {
 				return "" ;
 			} 

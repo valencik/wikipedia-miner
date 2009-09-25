@@ -35,14 +35,14 @@ public class Topic extends Article{
 
 	Vector<Position> positions ;
 
-	private double relatednessToContext ;
-	private double relatednessToAllTopics ;
-	private double totalLinkProbability ;
-	private double maxLinkProbability ;
+	private float relatednessToContext ;
+	private float relatednessToAllTopics ;
+	private float totalLinkProbability ;
+	private float maxLinkProbability ;
 
-	private double totalDisambigConfidence ;
-	private double maxDisambigConfidence ;
-	private double docLength ;
+	private float totalDisambigConfidence ;
+	private float maxDisambigConfidence ;
+	private float docLength ;
 
 	/**
 	 * Initializes a new topic 
@@ -51,10 +51,9 @@ public class Topic extends Article{
 	 * @param id the id of the article that this topic represents
 	 * @param relatednessToContext the extent to which this topic relates to the surrounding unambiguous context
 	 * @param docLength the length of the document, in characters
-	 * @throws SQLException if there is a problem with the wikipedia database.
 	 */
-	public Topic(Wikipedia wikipedia, int id, double relatednessToContext, double docLength) throws SQLException{
-		super(wikipedia.getDatabase(), id) ;
+	public Topic(Wikipedia wikipedia, int id, float relatednessToContext, float docLength) {
+		super(wikipedia.getEnvironment(), id) ;
 
 		this.relatednessToContext = relatednessToContext ;
 		this.relatednessToAllTopics = -1 ;
@@ -68,22 +67,21 @@ public class Topic extends Article{
 	}
 
 	/**
-	 * Adds an ngram occurance in the document that refers to this topic 
+	 * Adds an ngram occurrence in the document that refers to this topic 
 	 * 
-	 * @param reference	the refering ngram (and it's location)
+	 * @param reference	the referring ngram (and it's location)
 	 * @param disambigConfidence the confidence with which the disambiguator chose this topic as the correct sense for the ngram
-	 * @throws SQLException if there is a problem with the wikipedia database.
 	 */
-	public void addReference(TopicReference reference, double disambigConfidence) throws SQLException{
+	public void addReference(TopicReference reference, float disambigConfidence) {
 		positions.add(reference.getPosition()) ;
 
-		double prob = reference.getAnchor().getLinkProbability() ;
+		float prob = reference.getAnchor().getLinkProbability() ;
 
 		totalLinkProbability = totalLinkProbability + prob ;
 		if (prob > maxLinkProbability)
 			maxLinkProbability = prob ;
 		
-		double dc = disambigConfidence ;
+		float dc = disambigConfidence ;
 
 		totalDisambigConfidence = totalDisambigConfidence + dc ;
 		if (dc > maxDisambigConfidence)
@@ -107,7 +105,7 @@ public class Topic extends Article{
 	/**
 	 * @return the extent to which this topic relates to surrounding unambiguous context.
 	 */
-	public double getRelatednessToContext() {
+	public float getRelatednessToContext() {
 		return relatednessToContext ;
 	}
 	
@@ -115,7 +113,7 @@ public class Topic extends Article{
 	 * @return the extent to which this topic relates to all other topics detected in the document.
 	 * @throws Exception if this has not been calculated yet (this is the last step performed by the topic detector).
 	 */
-	public double getRelatednessToOtherTopics() throws Exception{
+	public float getRelatednessToOtherTopics() throws Exception{
 		
 		if (relatednessToAllTopics < 0) {
 			throw new Exception("TOPIC: Relatedness to context not calcuated yet!") ;
@@ -129,58 +127,58 @@ public class Topic extends Article{
 	 * 
 	 * @param r the extent to which this topic relates to all other topics detected in the document.
 	 */
-	protected void setRelatednessToOtherTopics(double r) {
+	protected void setRelatednessToOtherTopics(float r) {
 		this.relatednessToAllTopics = r ;
 	}
 
 	/** 
 	 * @return the maximum probability that the ngrams which refer to this topic would be links (rather than plain text) if found in a random wikipedia article.
 	 */
-	public double getMaxLinkProbability() {
+	public float getMaxLinkProbability() {
 		return maxLinkProbability ;
 	}
 
 	/** 
 	 * @return the average probability that the ngrams which refer to this topic would be links (rather than plain text) if found in a random wikipedia article.
 	 */
-	public double getAverageLinkProbability() {
+	public float getAverageLinkProbability() {
 		return totalLinkProbability/positions.size() ;
 	}
 
 	/** 
 	 * @return the maximum confidence with which the disambiguator chose this topic as the correct sense for the ngrams from which it was mined.
 	 */
-	public double getMaxDisambigConfidence() {
+	public float getMaxDisambigConfidence() {
 		return maxDisambigConfidence ;
 	}
 
 	/** 
 	 * @return the average confidence with which the disambiguator chose this topic as the correct sense for the ngrams from which it was mined.
 	 */
-	public double getAverageDisambigConfidence() {
+	public float getAverageDisambigConfidence() {
 		return totalDisambigConfidence/positions.size() ;
 	}
 
 	/**
 	 * @return the distance between the start of the document and the first occurance of this topic, normalized by document length
 	 */
-	public double getFirstOccurance() {
+	public float getFirstOccurance() {
 		Position start = positions.firstElement() ;
-		return ((double)start.getStart()) / docLength ;
+		return ((float)start.getStart()) / docLength ;
 	}
 
 	/**
 	 * @return the distance between the end of the document and the last occurance of this topic, normalized by document length
 	 */
-	public double getLastOccurance() {
+	public float getLastOccurance() {
 		Position end = positions.lastElement() ;
-		return ((double)end.getStart()) / docLength ;			
+		return ((float)end.getStart()) / docLength ;			
 	}
 
 	/**
 	 * @return the distance between the first and last occurances of this topic, normalized by document length
 	 */
-	public double getSpread() {
+	public float getSpread() {
 		return getLastOccurance() - getFirstOccurance() ;
 	}
 }
