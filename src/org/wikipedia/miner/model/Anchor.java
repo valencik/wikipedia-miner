@@ -359,8 +359,8 @@ public class Anchor implements Comparable<Anchor>{
 		
 		DecimalFormat df = new DecimalFormat("0.00") ;
 		
-		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/simple/20080620") ;
-		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/simple/20080620") ;
+		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
+		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
 		
 		Wikipedia wikipedia = new Wikipedia(berkeleyDir, luceneDir) ;
 		
@@ -456,5 +456,4 @@ public class Anchor implements Comparable<Anchor>{
 			return obviousness ;
 		}
 	}
-	
 }

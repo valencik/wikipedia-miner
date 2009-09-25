@@ -77,8 +77,8 @@ public class DbAnchor {
 			Arrays.sort(mergedSenses) ;
 		}
 			
-		totalLinks = (short)(totalLinks + anchor.totalLinks) ;
-		distinctLinks = (short)(distinctLinks + anchor.distinctLinks) ;
+		totalLinks = totalLinks + anchor.totalLinks ;
+		distinctLinks = distinctLinks + anchor.distinctLinks ;
 		totalReferences = totalReferences + anchor.totalReferences ;
 		distinctReferences = distinctReferences + anchor.distinctReferences ;
 		senses = mergedSenses ;
