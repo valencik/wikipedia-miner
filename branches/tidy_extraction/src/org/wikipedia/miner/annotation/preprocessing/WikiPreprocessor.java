@@ -51,7 +51,7 @@ public class WikiPreprocessor extends DocumentPreprocessor {
 	public PreprocessedDocument preprocess(String content) {
 
 		StringBuffer context = new StringBuffer() ;
-		SortedVector<RegionTag> regionTags = getRegionTags(content) ;
+		RegionTag[] regionTags = getRegionTags(content) ;
 		HashSet<Integer> bannedTopics = new HashSet<Integer>() ;
 
 		String temp = blankTemplates(content) ;

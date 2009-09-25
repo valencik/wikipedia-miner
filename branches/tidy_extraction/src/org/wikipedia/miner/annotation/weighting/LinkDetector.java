@@ -97,12 +97,12 @@ public class LinkDetector extends TopicWeighter{
 	 * @return a sorted vector of the same topics, where the weight of each topic is the probability that it is a link
 	 * @throws Exception
 	 */
-	public SortedVector<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception {
+	public TreeSet<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception {
 
 		if (classifier == null)
 			throw new Exception("You must train the link detector first.") ;
 
-		SortedVector<Topic> weightedTopics = new SortedVector<Topic>() ;
+		TreeSet<Topic> weightedTopics = new TreeSet<Topic>() ;
 
 		for (Topic topic: topics) {
 
@@ -131,9 +131,9 @@ public class LinkDetector extends TopicWeighter{
 			Instance instance = new Instance(1.0, values) ;
 			instance.setDataset(header) ;
 			
-			double prob = classifier.distributionForInstance(instance)[0] ;
+			float prob = (float)classifier.distributionForInstance(instance)[0] ;
 			topic.setWeight(prob) ;
-			weightedTopics.add(topic, false) ;
+			weightedTopics.add(topic) ;
 		}
 
 		return weightedTopics ;
@@ -161,7 +161,7 @@ public class LinkDetector extends TopicWeighter{
 			
 			Article art = null;
 			try {
-				art = new Article(wikipedia.getDatabase(), id) ;
+				art = new Article(wikipedia.getEnvironment(), id) ;
 			} catch (Exception e) {
 				System.err.println("Warning: " + id + " is not a valid article") ;
 			} 
@@ -284,7 +284,7 @@ public class LinkDetector extends TopicWeighter{
 			Article art = null ;
 			
 			try {
-				art = new Article(wikipedia.getDatabase(), id) ;
+				art = new Article(wikipedia.getEnvironment(), id) ;
 			} catch (Exception e) {
 				System.err.println("Warning: " + id + " is not a valid article") ;
 			} 
@@ -345,7 +345,7 @@ public class LinkDetector extends TopicWeighter{
 		
 		Collection<Topic> topics = td.getTopics(text, rc) ;
 		
-		SortedVector<Topic> weightedTopics = this.getWeightedTopics(topics) ;
+		TreeSet<Topic> weightedTopics = this.getWeightedTopics(topics) ;
 		
 		HashSet<Integer> linkedTopicIds = new HashSet<Integer>() ;
 		for (Topic topic: weightedTopics) {
@@ -449,11 +449,13 @@ public class LinkDetector extends TopicWeighter{
 		File dataDirectory = new File("/research/wikipediaminer/data/en/20080727") ;
 		ProgressNotifier pn = new ProgressNotifier(5) ;
 		
+		/*
 		TIntHashSet ids = wikipedia.getDatabase().getValidPageIds(dataDirectory, 2, pn) ;
 		wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;
 		wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 2, pn) ;
 		wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
 		wikipedia.getDatabase().cacheGenerality(dataDirectory, ids, pn) ;	
+		*/
 		
 		//gather article sets for training and testing
 		ArticleSet trainSet = new ArticleSet(new File("data/articleSets/trainingIds.csv")) ;

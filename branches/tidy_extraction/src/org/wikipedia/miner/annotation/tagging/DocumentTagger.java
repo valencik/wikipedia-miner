@@ -20,6 +20,8 @@
 
 package org.wikipedia.miner.annotation.tagging;
 
+import gnu.trove.TIntFloatHashMap;
+
 import java.util.*;
 import org.wikipedia.miner.annotation.* ;
 import org.wikipedia.miner.annotation.preprocessing.* ;
@@ -117,7 +119,7 @@ public abstract class DocumentTagger {
 	
 	private Vector<TopicReference> resolveCollisions(Collection<Topic> topics) {
 		
-		HashMap<Integer, Double> topicWeights = new HashMap<Integer, Double>() ;
+		TIntFloatHashMap topicWeights = new TIntFloatHashMap() ;
 		
 		TreeSet<TopicReference> temp = new TreeSet<TopicReference>() ;
 		

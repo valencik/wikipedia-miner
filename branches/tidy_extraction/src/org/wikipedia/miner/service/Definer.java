@@ -24,6 +24,8 @@ import org.w3c.dom.*;
 import org.wikipedia.miner.model.* ;
 import org.wikipedia.miner.util.* ;
 
+import com.sleepycat.je.DatabaseException;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.Authenticator;
@@ -256,7 +258,7 @@ public class Definer {
 		response.setAttribute("title", page.getTitle()) ;
 				
 		if (length==LENGTH_SHORT) 
-			response.appendChild(wms.createElement("Definition", formatDefinition(page.getFirstSentence(null, null), format, linkDestination))) ;
+			response.appendChild(wms.createElement("Definition", formatDefinition(page.getFirstSentence(), format, linkDestination))) ;
 				
 		if (length==LENGTH_LONG) 
 			response.appendChild(wms.createElement("Definition", formatDefinition(page.getFirstParagraph(), format, linkDestination))) ;

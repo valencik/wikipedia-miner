@@ -34,7 +34,7 @@ public class PreprocessedDocument {
 	private String preprocessedText ;
 	private String contextText ;
 	private HashSet<Integer> bannedTopics ;
-	private SortedVector<RegionTag> regionTags ;
+	private RegionTag[] regionTags ;
 
 	//region tracking
 	private Vector<HashSet<Integer>> doneIdsStack ;
@@ -50,7 +50,7 @@ public class PreprocessedDocument {
 	 * @param regionTags the region tags detected in the document.
 	 * @param bannedTopics a set of ids for topics that you don't want to be detected in the document.
 	 */
-	public PreprocessedDocument(String originalText, String preprocessedText, String contextText, SortedVector<RegionTag> regionTags, HashSet<Integer>bannedTopics) {
+	public PreprocessedDocument(String originalText, String preprocessedText, String contextText, RegionTag[] regionTags, HashSet<Integer>bannedTopics) {
 		this.originalText = originalText ;
 		this.preprocessedText = preprocessedText ;
 		this.contextText = contextText ;
@@ -134,14 +134,14 @@ public class PreprocessedDocument {
 
 		//System.out.println(" - currPos=" + pos + "nextIndex=" + nextTagIndex + ", maxIndex=" + regionTags.size()) ;
 
-		if (nextTagIndex >= regionTags.size()) {
+		if (nextTagIndex >= regionTags.length) {
 			// no more tags, so just return last set we looked at
 			return doneIds ;
 		}
 
-		while (nextTagIndex < regionTags.size()) {
+		while (nextTagIndex < regionTags.length) {
 
-			RegionTag nextTag = regionTags.elementAt(nextTagIndex) ;
+			RegionTag nextTag = regionTags[nextTagIndex] ;
 			//System.out.println(" - nextTag=" + nextTag) ;
 
 			if (nextTag.getPosition() < pos) {

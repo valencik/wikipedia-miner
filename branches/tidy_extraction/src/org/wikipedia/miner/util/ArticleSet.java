@@ -25,6 +25,8 @@ import java.text.DecimalFormat;
 import java.util.*;
 import java.util.regex.*;
 
+import org.wikipedia.miner.db.WikipediaEnvironment;
+import org.wikipedia.miner.db.WikipediaEnvironment.Statistic;
 import org.wikipedia.miner.model.*;
 
 /**
@@ -35,6 +37,7 @@ import org.wikipedia.miner.model.*;
  */
 public class ArticleSet {
 	private TreeSet<Integer> articleIds = new TreeSet<Integer>() ;
+	MarkupStripper stripper = new MarkupStripper() ;
 	
 	int x = 0 ;
 	
@@ -81,9 +84,8 @@ public class ArticleSet {
 	 * @param minWordCount  the minimum number of words allowed in an article
 	 * @param maxWordCount the maximum number of words allowed in an article
 	 * @param maxListProportion the maximum proportion of list items (over total line count) that an article may contain. 
-	 * @throws SQLException if there is a problem with the wikipedia database.
 	 */
-	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) throws SQLException{
+	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) {
 		
 		DecimalFormat df = new DecimalFormat("#0.00 %") ;
 		
@@ -151,10 +153,10 @@ public class ArticleSet {
 		writer.close() ;
 	}
 		
-	private Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks) throws SQLException {
+	private Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks)  {
 		
 		Vector<Article> articles = new Vector<Article>() ;
-		ProgressNotifier pn = new ProgressNotifier(wikipedia.getDatabase().getArticleCount(), "Gathering rough candidates") ;
+		ProgressNotifier pn = new ProgressNotifier(wikipedia.getEnvironment().getStatisticValue(Statistic.ARTICLE_COUNT), "Gathering rough candidates") ;
 		
 		Iterator<Page> i = wikipedia.getPageIterator(Page.ARTICLE) ;
 		
@@ -162,10 +164,10 @@ public class ArticleSet {
 			Article art = (Article)i.next() ;
 			pn.update() ;
 			
-			if (minOutLinks >= 0 && art.getLinksOutCount() < minOutLinks)
+			if (minOutLinks >= 0 && art.getDistinctLinksOutCount() < minOutLinks)
 				continue ;
 			
-			if (minInLinks >= 0 && art.getLinksInCount() < minInLinks)
+			if (minInLinks >= 0 && art.getDistinctLinksInCount() < minInLinks)
 				continue ;
 			
 			articles.add(art) ;
@@ -174,7 +176,7 @@ public class ArticleSet {
 		return articles ;
 	}
 		
-	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) throws SQLException{
+	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) {
 				
 		//we don't want any disambiguations
 		if (art.getType() == Page.DISAMBIGUATION) 
@@ -194,7 +196,7 @@ public class ArticleSet {
 		if (markup == null)
 			return false ;
 		
-		markup = MarkupStripper.stripTemplates(markup) ;
+		markup = MarkupStripper
 		markup = MarkupStripper.stripTables(markup) ;
 		markup = MarkupStripper.stripLinks(markup) ;
 		markup = MarkupStripper.stripHTML(markup) ;
@@ -247,7 +249,7 @@ public class ArticleSet {
 			if (wordCount > maxWordCount && maxWordCount != -1) 
 				return false ;
 			
-			int linkCount = art.getLinksOutIds().length ;
+			int linkCount = art.getTotalLinksOutCount() ;
 			double linkProportion = (double)linkCount/wordCount ;
 			if (linkProportion < minLinkProportion || linkProportion > maxLinkProportion)
 				return false ;

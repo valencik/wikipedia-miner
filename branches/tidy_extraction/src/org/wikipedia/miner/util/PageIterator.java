@@ -20,7 +20,10 @@
 package org.wikipedia.miner.util;
 
 import java.util.* ;
+import java.io.File;
 import java.sql.* ;
+
+import org.wikipedia.miner.db.WikipediaEnvironment;
 import org.wikipedia.miner.model.* ;
 
 /**
@@ -30,25 +33,25 @@ import org.wikipedia.miner.model.* ;
  */
 public class PageIterator implements Iterator<Page> {
 
-	WikipediaDatabase database ;
+	WikipediaEnvironment environment ;
 
-	Vector<Page> pageBuffer ;
-	int pageType = -1 ;
-
-	int lastId = 0 ;
-	int bufferSize = 100000 ;
+	Iterator<Integer> idIterator ;
+	
+	Page nextPage = null ;
+	
+	short pageType = -1 ;
 
 	/**
 	 * Creates an iterator that will loop through all pages in Wikipedia.
 	 * 
 	 * @param database an active (connected) Wikipedia database.
-	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
-	public PageIterator(WikipediaDatabase database) throws SQLException {
-		this.database = database ;
-		pageBuffer = new Vector<Page>() ;
-
-		fillBuffer() ;
+	public PageIterator(WikipediaEnvironment environment) {
+		this.environment = environment ;
+		
+		idIterator = environment.getPageIdIterator() ;
+		
+		queueNext() ;
 	}
 
 	/**
@@ -58,16 +61,17 @@ public class PageIterator implements Iterator<Page> {
 	 * @param pageType the type of page to restrict the iterator to (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
 	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
-	public PageIterator(WikipediaDatabase database, int pageType) throws SQLException {
-		this.database = database ;
+	public PageIterator(WikipediaEnvironment environment, short pageType)  {
+		this.environment = environment ;
 		this.pageType = pageType ;
-		pageBuffer = new Vector<Page>() ;
-
-		fillBuffer() ;
+		
+		idIterator = environment.getPageIdIterator() ;
+		
+		queueNext() ;
 	}
 
 	public boolean hasNext() {
-		return !pageBuffer.isEmpty() ;
+		return !(nextPage == null) ;
 	}
 
 	public void remove() {
@@ -76,56 +80,41 @@ public class PageIterator implements Iterator<Page> {
 
 	public Page next() {
 
-		if (pageBuffer.isEmpty())
+		if (nextPage == null)
 			throw new NoSuchElementException() ;
 
-		Page p = pageBuffer.firstElement() ;
-		pageBuffer.remove(0) ;
-
-		try {
-			while (pageBuffer.isEmpty()) 
-				fillBuffer() ;
-		} catch (SQLException e) {} ;
-
+		Page p = nextPage ;
+		queueNext() ;
+		
 		return p ;
 	}
-
-	private void fillBuffer() throws SQLException{
-
-		Statement stmt = database.createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT page_id, page_title, page_type FROM page WHERE page_id>" + lastId + " ORDER BY page_id LIMIT " + bufferSize) ;
-
-		if (!rs.first()) {
-			// there is nothing left to retrieve
-			rs.close() ;
-			stmt.close() ;
-			
-			throw new SQLException("No pages left to retrieve") ;
-		}
-
-		while (rs.next()) {
-
-			try {
-				int id = rs.getInt(1) ;
-				String title = new String(rs.getBytes(2), "UTF-8") ;
-				int type = rs.getInt(3) ;
-
-				Page p = Page.createPage(database, id, title, type) ; ;
+	
+	private void queueNext() {
+		nextPage=null ;
+		while (nextPage==null) {
+			if (idIterator.hasNext()) {
+				int id = idIterator.next() ;
 				
-				//oddly, it is faster to cut out unwanted page types here, rather than with the database call
-				if (p != null && (pageType<0 || type == pageType)) {
-					pageBuffer.add(p) ;
-				}
-
-				lastId = id ;
-
-			} catch (Exception e) {
-				e.printStackTrace() ;
-			} ;	
+				nextPage = Page.createPage(environment, id) ;
+				
+				if (pageType >= 0 && nextPage.getType() != pageType)
+					nextPage = null ;
+			} else {
+				break ;
+			}
+		}
+	}
+	
+	public static void main(String[] args) throws Exception {
+		
+		File dataDir = new File("/Users/dmilne/Research/wikipedia/databases/simple/20080620") ;
+		Wikipedia wikipedia = new Wikipedia(dataDir) ;
+		
+		Iterator<Page> iter = wikipedia.getPageIterator(Page.DISAMBIGUATION) ;
+		while (iter.hasNext()) {
+			Page p = iter.next() ;
+			System.out.println(p + "," + p.getType()) ;
 		}
 		
-		rs.close() ;
-		stmt.close() ;
 	}
 }
-

@@ -31,13 +31,13 @@ import java.sql.*;
  */
 public class RelatednessCache {
 
-	TLongDoubleHashMap cachedRelatedness ;
+	TLongFloatHashMap cachedRelatedness ;
 	
 	/**
 	 * Initializes the relatedness cache.
 	 */
 	public RelatednessCache() {
-		cachedRelatedness = new TLongDoubleHashMap() ;
+		cachedRelatedness = new TLongFloatHashMap() ;
 	}
 	
 	/**
@@ -47,9 +47,8 @@ public class RelatednessCache {
 	 * @param art1 
 	 * @param art2
 	 * @return the semantic relatedness of art1 and art2
-	 * @throws SQLException
 	 */
-	public double getRelatedness(Article art1, Article art2) throws SQLException {
+	public float getRelatedness(Article art1, Article art2) {
 		
 		//generate unique key for this pair
 		long min = Math.min(art1.getId(), art2.getId()) ;
@@ -57,7 +56,7 @@ public class RelatednessCache {
 		long key = min + (max << 30) ;
 				
 		if (!cachedRelatedness.containsKey(key)) {		
-			Double rel = art1.getRelatednessTo(art2) ;		
+			float rel = art1.getRelatednessTo(art2) ;		
 			cachedRelatedness.put(key, rel) ;
 			return rel ;
 		} else {			

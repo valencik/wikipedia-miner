@@ -20,6 +20,7 @@
 package org.wikipedia.miner.model;
 
 import org.wikipedia.miner.util.* ;
+import org.wikipedia.miner.db.*;
 import java.sql.*;
 import java.util.* ;
 
@@ -48,8 +49,8 @@ public class Disambiguation extends Article{
 	 * @param id	the unique identifier of the disambiguation page
 	 * @param title	the (case dependent) title of the disambiguation page
 	 */
-	public Disambiguation(WikipediaDatabase database, int id, String title) {
-		super(database, id, title) ;
+	public Disambiguation(WikipediaEnvironment environment, int id, String title) {
+		super(environment, id, title) ;
 		type = DISAMBIGUATION ;
 	}
 	
@@ -58,24 +59,9 @@ public class Disambiguation extends Article{
 	 * 
 	 * @param database	an active WikipediaDatabase
 	 * @param id	the unique identifier of the disambiguation page
-	 * @throws SQLException	if no page is defined for the id, or if it is not a disambiguation page.
 	 */
-	public Disambiguation(WikipediaDatabase database, int id) throws SQLException{
-		super(database, id) ;
-		
-		if (type != DISAMBIGUATION)
-			throw new SQLException("The page given by id: " + id + " is not a disambiguation page") ;
-	}
-	
-	/**
-	 * Initializes a newly created DisambiguationPage so that it represents the disambiguation page given by <em>title</em>.
-	 * 
-	 * @param database	an active WikipediaDatabase
-	 * @param title	the (case dependent) title of the disambiguation page
-	 * @throws SQLException	if no disambiguation page is defined for the title.
-	 */
-	public Disambiguation(WikipediaDatabase database, String title) throws SQLException {
-		super(database, title, DISAMBIGUATION) ;
+	public Disambiguation(WikipediaEnvironment environment, int id) {
+		super(environment, id) ;
 	}
 		
 	/**
@@ -84,7 +70,7 @@ public class Disambiguation extends Article{
 	 * 
 	 * @return the most obvious (first) sense listed.
 	 * @throws SQLException	if there is a problem with the Wikipedia database.
-	 */
+	 *//*
 	public SensePage getMostObviousSense() throws SQLException{
 		SensePage sense = null ;
 		
@@ -101,12 +87,12 @@ public class Disambiguation extends Article{
 		stmt.close() ;
 		
 		return sense ;
-	}
+	}*/
 	
 	/**
 	 * @return all senses of the ambiguous term, ordered by page id.
 	 * @throws SQLException	if there is a problem with the Wikipedia database.
-	 */
+	 *//*
 	public SortedVector<SensePage> getSenses() throws SQLException{
 		
 		SortedVector<SensePage> senses = new SortedVector<SensePage>() ;
@@ -125,7 +111,7 @@ public class Disambiguation extends Article{
 		stmt.close() ;
 		
 		return senses ;
-	}
+	}*/
 	
 	/**
 	 * Returns all senses of the ambiguous term, in the order they were found on the page.
@@ -133,7 +119,7 @@ public class Disambiguation extends Article{
 	 * 
 	 * @return see above
 	 * @throws SQLException	if there is a problem with the wikipedia database.
-	 */
+	 *//*
 	public Vector<SensePage> getSensesInPageOrder() throws SQLException{
 		
 		Vector<SensePage> senses = new Vector<SensePage>() ;
@@ -152,7 +138,7 @@ public class Disambiguation extends Article{
 		stmt.close() ;
 		
 		return senses ;
-	}
+	}*/
 	
 	
 	
@@ -161,7 +147,7 @@ public class Disambiguation extends Article{
 	 * 
 	 * @param args an array of arguments for connecting to a wikipedia database: server and database names at a minimum, and optionally a username and password
 	 * @throws Exception if there is a problem with the wikipedia database.
-	 */
+	 *//*
 	public static void main(String[] args) throws Exception {
 		
 		Wikipedia wikipedia = new Wikipedia("kia", "enwiki_20071120", "root", "");
@@ -178,5 +164,5 @@ public class Disambiguation extends Article{
 			System.out.println("     " + sp.getScopeNote()) ;
 		}
 		System.out.println("") ;
-	}
+	}*/
 }

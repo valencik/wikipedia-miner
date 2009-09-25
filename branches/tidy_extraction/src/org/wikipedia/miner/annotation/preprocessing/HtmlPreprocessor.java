@@ -19,6 +19,7 @@
 
 package org.wikipedia.miner.annotation.preprocessing;
 
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.wikipedia.miner.annotation.preprocessing.PreprocessedDocument.RegionTag;
@@ -69,7 +70,7 @@ public class HtmlPreprocessor extends DocumentPreprocessor{
 		
 		String temp = content.toLowerCase() ;
 		
-		SortedVector<RegionTag> regionTags = getRegionTags(temp) ;
+		RegionTag[] regionTags = getRegionTags(temp) ;
 		
 		
 		

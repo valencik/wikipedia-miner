@@ -38,6 +38,8 @@ import org.wikipedia.miner.annotation.preprocessing.*;
 import org.wikipedia.miner.annotation.tagging.*;
 import org.wikipedia.miner.annotation.weighting.*;
 
+import com.sleepycat.je.DatabaseException;
+
 /**
  * @author David Milne
  * 
@@ -92,7 +94,7 @@ public class Wikifier {
 	 * @param tp an (optional) text processor to use for modifying how text is compared to anchors in Wikipedia.
 	 * @throws ServletException
 	 */
-	public Wikifier(WikipediaMinerServlet wms, TextProcessor tp) throws ServletException {
+	public Wikifier(WikipediaMinerServlet wms) throws ServletException {
 		
 		this.wms = wms ;
 		//homePage = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\"> <html><head> <title>MW Wikifier</title> <link rel=\"stylesheet\" href=\"css/style.css\" type=\"text/css\"></head><body><p>Welcome to the Wikipedia Miner wikifier service. This service automatically augments web pages with links to relevant Wikipedia topics. It doesn't just use Wikipedia as a source of information to link to, but also as training data for how best to do it. In other words, it has been trained to make the same decisions as the people who edit Wikipedia. </p> <p>Try it out! Just enter a url above, or drag this <a href=\"javascript:void(document.location='" + wms.context.getInitParameter("server_path") + "wikifier?url='+escape(document.location)')\" target=\"_top\">Wikifier</a> link into your bookmarks and you will be able to wikify pages with the click of a button.</p></body></html>" ;
@@ -102,7 +104,7 @@ public class Wikifier {
 		
 		
 		try {	
-			disambiguator = new Disambiguator(wms.wikipedia, tp, 0.01, 0, 25) ;
+			disambiguator = new Disambiguator(wms.wikipedia, wms.tp, 0.01, 0, 25) ;
 			disambiguator.loadClassifier(new File(wms.context.getInitParameter("wikifier_disambigModel"))) ;
 		} catch (Exception e) {
 			throw new ServletException("WikipediaMiner | could not retrieve disambiguation model for wikification (" + wms.context.getInitParameter("wikifier_disambigModel") + ")") ;
@@ -290,7 +292,7 @@ public class Wikifier {
 			sourceMode = resolveSourceMode(source) ;
 		
 		
-		SortedVector<Topic> detectedTopics = new SortedVector<Topic>() ;
+		TreeSet<Topic> detectedTopics = new TreeSet<Topic>() ;
 		
 		Element xmlResult = wms.createElement("Result", wikifyAndGatherTopics(source, sourceMode, minProbability, repeatMode, bannedTopics, baseColor, linkColor, showTooltips, detectedTopics)) ;
 		xmlResponse.appendChild(xmlResult) ;
@@ -343,7 +345,7 @@ public class Wikifier {
 	public String wikify(String source, int sourceMode, double minProbability, int repeatMode, String bannedTopics, String baseColor, String linkColor, boolean showTooltips) {
 		
 		try {
-			return wikifyAndGatherTopics(source, sourceMode, minProbability, repeatMode, bannedTopics, baseColor, linkColor, showTooltips, new SortedVector<Topic>()) ;
+			return wikifyAndGatherTopics(source, sourceMode, minProbability, repeatMode, bannedTopics, baseColor, linkColor, showTooltips, new TreeSet<Topic>()) ;
 		
 		} catch (IOException e) {
 			return lostPage ;
@@ -355,7 +357,7 @@ public class Wikifier {
 		}
 	}
 	
-	private Vector<Article> resolveTopicList(String topicList) {
+	private Vector<Article> resolveTopicList(String topicList) throws DatabaseException {
 		
 		Vector<Article> topics = new Vector<Article>() ;
 		
@@ -366,7 +368,7 @@ public class Wikifier {
 			try {
 				// try it as an id first
 				Integer id = Integer.parseInt(t) ;
-				topics.add(new Article(wms.wikipedia.getDatabase(), id)) ;
+				topics.add(new Article(wms.wikipedia.getEnvironment(), id)) ;
 			} catch (Exception e) {
 				// if that fails, try as an article title				
 				Article art = wms.wikipedia.getArticleByTitle(t.trim()) ;
@@ -379,7 +381,7 @@ public class Wikifier {
 	}
 	
 	
-	private String wikifyAndGatherTopics(String source, int sourceMode, double minProbability, int repeatMode, String bannedTopics, String baseColor, String linkColor, boolean showTooltips, SortedVector<Topic> detectedTopics) throws IOException, Exception {
+	private String wikifyAndGatherTopics(String source, int sourceMode, double minProbability, int repeatMode, String bannedTopics, String baseColor, String linkColor, boolean showTooltips, TreeSet<Topic> detectedTopics) throws IOException, Exception {
 		
 		if (source == null || source.trim().equals(""))
 			return "" ;
@@ -425,16 +427,11 @@ public class Wikifier {
 		//TODO: find smarter way to resolve this hack, which stops wikifier from detecting "Space (punctuation)" ;
 		doc.banTopic(143856) ;
 		
-		SortedVector<Topic> allTopics = linkDetector.getWeightedTopics(topicDetector.getTopics(doc, null)) ;
-		SortedVector<Topic> bestTopics = new SortedVector<Topic>() ;
-		for (Topic t:allTopics) {
-			if (t.getWeight() >= minProbability)
-				bestTopics.add(t, true) ;
-			
-			detectedTopics.add(t, true) ;
-		}
+		TreeSet<Topic>tmpTopics = linkDetector.getBestTopics(topicDetector.getTopics(doc, null), minProbability) ;
+		for (Topic t:tmpTopics) 
+			detectedTopics.add(t) ;
 		
-		String taggedText = dt.tag(doc, bestTopics, repeatMode) ;
+		String taggedText = dt.tag(doc, detectedTopics, repeatMode) ;
 		
 		if (sourceMode == SOURCE_URL) {
 			taggedText = taggedText.replaceAll("(?i)<html", "<base href=\"" + source  + "\" target=\"_top\"/><html") ;
