@@ -17,11 +17,11 @@
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+package org.wikipedia.miner.util ;
 
 import java.util.*;
 import java.util.regex.*;
 
-import org.wikipedia.miner.model.* ;
 
 /**
  * This provides tools to strip out markup from wikipedia articles, or anything else that has been written
@@ -724,35 +724,5 @@ public class MarkupStripper {
 		}
 	}
 	
-	public static void main(String[] args) throws Exception{
-		
-		Wikipedia wikipedia = new Wikipedia("wdm", "enwiki_20090306", "student", "*****") ;
-		MarkupStripper ms = new MarkupStripper() ;
-		
-		Article art = wikipedia.getMostLikelyArticle("photographic memory", null) ;
-		
-		String content = art.getContent() ;
-		
-		Character replacement = null ; //new Character(' ') ;
-		
-		String cleanedContent = ms.stripToPlainText(content, replacement) ; //ms.stripAllButLinksAndEmphasis(content, replacement) ;
-		cleanedContent = ms.stripNonArticleInternalLinks(cleanedContent, replacement) ;
-		
-		String[] unwantedSections = {"see also", "references", "further sources", "further reading", "footnotes", "external links", "bibliography", "notes", "notes and references"} ; 
-		
-		cleanedContent = ms.stripSections(cleanedContent, unwantedSections, replacement) ;
-		
-		
-		
-		System.out.println(cleanedContent) ;
-		
-		Vector<int[]> headers = ms.gatherSectionHeaders(cleanedContent) ;
-		for (int[] region:headers) {
-			String header = cleanedContent.substring(region[0], region[1]) ;
-			System.out.println(header) ;
-		}
-		
-		
-	}
 
 }
