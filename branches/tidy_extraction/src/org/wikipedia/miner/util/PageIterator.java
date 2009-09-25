@@ -107,8 +107,10 @@ public class PageIterator implements Iterator<Page> {
 	
 	public static void main(String[] args) throws Exception {
 		
-		File dataDir = new File("/Users/dmilne/Research/wikipedia/databases/simple/20080620") ;
-		Wikipedia wikipedia = new Wikipedia(dataDir) ;
+		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/simple/20080620") ;
+		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/simple/20080620") ;
+		
+		Wikipedia wikipedia = new Wikipedia(berkeleyDir, luceneDir) ;
 		
 		Iterator<Page> iter = wikipedia.getPageIterator(Page.DISAMBIGUATION) ;
 		while (iter.hasNext()) {

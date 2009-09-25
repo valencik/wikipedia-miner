@@ -76,7 +76,12 @@ public class WikipediaMinerServlet extends HttpServlet {
 		tp = null ; //new CaseFolder() ; 
 
 		try {
-			wikipedia = new Wikipedia(new File("/Users/dmilne/Research/wikipedia/databases/en/20090822")) ;
+			
+			//TODO: get from context parameters
+			File dataDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
+			File indexDir = new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
+			
+			wikipedia = new Wikipedia(dataDir, indexDir) ;
 				
 			//	new Wikipedia(context.getInitParameter("mysql_server"), context.getInitParameter("mysql_database"), context.getInitParameter("mysql_user"), context.getInitParameter("mysql_password")) ;
 		} catch (Exception e) {

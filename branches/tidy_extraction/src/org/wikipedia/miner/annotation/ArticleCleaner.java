@@ -43,15 +43,16 @@ public class ArticleCleaner {
 	public static final int FIRST_PARAGRAPH = 2 ;
 	
 
-	
-	
+	private MarkupStripper stripper = new MarkupStripper() ;
+	private String[] unwantedSections = {"see also", "references", "further sources", "further reading", "footnotes", "external links", "bibliography", "notes", "notes and references", "other websites"} ;
+
 	/**
 	 * @param article the article to clean
 	 * @param snippetLength the portion of the article that is to be extracted and cleaned (ALL, FIRST_SENTENCE, or FIRST_PARAGRAPH)
 	 * @return the content (or snippet) of the given article, with all markup removed except links to other articles.  
 	 * @throws Exception
 	 */
-	public static String getMarkupLinksOnly(Article article, int snippetLength) throws Exception {
+	public String getMarkupLinksOnly(Article article, int snippetLength) throws Exception {
 		
 		if (snippetLength == FIRST_SENTENCE || snippetLength == FIRST_PARAGRAPH) {
 			
@@ -62,27 +63,17 @@ public class ArticleCleaner {
 			else
 				content = article.getFirstParagraph() ;
 			
-			content = MarkupStripper.stripFormatting(content) ;
+			content = content.replaceAll("'{2,}", "") ; 
 			return content ;
 			
 		} else {
 			String content = article.getContent() ;
 			
-			content = MarkupStripper.stripTemplates(content) ;
-			content = MarkupStripper.stripSection(content, "see also") ;
-			content = MarkupStripper.stripSection(content, "references") ;
-			content = MarkupStripper.stripSection(content, "external links") ;
-			content = MarkupStripper.stripSection(content, "further reading") ;
-			content = MarkupStripper.stripHeadings(content) ; 
-			content = MarkupStripper.stripNonArticleLinks(content) ;
-			content = MarkupStripper.stripExternalLinks(content) ;
-			content = MarkupStripper.stripIsolatedLinks(content) ;
-			content = MarkupStripper.stripTables(content) ;
-			content = MarkupStripper.stripHTML(content) ;
-			content = MarkupStripper.stripMagicWords(content) ;
-			content = MarkupStripper.stripFormatting(content) ;
-			content = MarkupStripper.stripExternalLinks(content) ;		
-			content = MarkupStripper.stripExcessNewlines(content) ;
+			content = stripper.stripAllButLinksAndEmphasis(content, null) ;
+			content = stripper.stripSections(content, unwantedSections, null) ;
+			content = stripper.stripSectionHeaders(content, null) ;
+			
+			content = content.replaceAll("'{2,}", "") ; 
 			
 			return content ;
 		}
@@ -96,7 +87,7 @@ public class ArticleCleaner {
 	 * @return the content of the given article, with all markup removed.  
 	 * @throws Exception
 	 */
-	public static String getCleanedContent(Article article,  int snippetLength) throws Exception{
+	public String getCleanedContent(Article article,  int snippetLength) throws Exception{
 		
 		if (snippetLength == FIRST_SENTENCE || snippetLength == FIRST_PARAGRAPH) {
 			
@@ -107,28 +98,19 @@ public class ArticleCleaner {
 			else
 				content = article.getFirstParagraph() ;
 			
-			content = MarkupStripper.stripFormatting(content) ;
-			content = MarkupStripper.stripLinks(content) ;
+			content = stripper.stripInternalLinks(content, null) ;
+			content = content.replaceAll("'{2,}", "") ; 
+			
 			return content ;
 	
 		} else {
 		
 			String content = article.getContent() ;
-			content = MarkupStripper.stripTemplates(content) ;
-			content = MarkupStripper.stripSection(content, "see also") ;
-			content = MarkupStripper.stripSection(content, "references") ;
-			content = MarkupStripper.stripSection(content, "external links") ;
-			content = MarkupStripper.stripSection(content, "further reading") ;
-			content = MarkupStripper.stripHeadings(content) ; 
-			content = MarkupStripper.stripExternalLinks(content) ;
-			content = MarkupStripper.stripIsolatedLinks(content) ;
-			content = MarkupStripper.stripLinks(content) ;
-			content = MarkupStripper.stripTables(content) ;
-			content = MarkupStripper.stripHTML(content) ;
-			content = MarkupStripper.stripMagicWords(content) ;
-			content = MarkupStripper.stripFormatting(content) ;
-			content = MarkupStripper.stripExternalLinks(content) ;		
-			content = MarkupStripper.stripExcessNewlines(content) ;
+			content = stripper.stripToPlainText(content, null) ; 
+			content = stripper.stripSections(content, unwantedSections, null) ;
+			content = stripper.stripSectionHeaders(content, null) ;
+			
+			content = content.replaceAll("'{2,}", "") ; 
 		
 			return content ;
 		}

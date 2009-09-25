@@ -359,8 +359,10 @@ public class Anchor implements Comparable<Anchor>{
 		
 		DecimalFormat df = new DecimalFormat("0.00") ;
 		
-		File dataDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
-		Wikipedia wikipedia = new Wikipedia(dataDir) ;
+		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/simple/20080620") ;
+		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/simple/20080620") ;
+		
+		Wikipedia wikipedia = new Wikipedia(berkeleyDir, luceneDir) ;
 		
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );			
 

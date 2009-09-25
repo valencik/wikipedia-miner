@@ -196,12 +196,8 @@ public class ArticleSet {
 		if (markup == null)
 			return false ;
 		
-		markup = MarkupStripper
-		markup = MarkupStripper.stripTables(markup) ;
-		markup = MarkupStripper.stripLinks(markup) ;
-		markup = MarkupStripper.stripHTML(markup) ;
-		markup = MarkupStripper.stripExcessNewlines(markup) ;
-		
+		markup = stripper.stripAllButLinksAndEmphasis(markup, null) ;
+		markup = stripper.stripNonArticleInternalLinks(markup, null) ; 
 		
 		if (maxListProportion >= 0) {
 			//we need to count lines and list items
@@ -235,8 +231,7 @@ public class ArticleSet {
 			//we need to count words
 			
 			int wordCount = 0 ;
-			markup = MarkupStripper.stripFormatting(markup) ;
-		
+			
 			Pattern wordPattern = Pattern.compile("\\W(\\w+)\\W") ; 
 			Matcher wordMatcher = wordPattern.matcher(markup) ;
 		

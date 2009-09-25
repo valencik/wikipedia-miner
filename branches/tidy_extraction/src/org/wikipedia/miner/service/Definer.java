@@ -49,6 +49,7 @@ import javax.servlet.ServletException;
 public class Definer {
 
 	private WikipediaMinerServlet wms ;
+	private MarkupStripper stripper = new MarkupStripper() ;
 	
 	/**
 	 * Only first sentences are used for definitions.
@@ -339,8 +340,8 @@ public class Definer {
 	protected String formatDefinition(String definition, int format, int linkDestination){
 				
 		if (format == FORMAT_PLAIN) {
-			definition = MarkupStripper.stripLinks(definition) ;
-			definition = MarkupStripper.stripFormatting(definition) ;
+			definition = stripper.stripInternalLinks(definition, null) ; 
+			definition = definition.replaceAll("'{2,}", "") ; 
 		}
 		
 		if (format == FORMAT_HTML) {
