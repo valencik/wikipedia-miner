@@ -60,11 +60,11 @@ public class WikipediaEnvironmentLoader {
 		//loadLinkCounts(dataDirectory, null) ;
 		//loadPageLinks(dataDirectory, null) ;
 		//loadCategoryLinks(dataDirectory, null) ;
-		//loadAnchors(dataDirectory, null) ;
+		loadAnchors(dataDirectory, null) ;
 		//loadAnchorTexts(dataDirectory, null) ;
 		//loadTranslations(dataDirectory, null) ;
 		//loadContent(dataDirectory, null) ;
-		indexArticles() ;
+		//indexArticles() ;
 
 
 		//we.prepareForTextProcessor(new CaseFolder()) ;
@@ -796,7 +796,7 @@ public class WikipediaEnvironmentLoader {
 					Arrays.sort(sortedSenses) ;
 
 					//set counts as 0 for now
-					DbAnchor anch = new DbAnchor((short)0,(short)0,(long)0,0,sortedSenses) ;
+					DbAnchor anch = new DbAnchor(0,0,(long)0,0,sortedSenses) ;
 
 					sm.put(anchor, anch) ;
 					pn2.update() ;

@@ -3,13 +3,15 @@ package org.wikipedia.miner.db;
 public class DbLink  implements Comparable<DbLink>{
 
 	int id ;
-	short[] positionOffsets ;
+	//short[] positionOffsets ;
 	
-	//int[] positions ;
+	int[] positions ;
 	
 	public DbLink(int id, int[]positions) {
 		this.id = id ;
+		this.positions = positions ;
 		
+		/*
 		if (positions != null) {
 			this.positionOffsets = new short[positions.length] ;
 			
@@ -22,7 +24,7 @@ public class DbLink  implements Comparable<DbLink>{
 				}
 			}
 		}
-
+	*/
 	}
 	
 	public int getId() {
@@ -31,6 +33,9 @@ public class DbLink  implements Comparable<DbLink>{
 	
 	public int[] getPositions() {
 		
+		return this.positions ;
+		
+		/*
 		if (positionOffsets == null)
 			return null ;
 		
@@ -44,6 +49,7 @@ public class DbLink  implements Comparable<DbLink>{
 		
 		
 		return positions ;
+		*/
 	}
 	
 	public int compareTo(DbLink link) {
