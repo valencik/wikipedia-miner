@@ -26,11 +26,14 @@ import org.tartarus.snowball.ext.*;
 /**
  * This class provides a TextProcessor based on snowball stemmers.
  * Have a look at http://snowball.tartarus.org/
+ *
+ * @author Giulio Paci
  */	
 public class SnowballStemmerWrapper extends TextProcessor {
     private int repeat;
 	private Cleaner cleaner ;
     private SnowballStemmer stemmer;
+    private String language;
 
     /**
 	 * Initializes a newly created Stemmer (English).
@@ -38,6 +41,7 @@ public class SnowballStemmerWrapper extends TextProcessor {
 	public SnowballStemmerWrapper() {
 		this.cleaner = new Cleaner();
         this.stemmer = (SnowballStemmer) new englishStemmer();
+        this.language = "english";
         this.repeat = 1;
 	}
 
@@ -46,13 +50,31 @@ public class SnowballStemmerWrapper extends TextProcessor {
 	 */
 	public SnowballStemmerWrapper(String language) throws ClassNotFoundException, InstantiationException, IllegalAccessException {
 		this.cleaner = new Cleaner();
+        this.language = language;
         this.selectLanguage(language);
         this.repeat = 1;
 	}
 
+	/**
+	 * Returns the name of the current SnowballStemmer (includes language information).
+	 *
+	 * @return	the name of this TextProcessor.
+	 */
     @Override
     public String getName(){
-        return this.getClass().getSimpleName() + "<" + this.stemmer.getClass().getSimpleName() + ">";
+        return this.getClass().getSimpleName() + "_" + this.language;
+    }
+
+
+	/**
+	 * Returns a string that provides complete information to setup the current configuration of the
+     * text processor.
+	 *
+	 * @return	a textual description of the TextProcessor.
+	 */
+    @Override
+    public String toString(){
+        return super.toString() + "<string<" + TextProcessor.encodeParam(this.language);
     }
 
 	/**
@@ -71,10 +93,8 @@ public class SnowballStemmerWrapper extends TextProcessor {
 	 * @return the processed string
 	 */	
 	public synchronized String processText(String text) {
-		String t = text ;
-        String ret = "";
-        
-		String[] terms = t.toLowerCase().split("\\s+") ;
+		StringBuffer processedText = new StringBuffer() ;
+		String[] terms = text.toLowerCase().split("\\s+") ;
 		for(int i=0;i<terms.length; i++)
         {
             if(terms[i].length() > 0)
@@ -83,12 +103,12 @@ public class SnowballStemmerWrapper extends TextProcessor {
                 for (int j = this.repeat; j != 0; j--) {
                     this.stemmer.stem();
                 }
-                ret += stemmer.getCurrent() + " ";
+				processedText.append(cleaner.processText(stemmer.getCurrent()));
+				processedText.append(" ");
             }
-        }
-        ret = this.cleaner.processText(ret);
-		
-		return ret.trim();
+		}
+
+		return processedText.toString().trim() ;
 	}
 }
 
