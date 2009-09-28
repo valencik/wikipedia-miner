@@ -4,7 +4,10 @@ import gnu.trove.*;
 
 import java.io.* ;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.util.ProgressNotifier;
 import org.wikipedia.miner.util.text.* ;
 
@@ -35,6 +38,13 @@ public class WikipediaEnvironment extends Environment {
 
 	private HashMap<String, StoredMap<String, DbAnchor>> anchorMaps ;
 	private HashMap<String, Database> anchorDatabases ;
+	
+	
+	private TIntObjectHashMap<DbPage> cachedPages ;
+	private TIntObjectHashMap<int[]>cachedInLinks ;
+	
+	
+	
 
 	private DatabaseConfig normalConfig ;
 	private DatabaseConfig writingConfig ;
@@ -60,18 +70,19 @@ public class WikipediaEnvironment extends Environment {
 			public boolean getTransactional() {
 				return false ;
 			}
+			/*
 			public int getCachePercent() {
 				if (loading) {
 					return 20 ;
 				} else {
-					return 70 ;
+					return 50 ;
 				}
-			}
+			}*/
 		}) ;
 
 		EnvironmentConfig ec = this.getConfig() ;
-		ec.setConfigParam(EnvironmentConfig.ENV_RUN_CHECKPOINTER, "false") ;
-		ec.setConfigParam(EnvironmentConfig.ENV_RUN_CLEANER, "false") ;
+		//ec.setConfigParam(EnvironmentConfig.ENV_RUN_CHECKPOINTER, "false") ;
+		//ec.setConfigParam(EnvironmentConfig.ENV_RUN_CLEANER, "false") ;
 		
 		this.databaseDir = databaseDir ;
 		this.indexDir = indexDir ;
@@ -334,6 +345,10 @@ public class WikipediaEnvironment extends Environment {
 
 
 	public DbPage getPageDetails(int id)  {
+		
+		if (arePagesCached()) 
+			return cachedPages.get(id) ;
+		
 		StoredMap<Integer, DbPage> smPageDetails = openStoredMaps.get(DatabaseName.PAGE_DETAILS) ;
 		return smPageDetails.get(id) ;
 	}
@@ -414,6 +429,24 @@ public class WikipediaEnvironment extends Environment {
 		StoredMap<Integer, DbLink[]> smLinksIn = openStoredMaps.get(DatabaseName.LINKS_IN) ;
 		return smLinksIn.get(id) ;
 	}
+	
+	public int[] getLinkIdsIn(int id) {
+		
+		if (areInLinksCached()) 
+			return cachedInLinks.get(id) ;
+		
+		DbLink[] dbLinks = getLinksIn(id) ;
+		
+		if (dbLinks == null)
+			return null ;
+		
+		int[] linkIds = new int[dbLinks.length] ;
+		
+		for (int i=0 ; i<dbLinks.length ; i++)
+			linkIds[i] = dbLinks[i].id ;
+		
+		return linkIds ;
+	}
 
 	public int[] getLinkCounts(int id) {
 		StoredMap<Integer, int[]> smLinkCounts = openStoredMaps.get(DatabaseName.LINK_COUNTS) ;
@@ -446,40 +479,161 @@ public class WikipediaEnvironment extends Environment {
 		StoredKeySet<Integer> pageIds = new StoredKeySet<Integer>(dbPageDetails, intBinding,false) ;
 		return pageIds.storedIterator(false) ;
 	}
+	
+	/**
+	 * Identifies the set of valid article ids which fit the given constrains. Useful for specifying a subset of 
+	 * articles that we are interested in caching.
+	 * 
+	 * @param minLinkCount the minimum number of links that an article must have (both in and out)
+	 * @param pn an optional progress notifier
+	 * @return the set of valid ids which fit the given constrains. 
+	 */
+	public TIntHashSet getValidPageIds(int minLinkCount, ProgressNotifier pn) throws DatabaseException {
+		
+		TIntHashSet pageIds = new TIntHashSet() ;
+				
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		
+		//CursorConfig cf = new CursorConfig() ;
+		//cf.getReadUncommitted()
+		
+		Database dbLinkCounts = this.openDatabases.get(DatabaseName.LINK_COUNTS) ;
+		pn.startTask(dbLinkCounts.count(), "gathering valid page ids") ;
+		
+		Cursor c = dbLinkCounts.openCursor(null, null) ;
+		
+		DatabaseEntry key = new DatabaseEntry() ;
+		DatabaseEntry value = new DatabaseEntry() ;
+		
+		while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
+	        Integer id = intBinding.entryToObject(key) ;
+	        int[] linkCounts = intArrayBinding.entryToObject(value) ;
+	        
+	        	pn.update();
+	
+			if (linkCounts[1] > minLinkCount && linkCounts[3] >= minLinkCount)
+				pageIds.add(id) ;
+		}
+		
+		return pageIds ;
+	}
+	
+	/**
+	 * Caches pages, so that titles and types can be retrieved 
+	 * very quickly without consulting the database.
+	 * 
+	 * @param validIds an optional set of ids. Only anchors that point to these ids, and only destinations within this list will be cached. 
+	 * @param pn an optional progress notifier
+	 * @throws DatabaseException if there is a problem with the underlying data.
+	 */
+	public void cachePages(TIntHashSet validIds, ProgressNotifier pn) throws DatabaseException {
+		
+		Database dbPage = this.openDatabases.get(DatabaseName.PAGE_DETAILS) ;
+		
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		pn.startTask(dbPage.count(), "caching pages") ;
+		
+		if (validIds == null)
+			cachedPages = new TIntObjectHashMap<DbPage>((int)dbPage.count(), 1) ;
+		else
+			cachedPages = new TIntObjectHashMap<DbPage>(validIds.size(), 1) ;
+		
+		Cursor c = dbPage.openCursor(null, null) ;
+		
+		DatabaseEntry key = new DatabaseEntry() ;
+		DatabaseEntry value = new DatabaseEntry() ;
+		
+		while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
+	       Integer id = intBinding.entryToObject(key) ;
+	       DbPage page = pageDetailsBinding.entryToObject(value) ;
+	       
+	       if (validIds == null || validIds.contains(id) || page.getType() == Page.CATEGORY || page.getType()==Page.REDIRECT) 
+				cachedPages.put(id, page) ;
+		
+			pn.update() ;
+		}
+	}
+	
+	/**
+	 * Caches links in to pages, so these and relatedness measures can be calculated very quickly,
+	 * without consulting the database.
+	 * 
+	 * @param dir	the directory containing csv files extracted from a Wikipedia dump.
+	 * @param validIds an optional set of ids. Only anchors that point to these ids, and only destinations within this list will be cached. 
+	 * @param pn an optional progress notifier
+	 * @throws IOException if the relevant files cannot be read.
+	 */
+	public void cacheInLinks(TIntHashSet validIds, ProgressNotifier pn) throws DatabaseException {
+		
+		Database dbLinks = this.openDatabases.get(DatabaseName.LINKS_IN) ;
+		
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		pn.startTask(dbLinks.count(), "caching links into pages") ;
+		
+		if (validIds == null)
+			cachedInLinks = new TIntObjectHashMap<int[]>((int)dbLinks.count(), 1) ;
+		else
+			cachedInLinks = new TIntObjectHashMap<int[]>(validIds.size(), 1) ;
+		
+		Cursor c = dbLinks.openCursor(null, null) ;
+		
+		DatabaseEntry key = new DatabaseEntry() ;
+		DatabaseEntry value = new DatabaseEntry() ;
+		
+		while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
+			Integer id = intBinding.entryToObject(key) ;
+			
+			if (validIds == null || validIds.contains(id)) {
+				
+				DbLink[] links = linkArrayBinding.entryToObject(value) ;
+			
+				TIntArrayList linkIds = new TIntArrayList() ;
+				
+				for (DbLink l:links) {
+					if (validIds == null || validIds.contains(l.id)) 
+						linkIds.add(l.id) ;
+				}
+				
+				cachedInLinks.put(id, linkIds.toNativeArray()) ;
+			}
+
+			pn.update() ;
+		}
+	}
+
+	public boolean arePagesCached() {
+		return cachedPages != null ;
+	}
+	
+	public boolean areInLinksCached() {
+		return cachedInLinks != null ;
+	}
 
 	public static void main(String[] args) throws Exception {
 
-		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/simple/20080620") ;
-		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/simple/20080620") ;
+		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
+		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
 		
-		File dumpDir = new File("/Users/dmilne/Research/wikipedia/data/simple/20080620") ;
+		File dumpDir = new File("/Users/dmilne/Research/wikipedia/data/en/20090822") ;
 
 		WikipediaEnvironment we = new WikipediaEnvironment(berkeleyDir, luceneDir, false) ;
 
 		try {
 			//we.loadData(dumpDir, true) ;
+			
+			System.gc();
+			long memStart = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
-			TextProcessor tp = new CaseFolder() ;
-			//we.prepareForTextProcessor(tp) ;
+			
+			TIntHashSet validIds = we.getValidPageIds(5, null) ;
+			we.cacheInLinks(validIds, null) ;
+			
+			System.gc();
+			long memEnd = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
-			String text = "Kiwi" ;
-
-			System.out.println("no tp") ;
-			DbAnchor anch = we.getAnchor(text, null) ;
-			System.out.println(anch.getTotalReferences()) ;
-			for (DbSense sense:anch.getSenses()) {
-				DbPage p = we.getPageDetails(sense.getDestination()) ;
-				System.out.println(" - " + sense.getDestination() + ":" + p.getTitle() + "," + sense.getDistinctCount()) ;
-			}
-
-			System.out.println(tp.getName()) ;
-			anch = we.getAnchor(text, tp) ;
-			System.out.println(anch.getTotalReferences()) ;
-			for (DbSense sense:anch.getSenses()) {
-				DbPage p = we.getPageDetails(sense.getDestination()) ;
-				System.out.println(" - " + sense.getDestination() + ":" + p.getTitle() + "," + sense.getDistinctCount()) ;
-			}
-
+			System.out.println( (memEnd-memStart) + " bytes") ;
+			
+			
 		} catch (Exception e) {
 
 			throw e ;

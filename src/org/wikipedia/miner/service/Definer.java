@@ -74,7 +74,7 @@ public class Definer {
 	public static final int FORMAT_HTML = 2 ;
 	
 	
-	
+	protected Pattern linkPattern = Pattern.compile("\\[\\[(.*?)\\]\\]", Pattern.DOTALL) ;
 	
 	
 	
@@ -333,47 +333,7 @@ public class Definer {
 	}
 	
 	
-	protected String resolveFormatTags(String markup) {
-		
-		//replace bold tags
-		Pattern p = Pattern.compile("'''([^']*?)'''", Pattern.DOTALL) ;
-		Matcher m = p.matcher(markup) ;
-		
-		int lastPos = 0 ;
-		StringBuffer sb = new StringBuffer() ;
-		
-		while(m.find()) {
-			sb.append(markup.substring(lastPos, m.start())) ;
-			sb.append("<b>") ;
-			sb.append(m.group(1)) ;
-			sb.append("</b>") ;			
-			lastPos = m.end() ;		
-		}
-		
-		sb.append(markup.substring(lastPos)) ;
-		markup = sb.toString() ;
-		
-		//replace italic tags
-		p = Pattern.compile("''([^']*?)''", Pattern.DOTALL) ;
-		m = p.matcher(markup) ;
-		
-		lastPos = 0 ;
-		sb = new StringBuffer() ;
-		
-		while(m.find()) {
-			sb.append(markup.substring(lastPos, m.start())) ;
-			sb.append("<i>") ;
-			sb.append(m.group(1)) ;
-			sb.append("</i>") ;			
-			lastPos = m.end() ;		
-		}
-		
-		sb.append(markup.substring(lastPos)) ;
-		markup = sb.toString() ;
-		
-		return markup ;
-	}
-	
+
 	
 	protected String format(String markup, int format, int linkFormat){
 		
@@ -398,8 +358,7 @@ public class Definer {
 		if (linkFormat != LINK_WIKI) {
 			
 			//replace links
-			Pattern p = Pattern.compile("\\[\\[(.*?)\\]\\]", Pattern.DOTALL) ;
-			Matcher m = p.matcher(markup) ;
+			Matcher m = linkPattern.matcher(markup) ;
 			
 			int lastPos = 0 ;
 			StringBuffer sb = new StringBuffer() ;

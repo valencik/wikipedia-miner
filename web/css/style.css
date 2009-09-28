@@ -130,7 +130,7 @@ p{
 /* searching and browsing..............................................*/
 
 .sense {
-	margin-top: 15px ;
+	margin-bottom: 15px ;
 }
 
 .box input, .box select {
@@ -160,6 +160,19 @@ p{
 .explanation {
 	color: 	#4E4848 ;
 	padding-left: 1em ;
+}
+
+.snippetText {
+	
+	padding-top: 10px ;
+	padding-right: 1em ;
+}
+
+.snippetSource {
+	
+	font-style: italic;
+	padding-left:1em ;
+
 }
 
 .teaser {
