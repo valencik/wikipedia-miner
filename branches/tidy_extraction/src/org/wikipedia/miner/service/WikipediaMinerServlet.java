@@ -196,8 +196,6 @@ public class WikipediaMinerServlet extends HttpServlet {
 				data = definer.getDefinition(id, length, format, linkFormat, getImages, maxImageWidth, maxImageHeight, escapeDefinition) ;
 			}
 
-
-
 			//all of the remaining tasks require data to be cached, so lets make sure that is finished before continuing.
 			if (!cachingThread.isOk())
 				throw new ServletException("Could not cache wikipedia data") ;
@@ -214,33 +212,49 @@ public class WikipediaMinerServlet extends HttpServlet {
 
 			//process search request
 			if (data==null && task.equals("search")) {
-				String term = request.getParameter("term") ;
-				String id = request.getParameter("id") ;
+				String term = encodeParameter(request.getParameter("term"), request.getCharacterEncoding());
+				int id = resolveIntegerArg(request.getParameter("id"), -1) ;
 				int linkLimit = resolveIntegerArg(request.getParameter("linkLimit"), searcher.getDefaultMaxLinkCount()) ;
 				int senseLimit = resolveIntegerArg(request.getParameter("senseLimit"), searcher.getDefaultMaxSenseCount()) ;
 
-				if (id == null) 
+				if (id < 0) 
 					data = searcher.doSearch(term, linkLimit, senseLimit) ;
 				else
-					data = searcher.doSearch(Integer.parseInt(id), linkLimit) ;
+					data = searcher.doSearch(id, linkLimit) ;
 			}
 
 			//process compare request
 			if (data==null && task.equals("compare")) {
-				String term1 = request.getParameter("term1");
-				String term2 = request.getParameter("term2") ;
+				
+				String term1 = encodeParameter(request.getParameter("term1"), request.getCharacterEncoding());
+				String term2 = encodeParameter(request.getParameter("term2"), request.getCharacterEncoding());
 				
 				
+				int id1 = resolveIntegerArg(request.getParameter("id1"), -1) ;
+				int id2 = resolveIntegerArg(request.getParameter("id2"), -1) ;
+				
+				String ids1 = request.getParameter("ids1") ;
+				String ids2 = request.getParameter("ids2") ;
+				
+				int format = resolveIntegerArg(request.getParameter("format"), definer.getDefaultFormat()) ;
+				int linkFormat = resolveIntegerArg(request.getParameter("linkFormat"), definer.getDefaultFormat()) ;
 				
 				boolean getSenses = resolveBooleanArg(request.getParameter("getSenses"), false) ;
-				boolean getArtsInCommon = resolveBooleanArg(request.getParameter("getSenses"), false) ;
-				int artLimit = resolveIntegerArg(request.getParameter("linkLimit"), comparer.getDefaultMaxArticlesInCommon()) ;	
+				
+				boolean getMutualLinks = resolveBooleanArg(request.getParameter("getMutualLinks"), false) ;
+				int mutualLinkLimit = resolveIntegerArg(request.getParameter("mutualLinkLimit"), comparer.getDefaultMaxArticlesInCommon()) ;	
 				
 				
 				boolean getSnippets = resolveBooleanArg(request.getParameter("getSnippets"), false) ;
-				int snippetLimit = resolveIntegerArg(request.getParameter("linkLimit"), comparer.getDefaultMaxSnippets()) ;	
+				int snippetLimit = resolveIntegerArg(request.getParameter("snippetLimit"), comparer.getDefaultMaxSnippets()) ;	
 
-				data = comparer.getRelatedness(term1, term2, getSenses, getArtsInCommon, getSnippets, artLimit, snippetLimit) ;
+				if (id1 > 0 && id2 > 0) 
+					data = comparer.compare(id1, id2, getMutualLinks, getSnippets, mutualLinkLimit, snippetLimit, format, linkFormat) ;
+				else 
+					if (ids1 != null) 
+						data = comparer.compare(ids1, ids2) ;
+					else
+						data = comparer.compare(term1, term2, getSenses, getMutualLinks, getSnippets, mutualLinkLimit, snippetLimit, format, linkFormat) ;
 			}
 
 			//process wikify request
@@ -249,7 +263,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 				if (this.wikifier == null) 
 					throw new ServletException("Wikifier is not available. You must configure the servlet so that it has access to link detection and disambiguation models.") ;
 
-				String source = request.getParameter("source") ;
+				String source = encodeParameter(request.getParameter("source"), request.getCharacterEncoding());				
 				int sourceMode = resolveIntegerArg(request.getParameter("sourceMode"), Wikifier.SOURCE_AUTODETECT) ;
 				String linkColor = request.getParameter("linkColor") ;
 				String baseColor = request.getParameter("baseColor") ;
@@ -462,6 +476,16 @@ public class WikipediaMinerServlet extends HttpServlet {
 		return true ;
 	}
 
+	private String encodeParameter(String parameter, String sourceEncoding) throws Exception{
+		
+		if (sourceEncoding == null) 
+			sourceEncoding = "8859_1" ;
+		
+		if (parameter != null)
+			return new String(parameter.getBytes(sourceEncoding),"UTF8");
+		else
+			return null ;
+	}
 
 	protected Element createElement(String tagName, String xmlContent)  {
 

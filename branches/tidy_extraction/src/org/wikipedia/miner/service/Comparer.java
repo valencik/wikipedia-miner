@@ -20,6 +20,7 @@
 package org.wikipedia.miner.service;
 
 import gnu.trove.TIntHashSet;
+import gnu.trove.TLongHashSet;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -166,14 +167,17 @@ public class Comparer {
 	 * @return an Element message of how the two terms relate to each other
 	 * @throws Exception
 	 */
-	public Element getRelatedness(String term1, String term2, boolean getSenses, boolean getArtsInCommon, boolean getSnippets, int artsInCommonLimit, int snippetLimit) throws Exception {
+	public Element compare(String term1, String term2, boolean getSenses, boolean getMutualLinks, boolean getSnippets, int mutualLinkLimit, int snippetLimit, int format, int linkFormat) throws Exception {
 
-		Element response = wms.doc.createElement("RelatednessResponse") ;
+		Element response = wms.doc.createElement("CompareResponse") ;
 
 		if (term1 == null || term2 == null) {
 			response.setAttribute("unspecifiedParameters", "true") ;
 			return response ;
 		}
+		
+		response.setAttribute("term1", term1) ;
+		response.setAttribute("term2", term2) ;
 
 		Anchor anchor1 = new Anchor(wms.wikipedia.getEnvironment(), term1, wms.tp) ;
 		Anchor.Sense[] senses1 = anchor1.getSenses() ; 
@@ -190,10 +194,6 @@ public class Comparer {
 			response.setAttribute("unknownTerm", term2) ; 
 			return response ;
 		}
-
-		response.setAttribute("term1", term1) ;
-		response.setAttribute("term2", term2) ;
-
 
 		Anchor.DisambiguatedSensePair disambiguatedSenses = anchor1.disambiguateAgainst(anchor2) ;
 
@@ -243,181 +243,289 @@ public class Comparer {
 			response.appendChild(xmlSense2) ;
 		}
 
-		if (getSnippets || getArtsInCommon) {
-
-			//Build a list of pages that link to both sense1 and sense2, ordered by average relatedness to them
-			TreeSet<Article> mutualLinks = new TreeSet<Article>() ;
-			RelatednessCache rc = new RelatednessCache() ;
-
-			TIntHashSet ids1 = new TIntHashSet() ;
-			for (Article a:sense1.getLinksIn()) 
-				ids1.add(a.getId()) ;
-
-			for (Article a:sense2.getLinksIn()) {
-				if (ids1.contains(a.getId())) {
-					float weight = (rc.getRelatedness(a, sense1) + rc.getRelatedness(a, sense2))/2 ;
-					a.setWeight(weight) ;
-
-					mutualLinks.add(a) ;
-				}
-			}
-
-
-			if (getArtsInCommon) {
-
-				Element xmlArts = wms.doc.createElement("ArticlesInCommon");
-				response.appendChild(xmlArts) ;
-
-				int c = 0 ;
-
-				for (Article ml:mutualLinks) {
-					if (c++ > artsInCommonLimit) break ;
-
-					Element xmlArt = wms.doc.createElement("ArticleInCommon");
-					xmlArt.setAttribute("title", ml.getTitle()) ;
-					xmlArt.setAttribute("id", String.valueOf(ml.getId())) ;
-					xmlArt.setAttribute("relatedness1", wms.df.format(rc.getRelatedness(ml, sense1))) ;
-					xmlArt.setAttribute("relatedness2", wms.df.format(rc.getRelatedness(ml, sense2))) ;
-					xmlArts.appendChild(xmlArt) ;
-				}
-			}
-
-			if (getSnippets) {
-
-				Element xmlSnippets = wms.doc.createElement("Snippets");
-				response.appendChild(xmlSnippets) ;
-
-				String content1 = sense1.getContent() ;
-				String content2 = sense2.getContent() ;
-
-				int c=0 ;
-
-				//look for snippets in sense2 which mention sense1
-
-				int[] mentions = sense2.getLinkPositions(sense1) ;
-				if (mentions != null) {
-					for (Integer pos:mentions) {
-						if (c > snippetLimit) break ;
-						try {
-							int[] sb = sense2.getSentenceBoundsSurrounding(pos) ;
-							if (sb != null) {
-								String sentence = content2.substring(sb[0], sb[1]) ;
-								sentence = highlightTopics(sentence, sense1, sense2) ;
-								sentence = wms.definer.format(sentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
-
-								Element xmlSnippet = wms.createElement("Snippet", sentence);
-								xmlSnippet.setAttribute("sourceId", String.valueOf(sense2.getId())) ;
-								xmlSnippet.setAttribute("sourceTitle", sense2.getTitle()) ;
-								xmlSnippets.appendChild(xmlSnippet) ;
-								c++ ;
-							}
-						} catch (Exception e) {} ;
-					}
-				}
-
-				//look for snippets in sense1 which mention sense2
-				mentions = sense1.getLinkPositions(sense2) ;
-				if (mentions != null) {
-					for (Integer pos:mentions) {
-						if (c> snippetLimit) break ;
-						try {
-							int[] sb = sense1.getSentenceBoundsSurrounding(pos) ;
-							if (sb != null) {
-								String sentence = content1.substring(sb[0], sb[1]) ;
-								sentence = highlightTopics(sentence, sense1, sense2) ;
-								sentence = wms.definer.format(sentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
-
-								Element xmlSnippet = wms.createElement("Snippet", sentence);
-								xmlSnippet.setAttribute("sourceId", String.valueOf(sense1.getId())) ;
-								xmlSnippet.setAttribute("sourceTitle", sense1.getTitle()) ;
-								xmlSnippets.appendChild(xmlSnippet) ;
-								c++ ;
-							}
-						} catch (Exception e) {} ;
-					}
-				}
-
-				for (Article ml:mutualLinks) {
-					if (c > snippetLimit) break ;
-					int[] lp1 = ml.getLinkPositions(sense1) ;
-					int[] lp2 = ml.getLinkPositions(sense2) ;
-
-					String mlContent = null ;
-
-					if (lp1 != null && lp2 != null) {
-						for (int p1:lp1) {
-							for (int p2:lp2) {
-
-								if (c > snippetLimit) break ;
-								try {
-									int[] sb = ml.getSentenceBoundSurrounding(p1, p2) ;
-
-									if (sb != null) {
-
-										if (mlContent == null)
-											mlContent = ml.getContent() ;
-
-										String sentence = mlContent.substring(sb[0], sb[1]) ;
-										sentence = highlightTopics(sentence, sense1, sense2) ;
-										sentence = wms.definer.format(sentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
-
-										Element xmlSnippet = wms.createElement("Snippet", sentence);
-										xmlSnippet.setAttribute("sourceId", String.valueOf(ml.getId())) ;
-										xmlSnippet.setAttribute("sourceTitle", ml.getTitle()) ;
-										xmlSnippets.appendChild(xmlSnippet) ;
-										
-										c++ ;
-									}
-								} catch (Exception e) {} ;
-							}
-						}	
-					}	
-				}	
-			}
-		}
+		if (getMutualLinks || getSnippets)
+			addMutualLinksOrSnippets(response, sense1, sense2, getMutualLinks, getSnippets, mutualLinkLimit, snippetLimit, format, linkFormat) ;
 
 		return response ;
 	}
 
-	private String highlightTopics(String markup, Article topic1, Article topic2) {
+	public Element compare(int id1, int id2, boolean getMutualLinks, boolean getSnippets, int mutualLinkLimit, int snippetLimit, int format, int linkFormat) throws Exception {
 
+		Element response = wms.doc.createElement("CompareResponse") ;
+		
+		response.setAttribute("id1", String.valueOf(id1)) ;
+		response.setAttribute("id2", String.valueOf(id2)) ;
 
-		Matcher m = wms.definer.linkPattern.matcher(markup) ;
+		Article art1 = new Article(wms.wikipedia.getEnvironment(), id1) ;
+		if (!(art1.getType() == Page.ARTICLE || art1.getType() == Page.DISAMBIGUATION)) {
+			response.setAttribute("unknownId", String.valueOf(id1)) ; 
+			return response ;
+		}
+		
+		Article art2 = new Article(wms.wikipedia.getEnvironment(), id2) ;
+		if (!(art2.getType() == Page.ARTICLE || art2.getType() == Page.DISAMBIGUATION)) {
+			response.setAttribute("unknownId", String.valueOf(id2)) ; 
+			return response ;
+		}
+		
+		response.setAttribute("relatedness", wms.df.format(art1.getRelatednessTo(art2))) ;
+		
+		if (getMutualLinks || getSnippets)
+			addMutualLinksOrSnippets(response, art1, art2, getMutualLinks, getSnippets, mutualLinkLimit, snippetLimit, format, linkFormat) ;
 
-		int lastPos = 0 ;
-		StringBuffer sb = new StringBuffer() ;
+		return response ;
 
-		while(m.find()) {
-
-			String link = m.group(1) ;
-			String anchor ;
-			String dest ;
-
-			int pos = link.lastIndexOf("|") ;
-
-			if (pos >1) {
-				dest = link.substring(0,pos) ;
-				anchor = link.substring(pos+1) ;
-			} else {
-				dest = link ;
-				anchor = link ;
+	}
+	
+	public Element compare(String ids1, String ids2) throws Exception {
+		
+		Element response = wms.doc.createElement("CompareResponse") ;
+		response.setAttribute("ids1", ids1) ;
+		if (ids2 != null)
+			response.setAttribute("ids2", ids2) ;
+		
+		StringBuffer data = new StringBuffer() ;
+		
+		//gather articles from ids1 ;
+		Vector<Article> articles1 = new Vector<Article>() ;
+		for (String id:ids1.split(";")) {
+			try {
+				articles1.add((Article)wms.wikipedia.getPageById(Integer.parseInt(id))) ;
+			} catch (Exception e) {
+				//do nothing, this was an invalid id.
 			}
+		}
+		
+		//if ids2 is not specified, then we want to compare each item in ids1 with every other one
+		if (ids2 == null)
+			ids2 = ids1 ;
+		
+		// gather articles from ids2 ;
+		Vector<Article> articles2 = new Vector<Article>() ;
+		for (String id:ids2.split(";")) {
+			try {
+				articles2.add((Article)wms.wikipedia.getPageById(Integer.parseInt(id))) ;
+			} catch (Exception e) {
+				// do nothing, this was an invalid id.
+			}
+		}
+		
+		TLongHashSet doneKeys = new TLongHashSet() ;
+		for (Article art1:articles1) {
+			for (Article art2:articles2) {
+				if(art1.getId() == art2.getId())
+					continue ;
+				
+				//relatedness is symmetric, so create a unique key for this pair of ids were order doesnt matter 
+				long min = Math.min(art1.getId(), art2.getId()) ;
+				long max = Math.max(art1.getId(), art2.getId()) ;
+				long key = min + (max << 30) ;
+				
+				if(doneKeys.contains(key))
+					continue ;
+				
+				//havent seen this pair before, so output relatedness
+				data.append(min + "," + max + "," + wms.df.format(art1.getRelatednessTo(art2)) + "\n") ;
+				doneKeys.add(key) ;
+			}
+		}
+		
+		response.appendChild(wms.doc.createTextNode(data.toString())) ;
+		return response ;
+	}
 
-			Article art = wms.wikipedia.getArticleByTitle(dest) ;
+	private Element addMutualLinksOrSnippets(Element response, Article art1, Article art2, boolean getArtsInCommon, boolean getSnippets, int artsInCommonLimit, int snippetLimit, int format, int linkFormat) {
 
-			if (art.getId() == topic1.getId() || art.getId() == topic2.getId()) {
-				sb.append(markup.substring(lastPos, m.start())) ;
+		//Build a list of pages that link to both art1 and art2, ordered by average relatedness to them
+		TreeSet<Article> mutualLinks = new TreeSet<Article>() ;
+		RelatednessCache rc = new RelatednessCache() ;
 
-				sb.append("'''") ;
-				sb.append(anchor) ;
-				sb.append("'''") ;
+		Article[] links1 = art1.getLinksIn() ;
+		Article[] links2 = art2.getLinksIn() ;
 
-				lastPos = m.end() ;	
-			}	
+		int index1 = 0 ;
+		int index2 = 0 ;
+
+		while (index1 < links1.length && index2 < links2.length) {
+
+			Article link1 = links1[index1] ;
+			Article link2 = links2[index2] ;
+
+			int compare = link1.compareTo(link2) ;
+
+			if (compare == 0) {
+				if (link1.compareTo(art1)!= 0 && link2.compareTo(art2)!= 0) {
+					float weight = (rc.getRelatedness(link1, art1) + rc.getRelatedness(link1, art2))/2 ;
+					link1.setWeight(weight) ;
+					mutualLinks.add(link1) ;
+				}
+
+				index1 ++ ;
+				index2 ++ ;
+			} else {
+				if (compare < 0)
+					index1 ++ ;
+				else 
+					index2 ++ ;
+			}
 		}
 
-		sb.append(markup.substring(lastPos)) ;
-		return sb.toString() ;
+		if (getArtsInCommon) {
+
+			Element xmlArts = wms.doc.createElement("ArticlesInCommon");
+			response.appendChild(xmlArts) ;
+
+			int c = 0 ;
+
+			for (Article ml:mutualLinks) {
+				if (c++ > artsInCommonLimit) break ;
+
+				Element xmlArt = wms.doc.createElement("ArticleInCommon");
+				xmlArt.setAttribute("title", ml.getTitle()) ;
+				xmlArt.setAttribute("id", String.valueOf(ml.getId())) ;
+				xmlArt.setAttribute("relatedness1", wms.df.format(rc.getRelatedness(ml, art1))) ;
+				xmlArt.setAttribute("relatedness2", wms.df.format(rc.getRelatedness(ml, art2))) ;
+				xmlArts.appendChild(xmlArt) ;
+			}
+		}
+
+		if (getSnippets) {
+
+			Element xmlSnippets = wms.doc.createElement("Snippets");
+			response.appendChild(xmlSnippets) ;
+
+			String content1 = art1.getContent() ;
+			String content2 = art2.getContent() ;
+
+			int c=0 ;
+
+			//look for snippets in sense2 which mention sense1
+
+			int[] mentions = art2.getLinkPositions(art1) ;
+			if (mentions != null) {
+				for (Integer pos:mentions) {
+					if (c > snippetLimit) break ;
+					try {
+						int[] sb = art2.getSentenceBoundsSurrounding(pos) ;
+						if (sb != null) {
+							String sentence = content2.substring(sb[0], sb[1]) ;
+							sentence = highlightTopics(sentence, art1, art2) ;
+							sentence = wms.definer.format(sentence, format, linkFormat) ;
+
+							Element xmlSnippet = wms.createElement("Snippet", sentence);
+							xmlSnippet.setAttribute("sourceId", String.valueOf(art2.getId())) ;
+							xmlSnippet.setAttribute("sourceTitle", art2.getTitle()) ;
+							xmlSnippets.appendChild(xmlSnippet) ;
+							c++ ;
+						}
+					} catch (Exception e) {} ;
+				}
+			}
+
+			//look for snippets in sense1 which mention sense2
+			mentions = art1.getLinkPositions(art2) ;
+			if (mentions != null) {
+				for (Integer pos:mentions) {
+					if (c> snippetLimit) break ;
+					try {
+						int[] sb = art1.getSentenceBoundsSurrounding(pos) ;
+						if (sb != null) {
+							String sentence = content1.substring(sb[0], sb[1]) ;
+							sentence = highlightTopics(sentence, art1, art2) ;
+							sentence = wms.definer.format(sentence, format, linkFormat) ;
+
+							Element xmlSnippet = wms.createElement("Snippet", sentence);
+							xmlSnippet.setAttribute("sourceId", String.valueOf(art1.getId())) ;
+							xmlSnippet.setAttribute("sourceTitle", art1.getTitle()) ;
+							xmlSnippets.appendChild(xmlSnippet) ;
+							c++ ;
+						}
+					} catch (Exception e) {} ;
+				}
+			}
+
+			for (Article ml:mutualLinks) {
+				if (c > snippetLimit) break ;
+				int[] lp1 = ml.getLinkPositions(art1) ;
+				int[] lp2 = ml.getLinkPositions(art2) ;
+
+				String mlContent = null ;
+
+				if (lp1 != null && lp2 != null) {
+					for (int p1:lp1) {
+						for (int p2:lp2) {
+
+							if (c > snippetLimit) break ;
+							try {
+								int[] sb = ml.getSentenceBoundSurrounding(p1, p2) ;
+
+								if (sb != null) {
+
+									if (mlContent == null)
+										mlContent = ml.getContent() ;
+
+									String sentence = mlContent.substring(sb[0], sb[1]) ;
+									sentence = highlightTopics(sentence, art1, art2) ;
+									sentence = wms.definer.format(sentence, Definer.FORMAT_HTML, Definer.LINK_TOOLKIT) ;
+
+									Element xmlSnippet = wms.createElement("Snippet", sentence);
+									xmlSnippet.setAttribute("sourceId", String.valueOf(ml.getId())) ;
+									xmlSnippet.setAttribute("sourceTitle", ml.getTitle()) ;
+									xmlSnippets.appendChild(xmlSnippet) ;
+
+									c++ ;
+								}
+							} catch (Exception e) {} ;
+						}
+					}	
+				}	
+			}	
+		}
+		
+		return response ;
 	}
+
+
+
+private String highlightTopics(String markup, Article topic1, Article topic2) {
+
+
+	Matcher m = wms.definer.linkPattern.matcher(markup) ;
+
+	int lastPos = 0 ;
+	StringBuffer sb = new StringBuffer() ;
+
+	while(m.find()) {
+
+		String link = m.group(1) ;
+		String anchor ;
+		String dest ;
+
+		int pos = link.lastIndexOf("|") ;
+
+		if (pos >1) {
+			dest = link.substring(0,pos) ;
+			anchor = link.substring(pos+1) ;
+		} else {
+			dest = link ;
+			anchor = link ;
+		}
+
+		Article art = wms.wikipedia.getArticleByTitle(dest) ;
+
+		if (art.getId() == topic1.getId() || art.getId() == topic2.getId()) {
+			sb.append(markup.substring(lastPos, m.start())) ;
+
+			sb.append("'''") ;
+			sb.append(anchor) ;
+			sb.append("'''") ;
+
+			lastPos = m.end() ;	
+		}	
+	}
+
+	sb.append(markup.substring(lastPos)) ;
+	return sb.toString() ;
+}
 
 }
