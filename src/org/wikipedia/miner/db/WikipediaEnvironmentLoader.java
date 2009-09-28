@@ -1167,21 +1167,15 @@ public class WikipediaEnvironmentLoader {
 
 	}
 
-
-
-
-
-
-
-
-
-
 	public static void main(String[] args) throws Exception {
 
-		File berkeleyDir = new File("/research/wikipedia/databases/en/20090822") ;
-		File luceneDir = new File("/research/wikipedia/indexes/en/20090822") ;
-
-		File dumpDir = new File("/research/wikipedia/data/en/20090822") ;
+		if (args.length != 3) {
+			System.out.println("Please specify three directories, one for the berkeley database, one for the lucene index, and one containing the xml dump and csv files.") ;
+		}
+		
+		File berkeleyDir = new File(args[0]) ;
+		File luceneDir = new File(args[1]) ;
+		File dumpDir = new File(args[2]) ;
 
 		WikipediaEnvironmentLoader loader = new WikipediaEnvironmentLoader(berkeleyDir, luceneDir) ;
 

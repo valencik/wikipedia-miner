@@ -103,7 +103,7 @@ public class WikipediaEnvironment extends Environment {
 		if (this.indexDir != null) {
 			index = FSDirectory.getDirectory(indexDir) ;
 			
-			String[] fields = {"title","synonyms","content"} ;
+			String[] fields = {"title", "content"} ;
 			
 			queryParser = new MultiFieldQueryParser(fields, analyzer);
 			searcher = new IndexSearcher(index);
@@ -264,12 +264,9 @@ public class WikipediaEnvironment extends Environment {
 		
 		TopDocs docs = searcher.search(queryParser.parse(query), null, limit);
 
-		System.out.println(docs.totalHits + "total hits") ;
-		
 		Article[] results = new Article[docs.scoreDocs.length] ;
 		int i = 0 ;
 		for ( ScoreDoc sd:docs.scoreDocs) {
-			System.out.println(i) ;
 			Document d = searcher.doc(sd.doc);
 			
 			Integer id = Integer.parseInt(d.get("id")) ;
@@ -664,28 +661,29 @@ public class WikipediaEnvironment extends Environment {
 
 	public static void main(String[] args) throws Exception {
 
-		File berkeleyDir = new File("/research/wikipedia/databases/en/20090822") ;
-		File luceneDir = new File("/research/wikipedia/indexes/en/20090822") ;
+		if (args.length != 2) {
+			System.out.println("Please specify two directories, one for the berkeley database, and one for the lucene index") ;
+		}
 		
-		File dumpDir = new File("/research/wikipedia/data/en/20090822") ;
-
+		File berkeleyDir = new File(args[0]) ;
+		File luceneDir = new File(args[1]) ;
+		
 		WikipediaEnvironment we = new WikipediaEnvironment(berkeleyDir, luceneDir, false) ;
 
 		try {
-			//we.loadData(dumpDir, true) ;
 			
-			System.gc();
-			long memStart = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+			//System.gc();
+			//long memStart = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
 			TextProcessor tp = new CaseFolder() ;
 			
-			String query = "Hiking New Zealand" ;
+			String query = "Best Landmarks in New Zealand" ;
 			
-			TIntHashSet validIds = we.getValidPageIds(5, null) ;
-			we.cacheInLinks(validIds, null) ;
+			//TIntHashSet validIds = we.getValidPageIds(5, null) ;
+			//we.cacheInLinks(validIds, null) ;
 			
-			System.gc();
-			long memEnd = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+			//System.gc();
+			//long memEnd = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
 			Article[] arts = we.doFullTextSearch(query, 100) ;
 			for (Article art:arts) {
@@ -694,7 +692,7 @@ public class WikipediaEnvironment extends Environment {
 				
 			}
 
-			System.out.println( (memEnd-memStart) + " bytes") ;
+			//System.out.println( (memEnd-memStart) + " bytes") ;
 			
 		} catch (Exception e) {
 
