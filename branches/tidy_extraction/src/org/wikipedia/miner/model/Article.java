@@ -146,15 +146,15 @@ public class Article extends Page {
 	 */
 	public Article[] getLinksIn() {
 		
-		DbLink[] dbLinks = environment.getLinksIn(id) ;
+		int[] inLinks = environment.getLinkIdsIn(id) ;
 		
-		if (dbLinks == null)
+		if (inLinks == null)
 			return new Article[0] ;
 		
-		Article[] articles = new Article[dbLinks.length] ;
+		Article[] articles = new Article[inLinks.length] ;
 		
-		for (int i=0 ; i<dbLinks.length ; i++)
-			articles[i] = new Article(environment, dbLinks[i].getId()) ;
+		for (int i=0 ; i<inLinks.length ; i++)
+			articles[i] = new Article(environment, inLinks[i]) ;
 		
 		return articles ;
 	}
@@ -524,8 +524,8 @@ public Section getStructureRoot() {
 		if (getId() == article.getId()) 
 			return 1 ;
 		
-		DbLink[] linksA = environment.getLinksIn(id) ;
-		DbLink[] linksB = environment.getLinksIn(article.getId()) ;
+		int[] linksA = environment.getLinkIdsIn(id) ;
+		int[] linksB = environment.getLinkIdsIn(article.getId()) ;
 		
 		if (linksA==null || linksB==null) 
 			return 0 ;
@@ -537,25 +537,23 @@ public Section getStructureRoot() {
 
 		while (indexA < linksA.length && indexB < linksB.length) {
 
-			DbLink linkA = linksA[indexA] ;
-			DbLink linkB = linksB[indexB] ;
+			int linkA = linksA[indexA] ;
+			int linkB = linksB[indexB] ;
 			
-			int compare = linkA.compareTo(linkB) ;
-
-			if (compare == 0) {
+			if (linkA == linkB) {
 				linksBoth ++ ;
 				indexA ++ ;
 				indexB ++ ;
 			} else {
 				
-				if (compare < 0) {
-					if (linkA.getId() == article.getId()) 
+				if (linkA < linkB) {
+					if (linkA == article.getId()) 
 						linksBoth ++ ;
 					
 					indexA ++ ;
 				} else {
 					
-					if (linkB.getId() == id) 
+					if (linkB == id) 
 						linksBoth ++ ;
 					
 					indexB ++ ;

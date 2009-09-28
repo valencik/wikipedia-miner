@@ -103,19 +103,14 @@ public class WikipediaMinerServlet extends HttpServlet {
 			System.err.println("Could not initialize wikifier") ;			
 		}
 
-		/*
+		
 		try {
-			File dataDirectory = new File(context.getInitParameter("data_directory")) ;
-
-			if (!dataDirectory.exists() || !dataDirectory.isDirectory()) {
-				throw new Exception() ;
-			}
-
-			cachingThread = new CacherThread(dataDirectory, tp) ;
+			
+			cachingThread = new CacherThread(tp) ;
 			cachingThread.start() ;
 		} catch (Exception e) {
-			throw new ServletException("Could not locate wikipedia data directory.") ;
-		}*/
+			throw new ServletException("Could not cache data.") ;
+		}
 
 		try {
 			TransformerFactory tf = TransformerFactory.newInstance();
@@ -204,10 +199,10 @@ public class WikipediaMinerServlet extends HttpServlet {
 
 
 			//all of the remaining tasks require data to be cached, so lets make sure that is finished before continuing.
-			//if (!cachingThread.isOk())
-			//	throw new ServletException("Could not cache wikipedia data") ;
+			if (!cachingThread.isOk())
+				throw new ServletException("Could not cache wikipedia data") ;
 
-			/*
+			
 			double progress = cachingThread.getProgress() ;
 			if (data==null && (progress < 1 || task.equals("progress"))) {
 				//still caching up data, not ready to return a response yet.
@@ -215,7 +210,7 @@ public class WikipediaMinerServlet extends HttpServlet {
 				data = doc.createElement("loading") ;
 				data.setAttribute("progress", df.format(progress)) ;
 				task = "loading" ;
-			}*/
+			}
 
 			//process search request
 			if (data==null && task.equals("search")) {
@@ -234,12 +229,18 @@ public class WikipediaMinerServlet extends HttpServlet {
 			if (data==null && task.equals("compare")) {
 				String term1 = request.getParameter("term1");
 				String term2 = request.getParameter("term2") ;
-				int linkLimit = resolveIntegerArg(request.getParameter("linkLimit"), comparer.getDefaultMaxLinkCount()) ;	
+				
+				
+				
 				boolean getSenses = resolveBooleanArg(request.getParameter("getSenses"), false) ;
+				boolean getArtsInCommon = resolveBooleanArg(request.getParameter("getSenses"), false) ;
+				int artLimit = resolveIntegerArg(request.getParameter("linkLimit"), comparer.getDefaultMaxArticlesInCommon()) ;	
+				
+				
 				boolean getSnippets = resolveBooleanArg(request.getParameter("getSnippets"), false) ;
+				int snippetLimit = resolveIntegerArg(request.getParameter("linkLimit"), comparer.getDefaultMaxSnippets()) ;	
 
-
-				data = comparer.getRelatedness(term1, term2, getSenses, getSnippets, linkLimit) ;
+				data = comparer.getRelatedness(term1, term2, getSenses, getArtsInCommon, getSnippets, artLimit, snippetLimit) ;
 			}
 
 			//process wikify request
@@ -400,14 +401,12 @@ public class WikipediaMinerServlet extends HttpServlet {
 		private ProgressNotifier pn ;
 		private TextProcessor tp ;
 		private boolean completed ;
-		File dataDirectory ;
 		boolean ok = true ;
 
-		CacherThread(File dataDirectory, TextProcessor tp) {
+		CacherThread(TextProcessor tp) {
 			this.pn = null ;
 			this.tp = tp ;
 			this.completed = false ;
-			this.dataDirectory = dataDirectory ;
 		}
 
 		public boolean isOk() {
@@ -426,17 +425,18 @@ public class WikipediaMinerServlet extends HttpServlet {
 		}
 
 		public void run() {
-			pn = new ProgressNotifier(5) ;
+			pn = new ProgressNotifier(2) ;
 
 			try {
-				//TIntHashSet ids = wikipedia.getDatabase().getValidPageIds(dataDirectory, 3, pn) ;
+				TIntHashSet ids = wikipedia.getEnvironment().getValidPageIds(5, pn) ;
 				//wikipedia.getDatabase().cacheParentIds(dataDirectory, pn) ;
 				//wikipedia.getDatabase().cacheGenerality(dataDirectory, ids, null) ;
-				//wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;
+				//wikipedia.getEnvironment().cachePages(ids, pn) ;
 				//wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 3, pn) ;
-				//wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
+				wikipedia.getEnvironment().cacheInLinks(ids, pn) ;
 
-				//ids = null ;
+				ids = null ;
+				System.gc() ;
 			} catch (Exception e) {
 				ok = false ;
 

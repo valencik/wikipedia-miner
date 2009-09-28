@@ -10,7 +10,14 @@
 <xsl:template match="WikipediaMinerResponse/SearchResponse">
   <html xslns="http://www.w3.org/TR/html4/strict.dtd">
   <head>
-  	<title><xsl:value-of select="@term"/> | Wikipedia Miner search service</title>
+  	<xsl:choose>
+	  	<xsl:when test="@unspecifiedParameters">
+	  		<title>Wikipedia Miner search service</title>
+		</xsl:when>
+		<xsl:otherwise>
+			<title><xsl:value-of select="@term"/> | Wikipedia Miner search service</title>
+		</xsl:otherwise>
+  	</xsl:choose>
   	<link rel="stylesheet" href="css/style.css" type="text/css"/> 
   </head>
   <body>

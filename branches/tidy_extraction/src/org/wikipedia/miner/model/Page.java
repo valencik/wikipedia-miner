@@ -72,6 +72,11 @@ public abstract class Page implements Comparable<Page>{
 	 * the page type corresponding to DisambiguationPages
 	 */
 	public static final short DISAMBIGUATION = 4 ;
+	
+	/**
+	 * the page type corresponding to pages that are not in database, or have not been cached.
+	 */
+	public static final short UNKNOWN = 5 ;
 
 	/**
 	 * Initialises a newly created Page so that it represents the page given by <em>id</em>, <em>title</em> and <em>type</em>.
@@ -207,8 +212,13 @@ public abstract class Page implements Comparable<Page>{
 	private void setDetails() {
 		DbPage pd = environment.getPageDetails(id) ;
 		
-		title = pd.getTitle() ;
-		type = pd.getType() ;
+		if (pd == null) {
+			title = "UNKNOWN" ;
+			type = UNKNOWN ;
+		} else {
+			title = pd.getTitle() ;
+			type = pd.getType() ;
+		}
 		detailsSet = true ;
 	}
 	
