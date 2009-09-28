@@ -1,5 +1,5 @@
 /*
- *    SnowballStemmerWrapper.java
+ *    SnowballStemmer.java
  *    Copyright (C) 2009 Giulio Paci, g.paci@cineca.it
  *
  *    This program is free software; you can redistribute it and/or modify
@@ -19,7 +19,6 @@
 
 package org.wikipedia.miner.util.text;
 
-import org.tartarus.snowball.*;
 import org.tartarus.snowball.ext.*;
 
 
@@ -29,18 +28,18 @@ import org.tartarus.snowball.ext.*;
  *
  * @author Giulio Paci
  */	
-public class SnowballStemmerWrapper extends TextProcessor {
+public class SnowballStemmer extends TextProcessor {
     private int repeat;
 	private Cleaner cleaner ;
-    private SnowballStemmer stemmer;
+    private org.tartarus.snowball.SnowballStemmer stemmer;
     private String language;
 
     /**
 	 * Initializes a newly created Stemmer (English).
 	 */
-	public SnowballStemmerWrapper() {
+	public SnowballStemmer() {
 		this.cleaner = new Cleaner();
-        this.stemmer = (SnowballStemmer) new englishStemmer();
+        this.stemmer = (org.tartarus.snowball.SnowballStemmer) new englishStemmer();
         this.language = "english";
         this.repeat = 1;
 	}
@@ -48,7 +47,7 @@ public class SnowballStemmerWrapper extends TextProcessor {
 	/**
 	 * Initializes a newly created Stemmer for a specific language.
 	 */
-	public SnowballStemmerWrapper(String language) throws ClassNotFoundException, InstantiationException, IllegalAccessException {
+	public SnowballStemmer(String language) throws ClassNotFoundException, InstantiationException, IllegalAccessException {
 		this.cleaner = new Cleaner();
         this.language = language;
         this.selectLanguage(language);
@@ -83,7 +82,7 @@ public class SnowballStemmerWrapper extends TextProcessor {
     public void selectLanguage(String language) throws ClassNotFoundException, InstantiationException, IllegalAccessException
     {
         Class stemClass = Class.forName("org.tartarus.snowball.ext." + language + "Stemmer");
-        this.stemmer = (SnowballStemmer) stemClass.newInstance();
+        this.stemmer = (org.tartarus.snowball.SnowballStemmer) stemClass.newInstance();
     }
 
 	/**
