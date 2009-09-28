@@ -7,6 +7,15 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.queryParser.*;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.search.*;
+
+
+import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.util.ProgressNotifier;
 import org.wikipedia.miner.util.text.* ;
@@ -32,6 +41,13 @@ public class WikipediaEnvironment extends Environment {
 
 	protected File databaseDir ;
 	protected File indexDir ;
+	
+	
+	protected FSDirectory index ;
+	protected StandardAnalyzer analyzer = new StandardAnalyzer();
+	private QueryParser queryParser ;
+	private Searcher searcher ;
+	
 
 	private HashMap<DatabaseName, StoredMap> openStoredMaps ;
 	private HashMap<DatabaseName, Database> openDatabases ;
@@ -43,9 +59,6 @@ public class WikipediaEnvironment extends Environment {
 	private TIntObjectHashMap<DbPage> cachedPages ;
 	private TIntObjectHashMap<int[]>cachedInLinks ;
 	
-	
-	
-
 	private DatabaseConfig normalConfig ;
 	private DatabaseConfig writingConfig ;
 
@@ -59,8 +72,8 @@ public class WikipediaEnvironment extends Environment {
 	private DbAnchorTextArrayBinding anchorTextArrayBinding = new DbAnchorTextArrayBinding() ;
 	private DbStructureNodeBinding structureBinding = new DbStructureNodeBinding() ;
 	private StatisticBinding statBinding = new StatisticBinding() ;
-
-	public WikipediaEnvironment(File databaseDir, File indexDir, final boolean loading) throws EnvironmentLockedException, DatabaseException {
+	
+	public WikipediaEnvironment(File databaseDir, File indexDir, final boolean loading) throws EnvironmentLockedException, DatabaseException, IOException {
 
 		super(databaseDir, new EnvironmentConfig() {
 
@@ -86,7 +99,16 @@ public class WikipediaEnvironment extends Environment {
 		
 		this.databaseDir = databaseDir ;
 		this.indexDir = indexDir ;
-
+		
+		if (this.indexDir != null) {
+			index = FSDirectory.getDirectory(indexDir) ;
+			
+			String[] fields = {"title","synonyms","content"} ;
+			
+			queryParser = new MultiFieldQueryParser(fields, analyzer);
+			searcher = new IndexSearcher(index);
+		}
+		
 		normalConfig = new DatabaseConfig() ;
 		normalConfig.setReadOnly(true) ;
 
@@ -214,6 +236,14 @@ public class WikipediaEnvironment extends Environment {
 
 	public void close() throws DatabaseException {
 
+		if (index != null) {
+			try {
+				searcher.close() ;
+			} catch (Exception e) {} ;
+			
+			index.close() ;
+		}
+		
 		for (Database db:openDatabases.values()) {
 			try { 
 				db.close() ;
@@ -227,6 +257,29 @@ public class WikipediaEnvironment extends Environment {
 		}
 
 		super.close();
+	}
+	
+	
+	public Article[] doFullTextSearch(String query, int limit) throws IOException, ParseException{
+		
+		TopDocs docs = searcher.search(queryParser.parse(query), null, limit);
+
+		System.out.println(docs.totalHits + "total hits") ;
+		
+		Article[] results = new Article[docs.scoreDocs.length] ;
+		int i = 0 ;
+		for ( ScoreDoc sd:docs.scoreDocs) {
+			System.out.println(i) ;
+			Document d = searcher.doc(sd.doc);
+			
+			Integer id = Integer.parseInt(d.get("id")) ;
+			Article art = new Article(this, id) ;
+			art.setWeight(sd.score) ;
+			
+			results[i++] = art ;
+		}
+		
+		return results ;
 	}
 
 	/**
@@ -323,6 +376,9 @@ public class WikipediaEnvironment extends Environment {
 					return true ;
 				}
 			}) ;
+			
+			tmpProcessedAnchors.clear() ;
+			System.gc() ;
 
 			cleanLog() ;
 			checkpoint(null) ;
@@ -493,10 +549,7 @@ public class WikipediaEnvironment extends Environment {
 		TIntHashSet pageIds = new TIntHashSet() ;
 				
 		if (pn == null) pn = new ProgressNotifier(1) ;
-		
-		//CursorConfig cf = new CursorConfig() ;
-		//cf.getReadUncommitted()
-		
+				
 		Database dbLinkCounts = this.openDatabases.get(DatabaseName.LINK_COUNTS) ;
 		pn.startTask(dbLinkCounts.count(), "gathering valid page ids") ;
 		
@@ -611,10 +664,10 @@ public class WikipediaEnvironment extends Environment {
 
 	public static void main(String[] args) throws Exception {
 
-		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
-		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
+		File berkeleyDir = new File("/research/wikipedia/databases/en/20090822") ;
+		File luceneDir = new File("/research/wikipedia/indexes/en/20090822") ;
 		
-		File dumpDir = new File("/Users/dmilne/Research/wikipedia/data/en/20090822") ;
+		File dumpDir = new File("/research/wikipedia/data/en/20090822") ;
 
 		WikipediaEnvironment we = new WikipediaEnvironment(berkeleyDir, luceneDir, false) ;
 
@@ -624,6 +677,9 @@ public class WikipediaEnvironment extends Environment {
 			System.gc();
 			long memStart = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
+			TextProcessor tp = new CaseFolder() ;
+			
+			String query = "Hiking New Zealand" ;
 			
 			TIntHashSet validIds = we.getValidPageIds(5, null) ;
 			we.cacheInLinks(validIds, null) ;
@@ -631,8 +687,14 @@ public class WikipediaEnvironment extends Environment {
 			System.gc();
 			long memEnd = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
+			Article[] arts = we.doFullTextSearch(query, 100) ;
+			for (Article art:arts) {
+				
+				System.out.println(art + "," + art.getWeight()) ;
+				
+			}
+
 			System.out.println( (memEnd-memStart) + " bytes") ;
-			
 			
 		} catch (Exception e) {
 

@@ -11,22 +11,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.queryParser.QueryParser;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.TopDocCollector;
-import org.apache.lucene.store.FSDirectory;
 import org.wikipedia.miner.db.WikipediaEnvironment.DatabaseName;
 import org.wikipedia.miner.db.WikipediaEnvironment.Statistic;
 import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.util.MarkupStripper;
 import org.wikipedia.miner.util.ProgressNotifier;
-import org.wikipedia.miner.util.text.CaseFolder;
 
 import com.sleepycat.collections.StoredMap;
 import com.sleepycat.je.DatabaseException;
@@ -37,7 +29,7 @@ public class WikipediaEnvironmentLoader {
 	ProgressNotifier pn ;
 	WikipediaEnvironment we ;
 
-	public WikipediaEnvironmentLoader(File databaseDir, File indexDir) throws DatabaseException {
+	public WikipediaEnvironmentLoader(File databaseDir, File indexDir) throws DatabaseException, IOException {
 
 		we = new WikipediaEnvironment(databaseDir, indexDir, true) ;
 
@@ -60,14 +52,15 @@ public class WikipediaEnvironmentLoader {
 		//loadLinkCounts(dataDirectory, null) ;
 		//loadPageLinks(dataDirectory, null) ;
 		//loadCategoryLinks(dataDirectory, null) ;
-		loadAnchors(dataDirectory, null) ;
+		//loadAnchors(dataDirectory, null) ;
 		//loadAnchorTexts(dataDirectory, null) ;
 		//loadTranslations(dataDirectory, null) ;
 		//loadContent(dataDirectory, null) ;
-		//indexArticles() ;
-
-
+		
 		//we.prepareForTextProcessor(new CaseFolder()) ;
+		
+		indexArticles() ;
+
 		we.close();
 	}
 
@@ -1122,19 +1115,15 @@ public class WikipediaEnvironmentLoader {
 	}
 
 
-	private void indexArticles() throws IOException, ParseException {
+	private void indexArticles() throws IOException {
 
-		StandardAnalyzer analyzer = new StandardAnalyzer();
-		FSDirectory index = FSDirectory.getDirectory(we.indexDir) ;
-
-		
-		IndexWriter w = new IndexWriter(index, analyzer, true, IndexWriter.MaxFieldLength.UNLIMITED);
+		IndexWriter w = new IndexWriter(we.index, we.analyzer, true, IndexWriter.MaxFieldLength.UNLIMITED);
 
 		ProgressNotifier pn = new ProgressNotifier(we.getStatisticValue(Statistic.PAGE_COUNT), "Indexing articles for full-text search") ;
 		pn.setMinReportProgress(0.0001) ;
 		
 		MarkupStripper stripper = new MarkupStripper() ;
-		String[] unwantedSections = {"see also", "references", "further sources", "further reading", "footnotes", "external links", "bibliography", "notes", "notes and references", "other websites"} ;
+		//String[] unwantedSections = {"see also", "references", "further sources", "further reading", "footnotes", "external links", "bibliography", "notes", "notes and references", "other websites"} ;
 
 		Iterator<Integer> iter = we.getPageIdIterator() ;
 		while (iter.hasNext()) {
@@ -1144,67 +1133,38 @@ public class WikipediaEnvironmentLoader {
 
 			if (page.getType() == Page.ARTICLE || page.getType() == Page.DISAMBIGUATION) {
 
-				//System.out.println(id + ":" + page.getTitle()) ;
-
 				String markup = we.getPageContent(id) ;
 
 				if (markup == null) {
-					System.out.println("no content") ;
+					//System.out.println("no content") ;
 				} else {
-					//System.out.println(markup.length()) ;
-					
 					markup = stripper.stripToPlainText(markup, null) ;
-					//markup = stripper.stripSections(markup, unwantedSections, null) ;
-
+					
+					StringBuffer anchorText = new StringBuffer() ;
+					
+					DbAnchorText[] ats = we.getAnchorTexts(id) ;
+					if (ats != null) {
+						for (DbAnchorText at:ats) {
+							if (at.getTotalCount() >= 3) {
+								anchorText.append(at.getText()) ;
+								anchorText.append("\n\n") ;
+							}					
+						}
+					}
+					
 					Document doc = new Document();
+					doc.add(new Field("title", page.getTitle(), Field.Store.NO, Field.Index.ANALYZED)) ;
+					doc.add(new Field("synonyms", anchorText.toString(), Field.Store.NO, Field.Index.ANALYZED)) ;
 					doc.add(new Field("content", markup, Field.Store.NO, Field.Index.ANALYZED));
 					doc.add(new Field("id", String.valueOf(id), Field.Store.YES, Field.Index.NO));
 
 					w.addDocument(doc);
 				}
-				pn.update() ;
 			}
+			pn.update() ;
 		}
 		w.close();
 
-		try {
-			Query q = new QueryParser("content", analyzer).parse("\"New Zealand\"");
-			//q.rewrite() ;
-
-			// 3. search
-			int hitsPerPage = 1000;
-			IndexSearcher searcher = new IndexSearcher(index);
-
-			//Filter filter = new DuplicateFilter("headline") ;
-
-			TopDocCollector collector = new TopDocCollector(hitsPerPage);
-			searcher.search(q, collector);
-
-			ScoreDoc[] hits = collector.topDocs().scoreDocs;
-
-			// 4. display results
-			System.out.println("Found " + hits.length + " hits.");
-			for(int i=0;i<Math.min(hits.length, 10);++i) {
-				int docId = hits[i].doc;
-
-				Document d = searcher.doc(docId);
-
-				Integer id = Integer.parseInt(d.get("id")) ;
-				DbPage page = we.getPageDetails(id) ;
-
-
-				System.out.println((i + 1) + ". " + id + ":" + page.getTitle());
-				System.out.println(hits[i].score) ;
-			}
-
-			// searcher can only be closed when there
-			// is no need to access the documents any more.
-			searcher.close();
-		} catch (Exception e) {
-			e.printStackTrace() ;
-		}
-
-		index.close();
 	}
 
 
@@ -1218,10 +1178,10 @@ public class WikipediaEnvironmentLoader {
 
 	public static void main(String[] args) throws Exception {
 
-		File berkeleyDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
-		File luceneDir = new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
+		File berkeleyDir = new File("/research/wikipedia/databases/en/20090822") ;
+		File luceneDir = new File("/research/wikipedia/indexes/en/20090822") ;
 
-		File dumpDir = new File("/Users/dmilne/Research/wikipedia/data/en/20090822") ;
+		File dumpDir = new File("/research/wikipedia/data/en/20090822") ;
 
 		WikipediaEnvironmentLoader loader = new WikipediaEnvironmentLoader(berkeleyDir, luceneDir) ;
 
