@@ -160,9 +160,9 @@ public class TextProcessorChain extends TextProcessor {
     public static void main(String args[]) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException{
         TextProcessorChain tpc = new TextProcessorChain();
 
-        TextProcessor stem = new SnowballStemmerWrapper();
+        TextProcessor stem = new SnowballStemmer();
         tpc.addTextProcessor(stem);
-        stem = new SnowballStemmerWrapper("italian");
+        stem = new SnowballStemmer("italian");
         tpc.addTextProcessor(stem);
         stem = new CaseFolder();
         tpc.addTextProcessor(stem);
