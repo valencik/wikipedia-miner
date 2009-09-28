@@ -96,17 +96,35 @@ public class TextProcessorChain extends TextProcessor {
         if (this.name != null) {
             return this.name;
         } else {
-            StringBuffer ret_name = new StringBuffer(this.getClass().getSimpleName());
+            StringBuffer ret_name = new StringBuffer();
             for(TextProcessor tp : this.text_processor_list){
                 ret_name.append("_");
                 ret_name.append(tp.getName());
             }
-            if(ret_name.length() > TextProcessor.MAX_ID_LENGTH){
-                int char_to_keep;
-                int char_to_remove;
+            if(ret_name.length() > (TextProcessor.MAX_ID_LENGTH-3)){
                 //remove exceeding characters
+                int char_to_keep = 1;
+                int char_to_remove = ret_name.length() - (TextProcessor.MAX_ID_LENGTH-3);
+                double ratio = ((double)ret_name.length())/(double)char_to_remove;
+                if(ratio > 2){
+                    char_to_keep = (int) Math.floor(ratio - 1);
+                    char_to_remove = 1;
             }
-            this.name = ret_name.toString();
+                else{
+                    char_to_keep = 1;
+                    char_to_remove = (int) Math.floor(1 / (ratio - 1));
+                }
+                int tmp_start = char_to_remove;
+                int tmp_end = tmp_start + char_to_keep;
+                StringBuffer ret_name_tmp = new StringBuffer();
+                while (tmp_end <= ret_name.length()) {
+                    ret_name_tmp.append(ret_name.substring(tmp_start, tmp_end));
+                    tmp_start += char_to_keep + char_to_remove;
+                    tmp_end = tmp_start + char_to_keep;
+                }
+                ret_name = ret_name_tmp;
+            }
+            this.name = "TPC" + ret_name.toString();
             return this.name;
         }
     }
@@ -134,7 +152,6 @@ public class TextProcessorChain extends TextProcessor {
     public String processText(String text) {
         Iterator itr = text_processor_list.iterator();
 
-        String t = text;
         while (itr.hasNext()) {
             text = ((TextProcessor) itr.next()).processText(text);
         }
@@ -178,14 +195,15 @@ public class TextProcessorChain extends TextProcessor {
             System.err.println("No :-(");
         }
         try{
-            TextProcessor tp = TextProcessor.fromString(new File("."), "org.wikipedia.miner.util.text.SnowballStemmerWrapper<string<italian");
-            System.err.println(tp.getName());
+            TextProcessor tp = TextProcessor.fromString(new File("."), "org.wikipedia.miner.util.text.SnowballStemmer<string<italian");
+
             System.err.println(tp.toString());
         }
         catch(Exception ex){
             System.err.println("Noooo");
         }
-
+            System.err.println(tpc.getName());
+            System.err.println(tpc.getName().length());
 //        tpc.addTextProcessor(new StopwordRemover(new File(stopword_filename)));
  //       File tmp = new File(input_filename);
 //        FileInputStream fstream = new FileInputStream(tmp);
