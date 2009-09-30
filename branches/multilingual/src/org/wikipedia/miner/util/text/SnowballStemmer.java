@@ -19,9 +19,6 @@
 
 package org.wikipedia.miner.util.text;
 
-import org.tartarus.snowball.ext.*;
-
-
 /**
  * This class provides a TextProcessor based on snowball stemmers.
  * Have a look at http://snowball.tartarus.org/
@@ -39,7 +36,7 @@ public class SnowballStemmer extends TextProcessor {
 	 */
 	public SnowballStemmer() {
 		this.cleaner = new Cleaner();
-        this.stemmer = (org.tartarus.snowball.SnowballStemmer) new englishStemmer();
+        this.stemmer = (org.tartarus.snowball.SnowballStemmer) new org.tartarus.snowball.ext.englishStemmer();
         this.language = "english";
         this.repeat = 1;
 	}
