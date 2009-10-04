@@ -104,7 +104,7 @@ public class Wikifier {
 		
 		
 		try {	
-			disambiguator = new Disambiguator(wms.wikipedia, wms.tp, 0.01, 0, 25) ;
+			disambiguator = new Disambiguator(wms.wikipedia, wms.tp) ;
 			disambiguator.loadClassifier(new File(wms.context.getInitParameter("wikifier_disambigModel"))) ;
 		} catch (Exception e) {
 			throw new ServletException("WikipediaMiner | could not retrieve disambiguation model for wikification (" + wms.context.getInitParameter("wikifier_disambigModel") + ")") ;

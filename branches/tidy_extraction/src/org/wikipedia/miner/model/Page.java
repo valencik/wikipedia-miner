@@ -30,6 +30,8 @@ import org.wikipedia.miner.db.*;
 import org.wikipedia.miner.db.WikipediaEnvironment.Statistic;
 import org.wikipedia.miner.util.*;
 
+import com.sleepycat.je.DatabaseException;
+
 
 /**
  * This class provides properties and methods that are relevant for all pages in Wikipedia. 
@@ -110,7 +112,7 @@ public abstract class Page implements Comparable<Page>{
 		this.detailsSet = false ;
 	}
 	
-	public boolean exists() {
+	public boolean exists() throws DatabaseException {
 		if (!detailsSet) 
 			setDetails() ;
 		
@@ -164,7 +166,7 @@ public abstract class Page implements Comparable<Page>{
 	 * 
 	 * @return a string representation of the page
 	 */
-	public String toString() {
+	public String toString()  {
 		String s = getId() + ": " + getTitle() ;
 		return s ;
 	}
@@ -209,16 +211,22 @@ public abstract class Page implements Comparable<Page>{
 		return type;
 	}
 
-	private void setDetails() {
-		DbPage pd = environment.getPageDetails(id) ;
+	private void setDetails()  {
 		
-		if (pd == null) {
+		try {
+			DbPage pd = environment.getPageDetails(id) ;
+		
+			if (pd == null) {
+				throw new Exception() ;
+			} else {
+				title = pd.getTitle() ;
+				type = pd.getType() ;
+			}
+		} catch (Exception e) {
 			title = "UNKNOWN" ;
 			type = UNKNOWN ;
-		} else {
-			title = pd.getTitle() ;
-			type = pd.getType() ;
 		}
+		
 		detailsSet = true ;
 	}
 	
@@ -228,10 +236,10 @@ public abstract class Page implements Comparable<Page>{
 	 * @return	the generality of the page
 	 * @ if there is a problem with the Wikipedia database
 	 */
-	public float getGenerality() {
+	public float getGenerality() throws DatabaseException {
 
 		Integer depth = environment.getDepth(id) ;
-		int maxDepth = environment.getStatisticValue(Statistic.MAX_DEPTH) ;
+		Integer maxDepth = environment.getStatisticValue(Statistic.MAX_DEPTH) ;
 		
 		if (depth == null) {
 			return -1 ;
@@ -246,7 +254,7 @@ public abstract class Page implements Comparable<Page>{
 	 * 
 	 * @return	content of the page, in raw media wiki format.
 	 */
-	public String getContent() {
+	public String getContent()  throws DatabaseException {
 
 		return environment.getPageContent(id) ;
 	}
@@ -265,7 +273,7 @@ public abstract class Page implements Comparable<Page>{
 	 * @ if page content has not been imported, or if there is another problem with the Wikipedia database
 	 * @throws Exception if there is a problem splitting the text into sentences.
 	 */
-	public String getFirstSentence() {
+	public String getFirstSentence() throws DatabaseException {
 		
 		String content = getContent() ;
 		
@@ -296,7 +304,7 @@ public abstract class Page implements Comparable<Page>{
 	 * @return the first paragraph on this page.
 	 * @ if page content has not been imported, or if there is another problem with the Wikipedia database
 	 */
-	public String getFirstParagraph()  {
+	public String getFirstParagraph() throws DatabaseException {
 		
 		String content = getContent() ;
 		
@@ -392,7 +400,7 @@ public abstract class Page implements Comparable<Page>{
 	 * @param id the id of the page
 	 * @return the instantiated page, which can be safely cast as appropriate
 	 */
-	public static Page createPage(WikipediaEnvironment environment, int id) {
+	public static Page createPage(WikipediaEnvironment environment, int id) throws DatabaseException {
 
 		Page p = null ;
 		

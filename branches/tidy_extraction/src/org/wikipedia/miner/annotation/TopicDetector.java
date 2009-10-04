@@ -134,7 +134,7 @@ public class TopicDetector {
 		return topics ;
 	}
 	
-	private void calculateRelatedness(Collection<Topic> topics, RelatednessCache cache)  {
+	private void calculateRelatedness(Collection<Topic> topics, RelatednessCache cache) throws DatabaseException {
 		
 		for (Topic topicA: topics) {
 			float avgRelatedness = 0 ;

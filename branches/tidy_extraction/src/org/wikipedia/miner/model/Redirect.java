@@ -21,6 +21,8 @@ package org.wikipedia.miner.model;
 
 import org.wikipedia.miner.db.*;
 
+import com.sleepycat.je.DatabaseException;
+
 import gnu.trove.TIntHashSet;
 
 import java.util.*;
@@ -63,7 +65,7 @@ public class Redirect extends Page {
 	 * 
 	 * @return	the equivalent Article for this redirect.
 	 */	
-	public Article getTarget() {
+	public Article getTarget() throws DatabaseException {
 
 		Article target = null;
 

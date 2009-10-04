@@ -29,6 +29,8 @@ import org.wikipedia.miner.db.WikipediaEnvironment;
 import org.wikipedia.miner.db.WikipediaEnvironment.Statistic;
 import org.wikipedia.miner.model.*;
 
+import com.sleepycat.je.DatabaseException;
+
 /**
  * @author David Milne
  *
@@ -85,7 +87,7 @@ public class ArticleSet {
 	 * @param maxWordCount the maximum number of words allowed in an article
 	 * @param maxListProportion the maximum proportion of list items (over total line count) that an article may contain. 
 	 */
-	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) {
+	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) throws DatabaseException {
 		
 		DecimalFormat df = new DecimalFormat("#0.00 %") ;
 		
@@ -153,7 +155,7 @@ public class ArticleSet {
 		writer.close() ;
 	}
 		
-	private Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks)  {
+	private Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks) throws DatabaseException {
 		
 		Vector<Article> articles = new Vector<Article>() ;
 		ProgressNotifier pn = new ProgressNotifier(wikipedia.getEnvironment().getStatisticValue(Statistic.ARTICLE_COUNT), "Gathering rough candidates") ;
@@ -176,7 +178,7 @@ public class ArticleSet {
 		return articles ;
 	}
 		
-	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) {
+	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) throws DatabaseException {
 				
 		//we don't want any disambiguations
 		if (art.getType() == Page.DISAMBIGUATION) 

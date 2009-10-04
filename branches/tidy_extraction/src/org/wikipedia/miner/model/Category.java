@@ -22,6 +22,8 @@ package org.wikipedia.miner.model;
 import java.util.* ;
 import org.wikipedia.miner.db.*; 
 
+import com.sleepycat.je.DatabaseException;
+
 /**
  * This class represents categories in Wikipedia; the pages that exist to organize articles that discuss related topics. 
  * It is intended to contain all properties and methods that are relevant for a category, such as its pertinent statistics,
@@ -91,7 +93,7 @@ public class Category extends Page {
 	 * @return	a SortedVector of Categories
 	 * @ if there is a problem with the Wikipedia database
 	 */
-	public Category[] getParentCategories()  {
+	public Category[] getParentCategories() throws DatabaseException {
 		
 		int[] tmpParents = environment.getParents(id) ;
 		if (tmpParents == null) 
@@ -111,7 +113,7 @@ public class Category extends Page {
 	 * @return	a SortedVector of Categories
 	 * @ if there is a problem with the Wikipedia database
 	 */
-	public Category[] getChildCategories()  {
+	public Category[] getChildCategories() throws DatabaseException {
 		
 		int[] tmpChildren = environment.getChildCategories(id) ;
 		if (tmpChildren == null) 
@@ -130,7 +132,7 @@ public class Category extends Page {
 	 * @param page the page of interest
 	 * @return true if the argument page is a child of this category, otherwise false
 	 */
-	public boolean contains(Article article) {
+	public boolean contains(Article article) throws DatabaseException {
 
 		int[] tmpChildren = environment.getChildArticles(id) ;
 		
@@ -147,7 +149,7 @@ public class Category extends Page {
 	 * @param page the page of interest
 	 * @return true if the argument page is a child of this category, otherwise false
 	 */
-	public boolean contains(Category category) {
+	public boolean contains(Category category) throws DatabaseException {
 
 		int[] tmpChildren = environment.getChildCategories(id) ;
 		
@@ -164,7 +166,7 @@ public class Category extends Page {
 	 * @return	a Vector of Articles
 	 * @ if there is a problem with the wikipedia database
 	 */
-	public Article[] getChildArticles()  {
+	public Article[] getChildArticles() throws DatabaseException {
 
 		int[] tmpChildren = environment.getChildArticles(id) ;
 		if (tmpChildren == null) 

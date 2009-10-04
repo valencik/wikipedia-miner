@@ -30,6 +30,8 @@ import org.wikipedia.miner.db.* ;
 import org.wikipedia.miner.db.WikipediaEnvironment.Statistic;
 import org.wikipedia.miner.util.* ;
 
+import com.sleepycat.je.DatabaseException;
+
 /**
  * This class represents articles in Wikipedia; the pages that contain descriptive text regarding a particular topic. 
  * It is intended to contain all properties and methods that are relevant for an article, such as its pertinent statistics,
@@ -69,7 +71,7 @@ public class Article extends Page {
 	 * @return	a SortedVector of Redirects
 	 * @ if there is a problem with the Wikipedia database
 	 */
-	public Redirect[] getRedirects() {
+	public Redirect[] getRedirects() throws DatabaseException {
 		
 		int[] tmpRedirects = environment.getRedirects(id) ;
 		if (tmpRedirects == null) 
@@ -90,7 +92,7 @@ public class Article extends Page {
 	 * @return	a Vector of WikipediaCategories
 	 * @ if there is a problem with the Wikipedia database
 	 */
-	public Category[] getParentCategories()  {
+	public Category[] getParentCategories() throws DatabaseException {
 		
 		int[] tmpParents = environment.getParents(id) ;
 		if (tmpParents == null) 
@@ -144,7 +146,7 @@ public class Article extends Page {
 	 * @return	the SortedVector of Articles that this article links to
 	 * @ if there is a problem with the wikipedia database
 	 */
-	public Article[] getLinksIn() {
+	public Article[] getLinksIn() throws DatabaseException {
 		
 		int[] inLinks = environment.getLinkIdsIn(id) ;
 		
@@ -167,7 +169,7 @@ public class Article extends Page {
 	 * @return	the Vector of Articles that this article links to
 	 * @ if there is a problem with the wikipedia database
 	 */
-	public Article[] getLinksOut() {
+	public Article[] getLinksOut() throws DatabaseException {
 
 		DbLink[] dbLinks = environment.getLinksOut(id) ;
 		
@@ -190,7 +192,7 @@ public class Article extends Page {
 	 * @return the translated title if it is available; otherwise null.
 	 * @ if there is a problem with the Wikipedia database
 	 */	
-	public String getTranslation(String languageCode)  {		
+	public String getTranslation(String languageCode) throws DatabaseException {		
 		return environment.getTranslations(id).get(languageCode) ;
 	}
 
@@ -200,7 +202,7 @@ public class Article extends Page {
 	 * @return a HashMap associating language code with translated title.
 	 * @ if there is a problem with the Wikipedia database
 	 */	
-	public HashMap<String,String> getTranslations() {
+	public HashMap<String,String> getTranslations() throws DatabaseException {
 		return environment.getTranslations(id) ;
 	}
 
@@ -232,7 +234,7 @@ public class Article extends Page {
 	 * @return the weight of the semantic relation between this article and the argument one.
 	 * @ if there is a problem with the wikipedia database
 	 */
-	public float getRelatednessTo(Article article) {
+	public float getRelatednessTo(Article article) throws DatabaseException {
 		
 		return getRelatednessFromInLinks(article) ;
 		
@@ -254,7 +256,7 @@ public class Article extends Page {
 	 * @return the total number of links that are made to this article 
 	 * @
 	 */
-	public int getTotalLinksInCount()  {
+	public int getTotalLinksInCount() throws DatabaseException {
 		
 		int[] linkCounts = environment.getLinkCounts(id) ;
 		
@@ -267,7 +269,7 @@ public class Article extends Page {
 	/**
 	 * @return the number of distinct articles which contain a link to this article 
 	 */
-	public int getDistinctLinksInCount()  {
+	public int getDistinctLinksInCount() throws DatabaseException {
 		
 		int[] linkCounts = environment.getLinkCounts(id) ;
 		
@@ -280,7 +282,7 @@ public class Article extends Page {
 	/**
 	 * @return the total number links that this article makes to other articles 
 	 */
-	public int getTotalLinksOutCount()  {
+	public int getTotalLinksOutCount() throws DatabaseException {
 		
 		int[] linkCounts = environment.getLinkCounts(id) ;
 		
@@ -293,7 +295,7 @@ public class Article extends Page {
 	/**
 	 * @return the number of distinct articles that this article links to 
 	 */
-	public int getDistinctLinksOutCount()  {
+	public int getDistinctLinksOutCount() throws DatabaseException {
 		
 		int[] linkCounts = environment.getLinkCounts(id) ;
 		if (linkCounts == null) 
@@ -302,7 +304,7 @@ public class Article extends Page {
 			return linkCounts[1] ;
 	}
 	
-public Section getStructureRoot() {
+public Section getStructureRoot() throws DatabaseException {
 		
 		DbStructureNode dbRoot = environment.getPageStructure(id) ;
 		
@@ -329,7 +331,7 @@ public Section getStructureRoot() {
 		
 	}*/
 
-	public double getProbabilityOfCooccuranceWith(Article article) {
+	public double getProbabilityOfCooccuranceWith(Article article) throws DatabaseException {
 		
 		if (getId() == article.getId()) 
 			return 0 ;
@@ -393,7 +395,7 @@ public Section getStructureRoot() {
 		return probability ;
 	}
 	
-	public int[] getSentenceBoundsSurrounding(int pos) {
+	public int[] getSentenceBoundsSurrounding(int pos) throws DatabaseException {
 		
 		DbStructureNode dbRoot = environment.getPageStructure(id) ;
 		if (dbRoot == null)
@@ -404,7 +406,7 @@ public Section getStructureRoot() {
 	}
 	
 	
-	public int[] getSentenceBoundSurrounding(int pos1, int pos2) {
+	public int[] getSentenceBoundSurrounding(int pos1, int pos2) throws DatabaseException {
 		
 		DbStructureNode dbRoot = environment.getPageStructure(id) ;
 		if (dbRoot == null)
@@ -415,7 +417,7 @@ public Section getStructureRoot() {
 		return node.getSentenceSurrounding(pos1, pos2) ;
 	}
 	
-	public int[] getLinkPositions(Article art) {
+	public int[] getLinkPositions(Article art) throws DatabaseException {
 		
 		DbLink[] links = environment.getLinksOut(id) ;
 		if (links == null) 
@@ -519,7 +521,7 @@ public Section getStructureRoot() {
 	}*/
 
 	
-	private float getRelatednessFromInLinks(Article article) {
+	private float getRelatednessFromInLinks(Article article) throws DatabaseException {
 		
 		if (getId() == article.getId()) 
 			return 1 ;
@@ -583,7 +585,7 @@ public Section getStructureRoot() {
 	 * @return see above.
 	 * @ if there is a problem with the sql database
 	 */
-	public AnchorText[] getAnchorTexts()  {
+	public AnchorText[] getAnchorTexts() throws DatabaseException {
 
 		DbAnchorText[] dbAnchors = environment.getAnchorTexts(id) ;
 		

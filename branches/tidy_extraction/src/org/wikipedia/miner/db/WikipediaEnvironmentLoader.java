@@ -19,9 +19,14 @@ import org.wikipedia.miner.db.WikipediaEnvironment.Statistic;
 import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.util.MarkupStripper;
 import org.wikipedia.miner.util.ProgressNotifier;
+import org.wikipedia.miner.util.text.CaseFolder;
 
 import com.sleepycat.collections.StoredMap;
+import com.sleepycat.je.Database;
+import com.sleepycat.je.DatabaseEntry;
 import com.sleepycat.je.DatabaseException;
+import com.sleepycat.je.Environment;
+import com.sleepycat.je.OperationStatus;
 
 @SuppressWarnings("unchecked")
 public class WikipediaEnvironmentLoader {
@@ -51,7 +56,7 @@ public class WikipediaEnvironmentLoader {
 		//loadRedirects(dataDirectory, null) ;
 		//loadLinkCounts(dataDirectory, null) ;
 		//loadPageLinks(dataDirectory, null) ;
-		//loadCategoryLinks(dataDirectory, null) ;
+		loadCategoryLinks(dataDirectory, null) ;
 		//loadAnchors(dataDirectory, null) ;
 		//loadAnchorTexts(dataDirectory, null) ;
 		//loadTranslations(dataDirectory, null) ;
@@ -59,19 +64,30 @@ public class WikipediaEnvironmentLoader {
 		
 		//we.prepareForTextProcessor(new CaseFolder()) ;
 		
-		indexArticles() ;
+		//indexArticles() ;
 
 		we.close();
 	}
 
-
+	private void storeStat(Statistic stat, Integer value) throws DatabaseException {
+		
+		Database dbStats = we.getDatabase(DatabaseName.STATS, true, false) ;
+		
+		DatabaseEntry k = new DatabaseEntry() ;
+		we.statBinding.objectToEntry(stat, k) ;
+		
+		DatabaseEntry v = new DatabaseEntry() ;
+		we.intBinding.objectToEntry(value, v) ;
+		
+		dbStats.put(null, k, v) ;
+	}
 
 	private void loadPageDetails(File dataDirectory, ProgressNotifier pn) throws IOException, ParseException, DatabaseException{
 
 		File pageFile = new File(dataDirectory.getPath() + File.separatorChar + "page.csv") ;
 
-		StoredMap<Integer,DbPage> smPageDetails = we.getStoredMap(DatabaseName.PAGE_DETAILS, true, true) ;
-		StoredMap<Statistic,Integer> smStats = we.getStoredMap(DatabaseName.STATS, true, true) ;
+		Database dbPageDetails = we.getDatabase(DatabaseName.PAGE_DETAILS, true, true) ;
+		
 
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(pageFile), "UTF-8")) ;
 
@@ -103,7 +119,13 @@ public class WikipediaEnvironmentLoader {
 				String title = m.group(2) ;
 				short type = Short.parseShort(m.group(3)) ;
 
-				smPageDetails.put(id, new DbPage(title, type)) ;
+				DatabaseEntry k = new DatabaseEntry() ;
+				we.intBinding.objectToEntry(id, k) ;
+				
+				DatabaseEntry v = new DatabaseEntry() ;
+				we.pageDetailsBinding.objectToEntry(new DbPage(title, type), v) ;
+				
+				dbPageDetails.put(null, k, v) ;
 
 				pageCount++ ;
 				switch(type) {
@@ -131,25 +153,24 @@ public class WikipediaEnvironmentLoader {
 			pn.update(bytesRead) ;
 		}
 
-		smStats.put(Statistic.PAGE_COUNT, pageCount) ;
-		smStats.put(Statistic.ARTICLE_COUNT, articleCount) ;
-		smStats.put(Statistic.REDIRECT_COUNT, redirectCount);
-		smStats.put(Statistic.CATEGORY_COUNT, categoryCount);
-		smStats.put(Statistic.DISAMBIG_COUNT, disambigCount);
+		storeStat(Statistic.PAGE_COUNT, pageCount) ;
+		storeStat(Statistic.ARTICLE_COUNT, articleCount) ;
+		storeStat(Statistic.REDIRECT_COUNT, redirectCount);
+		storeStat(Statistic.CATEGORY_COUNT, categoryCount);
+		storeStat(Statistic.DISAMBIG_COUNT, disambigCount);
 
 		if(rootCategoryId<0)
 			throw new ParseException("Could not identify root category. Is your language file configured correctly?", 0) ;
 		else
-			smStats.put(Statistic.ROOT_ID, rootCategoryId) ;
+			storeStat(Statistic.ROOT_ID, rootCategoryId) ;
 
 		System.out.print("Syncing database... ") ;
+		dbPageDetails.sync() ;
+		
 		we.cleanLog() ;
 		we.checkpoint(null) ;
-		we.evictMemory() ;
-		smPageDetails = we.getStoredMap(DatabaseName.PAGE_DETAILS, false, false) ;
-		smStats = we.getStoredMap(DatabaseName.STATS, false, false) ;
-
-
+		
+	
 		System.out.println("...done.") ;
 
 		input.close();
@@ -159,7 +180,7 @@ public class WikipediaEnvironmentLoader {
 
 		File pageFile = new File(dataDirectory.getPath() + File.separatorChar + "structure.csv") ;
 
-		StoredMap<Integer, DbStructureNode> smPageStructure = we.getStoredMap(DatabaseName.PAGE_STRUCTURE, true, true) ;
+		Database dbPageStructure = we.getDatabase(DatabaseName.PAGE_STRUCTURE, true, true) ;
 
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(pageFile), "UTF-8")) ;
 
@@ -182,7 +203,14 @@ public class WikipediaEnvironmentLoader {
 
 				int id = Integer.parseInt(m.group(1)) ;
 				String structure = m.group(2) ;
-				smPageStructure.put(id, DbStructureNode.parseStructureString(structure)) ;
+				
+				DatabaseEntry k = new DatabaseEntry() ;
+				we.intBinding.objectToEntry(id, k) ;
+				
+				DatabaseEntry v = new DatabaseEntry() ;
+				we.structureBinding.objectToEntry(DbStructureNode.parseStructureString(structure), v) ;
+				
+				dbPageStructure.put(null, k, v) ;
 
 			} else {
 				throw new ParseException("\"" + line + "\" does not match expected format", linesRead) ;
@@ -192,10 +220,11 @@ public class WikipediaEnvironmentLoader {
 		}
 
 		System.out.print("Syncing database... ") ;
+		
+		dbPageStructure.sync() ; 
 		we.cleanLog() ;
 		we.checkpoint(null) ;
 		we.evictMemory() ;
-		smPageStructure = we.getStoredMap(DatabaseName.PAGE_STRUCTURE, false, false) ;
 		System.out.println("...done.") ;
 
 		input.close();
@@ -205,20 +234,20 @@ public class WikipediaEnvironmentLoader {
 
 		File redirectFile = new File(dataDirectory.getPath() + File.separatorChar + "redirect.csv") ;
 
-		StoredMap<Integer,int[]> smRedirectsIn = we.getStoredMap(DatabaseName.REDIRECTS_IN, true, true) ; 
-		StoredMap<Integer,Integer>smRedirectsOut = we.getStoredMap(DatabaseName.REDIRECTS_OUT, true, true) ; 
+		Database dbRedirectsIn = we.getDatabase(DatabaseName.REDIRECTS_IN, true, true) ; 
+		Database dbRedirectsOut = we.getDatabase(DatabaseName.REDIRECTS_OUT, true, true) ; 
 
 		BufferedReader input = new BufferedReader(new FileReader(redirectFile)) ;
 
-		if (pn == null) pn = new ProgressNotifier(1) ;
-		pn.startTask(redirectFile.length(), "loading redirects") ;
+		if (pn == null) pn = new ProgressNotifier(2) ;
+		pn.startTask(redirectFile.length(), "gathering redirects") ;
 
 		long bytesRead = 0 ;
 		int linesRead = 0 ;
 		String line ;
 
 		Pattern p = Pattern.compile("(\\d*?),(\\d*?)") ;
-		TIntObjectHashMap<Vector<Integer>> tempRedirects = new TIntObjectHashMap<Vector<Integer>>() ;
+		TIntObjectHashMap<TIntArrayList> tempRedirects = new TIntObjectHashMap<TIntArrayList>() ;
 
 
 		while ((line=input.readLine()) != null) {
@@ -232,12 +261,17 @@ public class WikipediaEnvironmentLoader {
 				int rdFrom = Integer.parseInt(m.group(1)) ;
 				int rdTo = Integer.parseInt(m.group(2)) ;
 
+				DatabaseEntry k = new DatabaseEntry() ;
+				we.intBinding.objectToEntry(rdFrom, k) ;
+				
+				DatabaseEntry v = new DatabaseEntry() ;
+				we.intBinding.objectToEntry(rdTo, v) ;
 
-				smRedirectsOut.put(rdFrom, rdTo) ;
+				dbRedirectsOut.put(null, k, v) ;
 
-				Vector<Integer> rdsIn = tempRedirects.get(rdTo) ;
+				TIntArrayList rdsIn = tempRedirects.get(rdTo) ;
 				if (rdsIn == null) 
-					rdsIn = new Vector<Integer>() ;
+					rdsIn = new TIntArrayList() ;
 
 				rdsIn.add(rdFrom) ;
 				tempRedirects.put(rdTo, rdsIn) ;
@@ -250,52 +284,56 @@ public class WikipediaEnvironmentLoader {
 		}
 
 		//save all stored redirects
-		TIntObjectIterator<Vector<Integer>> iter = tempRedirects.iterator() ; 
+		TIntObjectIterator<TIntArrayList> iter = tempRedirects.iterator() ; 
+		pn.startTask(tempRedirects.size(), "storing redirects") ;
 
 		for (int i = tempRedirects.size(); i-- > 0;) {
 			iter.advance();
 
 			int toId = iter.key() ;
+			int[] fromIds = iter.value().toNativeArray() ;
+			
+			DatabaseEntry k = new DatabaseEntry() ;
+			we.intBinding.objectToEntry(toId, k) ;
+			
+			DatabaseEntry v = new DatabaseEntry() ;
+			we.intArrayBinding.objectToEntry(fromIds, v) ;
 
-			int[] fromIds = new int[iter.value().size()] ;
-			int j = 0 ;
-			for (int fromId:iter.value()) 
-				fromIds[j++] = fromId ;
-
-			smRedirectsIn.put(toId, fromIds) ;
+			dbRedirectsIn.put(null, k, v) ;
+			
+			pn.update() ;
 		}
 		tempRedirects = null ;
 
 
 
 		System.out.print("Syncing database... ") ;
+		dbRedirectsIn.sync() ;
+		dbRedirectsOut.sync() ;
+		
 		we.cleanLog() ;
 		we.checkpoint(null) ;
-		we.evictMemory() ;
-		smRedirectsIn = we.getStoredMap(DatabaseName.REDIRECTS_IN, false, false) ; 
-		smRedirectsOut = we.getStoredMap(DatabaseName.REDIRECTS_OUT, false, false) ; 
+		we.evictMemory() ; 
 
 		System.out.println("...done.") ;
 
 		input.close();
 	}
 
-	private void loadPageLinks(File dataDirectory, ProgressNotifier pn) throws IOException, ParseException, DatabaseException {
+	private void loadPageLinks(File dataDirectory, ProgressNotifier pn, int passes) throws IOException, ParseException, DatabaseException {
 
 		File pagelinkFile = new File(dataDirectory.getPath() + File.separatorChar + "pagelink.csv") ;
 
-		StoredMap<Integer,DbLink[]>smLinksIn = we.getStoredMap(DatabaseName.LINKS_IN, true, true) ;
-		StoredMap<Integer,DbLink[]>smLinksOut = we.getStoredMap(DatabaseName.LINKS_OUT, true, true) ;
+		Database dbLinksIn = we.getDatabase(DatabaseName.LINKS_IN, true, true) ;
+		Database dbLinksOut = we.getDatabase(DatabaseName.LINKS_OUT, true, true) ;
 
-
-		if (pn == null) pn = new ProgressNotifier(6) ;
-
+		
 		Pattern p = Pattern.compile("(\\d*),(\\d*),(\\d*)") ;
 
-		int passes = 5 ;
+		if (pn == null) pn = new ProgressNotifier(passes * 2) ;
+
 		for (int pass=0 ; pass < passes ; pass++) {
 			pn.startTask(pagelinkFile.length(), "gathering pagelinks (pass " + (pass+1) + " of " + passes + ")") ;
-			//pn.startTask(pagelinkFile.length(), "gathering pagelinks") ;
 
 			TIntObjectHashMap<Vector<DbLink>> tempLinksIn = new TIntObjectHashMap<Vector<DbLink>>() ;
 			TIntObjectHashMap<TIntArrayList> tempLinksOut = new TIntObjectHashMap<TIntArrayList>() ;
@@ -337,13 +375,13 @@ public class WikipediaEnvironmentLoader {
 								// link in
 								if (destId % passes == pass) {
 
-									DbLink dbLinkIn = new DbLink(lastFromId, positions) ;
-									Vector<DbLink> dbLinksIn = tempLinksIn.get(destId) ;
-									if (dbLinksIn == null) 
-										dbLinksIn = new Vector<DbLink>() ;
+									DbLink linkIn = new DbLink(lastFromId, positions) ;
+									Vector<DbLink> linksIn = tempLinksIn.get(destId) ;
+									if (linksIn == null) 
+										linksIn = new Vector<DbLink>() ;
 
-									dbLinksIn.add(dbLinkIn) ;
-									tempLinksIn.put(destId, dbLinksIn) ;
+									linksIn.add(linkIn) ;
+									tempLinksIn.put(destId, linksIn) ;
 								}
 
 								//link out
@@ -353,7 +391,14 @@ public class WikipediaEnvironmentLoader {
 
 							if (pass == 0) {
 								Arrays.sort(outLinks) ;
-								smLinksOut.put(lastFromId, outLinks) ;
+								
+								DatabaseEntry k = new DatabaseEntry() ;
+								we.intBinding.objectToEntry(toId, k) ;
+								
+								DatabaseEntry v = new DatabaseEntry() ;
+								we.linkArrayBinding.objectToEntry(outLinks, v) ;
+
+								dbLinksOut.put(null, k, v) ;
 							}
 						}
 						tempLinksOut.clear() ;
@@ -392,13 +437,13 @@ public class WikipediaEnvironmentLoader {
 					// link in
 					if (destId % passes == pass) {
 
-						DbLink dbLinkIn = new DbLink(lastFromId, positions) ;
-						Vector<DbLink> dbLinksIn = tempLinksIn.get(destId) ;
-						if (dbLinksIn == null) 
-							dbLinksIn = new Vector<DbLink>() ;
+						DbLink linkIn = new DbLink(lastFromId, positions) ;
+						Vector<DbLink> linksIn = tempLinksIn.get(destId) ;
+						if (linksIn == null) 
+							linksIn = new Vector<DbLink>() ;
 
-						dbLinksIn.add(dbLinkIn) ;
-						tempLinksIn.put(destId, dbLinksIn) ;
+						linksIn.add(linkIn) ;
+						tempLinksIn.put(destId, linksIn) ;
 					}
 
 					//link out
@@ -408,7 +453,14 @@ public class WikipediaEnvironmentLoader {
 
 				if (pass == 0) {
 					Arrays.sort(outLinks) ;
-					smLinksOut.put(lastFromId, outLinks) ;
+					
+					DatabaseEntry k = new DatabaseEntry() ;
+					we.intBinding.objectToEntry(lastFromId, k) ;
+					
+					DatabaseEntry v = new DatabaseEntry() ;
+					we.linkArrayBinding.objectToEntry(outLinks, v) ;
+
+					dbLinksOut.put(null, k, v) ;
 				}
 			}
 
@@ -424,56 +476,55 @@ public class WikipediaEnvironmentLoader {
 				Vector<DbLink> inLinks = iter.value() ;
 
 				DbLink[] dbLinks = inLinks.toArray(new DbLink[inLinks.size()]) ;
-				smLinksIn.put(toId, dbLinks) ;
+				
+				DatabaseEntry k = new DatabaseEntry() ;
+				we.intBinding.objectToEntry(toId, k) ;
+				
+				DatabaseEntry v = new DatabaseEntry() ;
+				we.linkArrayBinding.objectToEntry(dbLinks, v) ;
+
+				dbLinksIn.put(null, k, v) ;
+
 				pn.update() ;
 			}
 			tempLinksIn.clear();
 
+			System.out.print("Syncing database... ") ;
+			dbLinksIn.sync() ;
+			dbLinksOut.sync() ;
 			we.cleanLog() ;
 			we.checkpoint(null) ;
 			we.evictMemory() ;
+			System.out.println("...done.") ;
 
 			System.gc();
 
 			input.close();
 		}
-
-
-		System.out.print("Syncing database... ") ;
-		smLinksIn = we.getStoredMap(DatabaseName.LINKS_IN, false, false) ;
-		smLinksOut = we.getStoredMap(DatabaseName.LINKS_OUT, false, false) ;
-		System.out.println("...done.") ;
-
-
 	}
 
 	private void loadCategoryLinks(File dataDirectory, ProgressNotifier pn) throws IOException, ParseException, DatabaseException {
 
 		File catLinkFile = new File(dataDirectory.getPath() + File.separatorChar + "categorylink.csv") ;
 
-		StoredMap<Integer,int[]> smParents = we.getStoredMap(DatabaseName.PARENTS, true, true) ;
-		StoredMap<Integer,int[]>smChildArticles = we.getStoredMap(DatabaseName.CHILD_ARTICLES, true, true) ;
-		StoredMap<Integer,int[]>smChildCategories = we.getStoredMap(DatabaseName.CHILD_CATEGORIES, true, true) ;
-		StoredMap<Integer,Integer> smDepths =  we.getStoredMap(DatabaseName.DEPTHS, true, true) ;
-		StoredMap<Statistic,Integer> smStats = we.getStoredMap(DatabaseName.STATS, true, false) ;
-
+		Database dbParents = we.getDatabase(DatabaseName.PARENTS, true, true) ;
+		Database dbChildArticles = we.getDatabase(DatabaseName.CHILD_ARTICLES, true, true) ;
+		Database dbChildCategories = we.getDatabase(DatabaseName.CHILD_CATEGORIES, true, true) ;
+		
 		BufferedReader input = new BufferedReader(new FileReader(catLinkFile)) ;
 
 		if (pn == null) pn = new ProgressNotifier(4) ;
-		pn.startTask(catLinkFile.length(), "summarizing category links") ;
+		pn.startTask(catLinkFile.length(), "gathering category links") ;
 
 		long bytesRead = 0 ;
 		int linesRead = 0 ;
 		String line ;
 
 		int lastChildId = -1 ;
-		Vector<Integer> tempParents = null ;
+		TIntArrayList tempParents = null ;
 
-
-		TIntObjectHashMap<Vector<Integer>> tempChildCategories = new TIntObjectHashMap<Vector<Integer>>() ;
-		TIntObjectHashMap<Vector<Integer>> tempChildArticles = new TIntObjectHashMap<Vector<Integer>>() ;
-
-
+		TIntObjectHashMap<TIntArrayList> tempChildCategories = new TIntObjectHashMap<TIntArrayList>() ;
+		TIntObjectHashMap<TIntArrayList> tempChildArticles = new TIntObjectHashMap<TIntArrayList>() ;
 
 		Pattern p = Pattern.compile("(\\d*?),(\\d*?)") ;
 
@@ -492,17 +543,19 @@ public class WikipediaEnvironmentLoader {
 
 					if (lastChildId > 0) {
 						//need to save gathered parents
-						int[] parents = new int[tempParents.size()] ;
+						
+						tempParents.sort() ;
+						
+						DatabaseEntry k = new DatabaseEntry() ;
+						we.intBinding.objectToEntry(lastChildId, k) ;
+						
+						DatabaseEntry v = new DatabaseEntry() ;
+						we.intArrayBinding.objectToEntry(tempParents.toNativeArray(), v) ;
 
-						int i= 0 ;
-						for (int pid:tempParents) 
-							parents[i++] = pid ;
-						Arrays.sort(parents) ;
-
-						smParents.put(lastChildId, parents) ;
+						dbParents.put(null, k, v) ;
 					}
 
-					tempParents = new Vector<Integer>() ;
+					tempParents = new TIntArrayList() ;
 					lastChildId = childId ;
 				}
 
@@ -513,16 +566,16 @@ public class WikipediaEnvironmentLoader {
 				if (pd != null) {
 
 					if (pd.getType() == Page.CATEGORY) {
-						Vector<Integer> children = tempChildCategories.get(parentId) ;
+						TIntArrayList children = tempChildCategories.get(parentId) ;
 						if (children == null) 
-							children = new Vector<Integer>() ;
+							children = new TIntArrayList() ;
 
 						children.add(childId) ;
 						tempChildCategories.put(parentId, children) ;
 					} else {
-						Vector<Integer> children = tempChildArticles.get(parentId) ;
+						TIntArrayList children = tempChildArticles.get(parentId) ;
 						if (children == null) 
-							children = new Vector<Integer>() ;
+							children = new TIntArrayList() ;
 
 						children.add(childId) ;
 						tempChildArticles.put(parentId, children) ;
@@ -533,21 +586,26 @@ public class WikipediaEnvironmentLoader {
 				throw new ParseException("\"" + line + "\" does not match expected format", linesRead) ;
 			}
 		}
+		
+		input.close();
 
 		//save all stored child categories
 		pn.startTask(tempChildCategories.size(), "storing child categories") ;
-		TIntObjectIterator<Vector<Integer>> iter = tempChildCategories.iterator() ; 
+		TIntObjectIterator<TIntArrayList> iter = tempChildCategories.iterator() ; 
 		for (int i = tempChildCategories.size(); i-- > 0;) {
 			iter.advance();
 
 			int parent = iter.key() ;
+			int[] children = iter.value().toNativeArray() ; 
+			
+			DatabaseEntry k = new DatabaseEntry() ;
+			we.intBinding.objectToEntry(parent, k) ;
+			
+			DatabaseEntry v = new DatabaseEntry() ;
+			we.intArrayBinding.objectToEntry(children, v) ;
 
-			int[] children = new int[iter.value().size()] ;
-			int j = 0 ;
-			for (int child:iter.value()) 
-				children[j++] = child ;
-
-			smChildCategories.put(parent, children) ;
+			dbChildCategories.put(null, k, v) ;
+			
 			pn.update() ;
 		}
 
@@ -558,77 +616,125 @@ public class WikipediaEnvironmentLoader {
 			iter.advance();
 
 			int parent = iter.key() ;
+			int[] children = iter.value().toNativeArray() ; 
+			
+			DatabaseEntry k = new DatabaseEntry() ;
+			we.intBinding.objectToEntry(parent, k) ;
+			
+			DatabaseEntry v = new DatabaseEntry() ;
+			we.intArrayBinding.objectToEntry(children, v) ;
 
-			int[] children = new int[iter.value().size()] ;
-			int j = 0 ;
-			for (int child:iter.value()) 
-				children[j++] = child ;
-
-			smChildArticles.put(parent, children) ;
+			dbChildArticles.put(null, k, v) ;
 			pn.update() ;
 		}
 
 		//calculate depths of pages (vertical distance from root category), while we have child relations in memory
-		pn.startTask(smStats.get(Statistic.PAGE_COUNT), "summarizing and storing page depths") ;
+		pn.startTask(we.getStatisticValue(Statistic.PAGE_COUNT), "gathering page depths") ;
 		int currDepth = 0 ;
-		Integer currPage = smStats.get(Statistic.ROOT_ID) ;
+		Integer currPage = we.getStatisticValue(Statistic.ROOT_ID) ;
 
-		Vector<Integer> currLevel = new Vector<Integer>() ;
-		Vector<Integer> nextLevel = new Vector<Integer>() ;
+		final TIntArrayList currLevel = new TIntArrayList() ;
+		final TIntArrayList nextLevel = new TIntArrayList() ;
+		final TIntIntHashMap tempDepths = new TIntIntHashMap() ;
 
 		while (currPage != null) {
 
-			if (smDepths.get(currPage) == null) {
-				smDepths.put(currPage, currDepth) ;
+			if (!tempDepths.containsKey(currPage)) {
+				tempDepths.put(currPage, currDepth) ;
 
-				Vector<Integer> childArticles = tempChildArticles.get(currPage) ;
+				TIntArrayList childArticles = tempChildArticles.get(currPage) ;
+				final int d = currDepth+1 ;
 				if (childArticles != null) {
-					for(int childArticle:childArticles) {
-						if (smDepths.get(childArticle)==null)
-							smDepths.put(childArticle, currDepth+1) ;
-					}
+					childArticles.forEach(new TIntProcedure() {
+						public boolean execute(int childArticle) {
+							if (!tempDepths.containsKey(childArticle))
+								tempDepths.put(childArticle, d) ;
+							return true ;
+						}
+					}) ;
 				}
 
-				Vector<Integer> childCategories = tempChildCategories.get(currPage) ;
+				TIntArrayList childCategories = tempChildCategories.get(currPage) ;
 				if (childCategories != null) {
-					for(int childCategory:childCategories) {
-						if (smDepths.get(childCategory)==null)
-							nextLevel.add(childCategory) ;
-					}
+					childCategories.forEach(new TIntProcedure() {
+						public boolean execute(int childCategory) {
+							if (!tempDepths.containsKey(childCategory))
+								nextLevel.add(childCategory) ;
+							return true ;
+						}
+					}) ;
 				}
-				pn.update();
+				
 			}
 
 			if (currLevel.isEmpty()) {
-				currLevel = nextLevel ;
-				nextLevel = new Vector<Integer>() ;
+				currLevel.add(nextLevel.toNativeArray()) ;
+				nextLevel.clear();
 				currDepth++ ;
 			}
 
 			if (currLevel.isEmpty())
 				currPage = null ;
 			else {
-				currPage = currLevel.firstElement();
+				currPage = currLevel.get(0);
 				currLevel.remove(0) ;
 			}
+			
+			pn.update(tempDepths.size());
 		}
+		
+		//save gathered depths
+		
+		final Database dbDepths =  we.getDatabase(DatabaseName.DEPTHS, true, true) ;
+		
+		pn.startTask(we.getStatisticValue(Statistic.PAGE_COUNT), "storing page depths") ;
+		final ProgressNotifier pn2 = pn ;
+		tempDepths.forEachEntry(new TIntIntProcedure() {
+			
+			public boolean execute(int id, int depth) {
+				try {
+					DatabaseEntry k = new DatabaseEntry() ;
+					we.intBinding.objectToEntry(id, k) ;
+					
+					DatabaseEntry v = new DatabaseEntry() ;
+					we.intBinding.objectToEntry(depth, v) ;
+	
+					dbDepths.put(null, k, v) ;
+				} catch (Exception e) {
+					System.out.println("Cannot store page depths") ;
+					return false ;
+				}
+				
+				pn2.update();
+				return true ;
+			}
+		});
+		
+		
 
 		//free up memory 
-		tempChildCategories = null ;
-		tempChildArticles = null ;
+		tempChildCategories.clear() ;
+		tempChildArticles.clear() ;
+		tempDepths.clear() ;
 
-		smStats.put(Statistic.MAX_DEPTH, currDepth) ;
+		storeStat(Statistic.MAX_DEPTH, currDepth) ;
 
 		System.out.print("Syncing database... ") ;
 
-		smParents = we.getStoredMap(DatabaseName.PARENTS, false, false) ;
-		smChildArticles = we.getStoredMap(DatabaseName.CHILD_ARTICLES,false, false) ;
-		smChildCategories = we.getStoredMap(DatabaseName.CHILD_CATEGORIES, false, false) ;
-		smDepths =  we.getStoredMap(DatabaseName.DEPTHS, false, false) ;
-		smStats = we.getStoredMap(DatabaseName.STATS, false, false) ;
+		dbParents.sync() ; 
+		dbChildArticles.sync() ; 
+		dbChildCategories.sync() ; 
+		dbDepths.sync() ; 
+		
+		we.cleanLog() ;
+		we.checkpoint(null) ;
+		we.evictMemory() ;
+		
+		System.gc() ;
+
 		System.out.println("...done.") ;
 
-		input.close();
+		
 	}
 
 	private void loadContent(File dataDir, ProgressNotifier pn) throws IOException, ParseException, DatabaseException {
@@ -645,7 +751,7 @@ public class WikipediaEnvironmentLoader {
 		if (dumpFiles.length == 0) 
 			throw new IOException("Could not locate xml dump file in " + dataDir.getPath()) ;
 
-		StoredMap<Integer,String>smPageContent = we.getStoredMap(DatabaseName.PAGE_CONTENT, true, true) ;
+		Database dbPageContent = we.getDatabase(DatabaseName.PAGE_CONTENT, true, true) ;
 
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(dumpFiles[0]), "UTF8")) ;
 
@@ -687,7 +793,14 @@ public class WikipediaEnvironmentLoader {
 								String content = contentMatcher.group(1) ;
 
 								content = StringEscapeUtils.unescapeXml(content) ;
-								smPageContent.put(id, content) ;
+								
+								DatabaseEntry k = new DatabaseEntry() ;
+								we.intBinding.objectToEntry(id, k) ;
+								
+								DatabaseEntry v = new DatabaseEntry() ;
+								we.strBinding.objectToEntry(content, v) ;
+				
+								dbPageContent.put(null, k, v) ;
 
 							} else {
 								new ParseException("Could not locate content in page markup", pagesRead) ;
@@ -712,10 +825,12 @@ public class WikipediaEnvironmentLoader {
 		}
 
 		System.out.print("Syncing database... ") ;
+		
+		dbPageContent.sync() ;
 		we.cleanLog() ;
 		we.checkpoint(null) ;
 		we.evictMemory() ;
-		smPageContent = we.getStoredMap(DatabaseName.PAGE_CONTENT, false, false) ;
+
 		System.out.println("...done.") ;
 
 		input.close();
@@ -724,19 +839,31 @@ public class WikipediaEnvironmentLoader {
 	private void loadAnchors(File dataDirectory, ProgressNotifier pn) throws IOException, ParseException, DatabaseException {
 
 		File anchorsFile = new File(dataDirectory.getPath() + File.separatorChar + "anchor.csv") ;
+		
+		//ensure that anchor database is empty
+		Database dbAnchor = we.openDatabases.get(DatabaseName.ANCHOR) ;
+		if (dbAnchor != null)
+			dbAnchor.close();
+		
+		try {
+			we.removeDatabase(null, DatabaseName.ANCHOR.toString()) ;
+		} catch (DatabaseException e) {};
 
-		StoredMap<String,DbAnchor> smAnchor = we.getStoredMap(DatabaseName.ANCHOR, true, true) ; 
-
-
-		if (pn==null) pn = new ProgressNotifier(3) ;
-
-
+		we.cleanLog() ;
+		we.checkpoint(null) ;
+		
+		dbAnchor = we.openDatabase(null, DatabaseName.ANCHOR.toString(), we.writingConfig) ;
+		
+		final DatabaseEntry k = new DatabaseEntry() ;
+		final DatabaseEntry v = new DatabaseEntry() ;
 
 		Pattern p = Pattern.compile("\"(.*?)\",(\\d*),(\\d*),(\\d*),(\\d*)", Pattern.DOTALL) ;
 
 		int passes = 5 ;
+		if (pn==null) pn = new ProgressNotifier((2*passes) + 1) ;
+
 		for (int pass=0 ; pass < passes ; pass++) {
-			pn.startTask(anchorsFile.length(), "gathering anchor senses (pass " + (pass+1) + " of " + passes + ")") ;
+			pn.startTask(anchorsFile.length(), "gathering anchors (pass " + (pass+1) + " of " + passes + ")") ;
 
 			BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(anchorsFile), "UTF-8")) ;
 
@@ -752,7 +879,7 @@ public class WikipediaEnvironmentLoader {
 
 				Matcher m = p.matcher(line) ;
 				if (m.matches()) {
-					String anchor = m.group(1) ;
+					String anchor = m.group(1).trim() ;
 					int destination = Integer.parseInt(m.group(2)) ;
 					int totalCount = Integer.parseInt(m.group(3)) ;
 					int distinctCount = Integer.parseInt(m.group(4)) ;
@@ -777,31 +904,43 @@ public class WikipediaEnvironmentLoader {
 			}
 			input.close();
 
-			//save all stored anchors
-			pn.startTask(tempSenses.size(), "storing anchor senses (pass " + (pass+1) + " of " + passes + ")") ;
+			//save all gathered anchors
+			pn.startTask(tempSenses.size(), "storing anchors (pass " + (pass+1) + " of " + passes + ")") ;
 			final ProgressNotifier pn2 = pn ;
-			final StoredMap<String, DbAnchor> sm = smAnchor ;
+			final Database db = dbAnchor ;
+			
+			
 
 			tempSenses.forEachEntry(new TObjectObjectProcedure<String, Vector<DbSense>>() {
 
-				public boolean execute(String anchor, Vector<DbSense> senses) {
+				public boolean execute(String text, Vector<DbSense> senses) {
 					DbSense[] sortedSenses = senses.toArray(new DbSense[senses.size()]) ;
 					Arrays.sort(sortedSenses) ;
 
 					//set counts as 0 for now
-					DbAnchor anch = new DbAnchor(0,0,(long)0,0,sortedSenses) ;
+					DbAnchor anchor = new DbAnchor(0,0,(long)0,0,sortedSenses) ;
 
-					sm.put(anchor, anch) ;
+					we.strBinding.objectToEntry(text, k) ;
+					we.anchorBinding.objectToEntry(anchor, v) ;
+					
+					try {
+						db.put(null, k, v) ;
+					} catch (DatabaseException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					
 					pn2.update() ;
 					return true ;
 				}
 			}) ;
 
 			tempSenses = null ;
+			
+			dbAnchor.sync() ;
 
 			we.cleanLog() ;
 			we.checkpoint(null) ;
-			we.evictMemory() ;
 
 			System.gc();
 		}
@@ -826,7 +965,7 @@ public class WikipediaEnvironmentLoader {
 
 			Matcher m = p.matcher(line) ;
 			if (m.matches()) {
-				String text = m.group(1) ;
+				String text = m.group(1).trim() ;
 				int linkCountTotal = Integer.parseInt(m.group(2)) ;
 				int linkCountDistinct = Integer.parseInt(m.group(3)) ;
 				long occCountTotal = Long.parseLong(m.group(4)) ;
@@ -834,11 +973,15 @@ public class WikipediaEnvironmentLoader {
 
 				DbAnchor anchorToStore = new DbAnchor(linkCountTotal, linkCountDistinct, occCountTotal, occCountDistinct, null) ;
 
-				DbAnchor storedAnchor = smAnchor.get(text) ;
-				if (storedAnchor != null) 
+				we.strBinding.objectToEntry(text, k) ;
+				
+				if (dbAnchor.get(null, k, v, null) == OperationStatus.SUCCESS){
+					DbAnchor storedAnchor = we.anchorBinding.entryToObject(v) ; 
 					anchorToStore.mergeWith(storedAnchor) ;
+				}
 
-				smAnchor.put(text, anchorToStore) ;
+				we.anchorBinding.objectToEntry(anchorToStore, v) ;
+				dbAnchor.put(null, k, v) ;
 			} else {
 				throw new ParseException("\"" + line + "\" does not match expected format", linesRead) ;
 			}
@@ -851,7 +994,7 @@ public class WikipediaEnvironmentLoader {
 		we.cleanLog() ;
 		we.checkpoint(null) ;
 		we.evictMemory() ;
-		smAnchor = we.getStoredMap(DatabaseName.ANCHOR, false, false) ; 
+		
 		System.out.println("...done.") ;
 
 		input.close();
@@ -862,9 +1005,7 @@ public class WikipediaEnvironmentLoader {
 
 		File anchorsFile = new File(dataDirectory.getPath() + File.separatorChar + "anchor.csv") ;
 
-		StoredMap<Integer,DbAnchorText[]> smAnchorTexts = we.getStoredMap(DatabaseName.ANCHOR_TEXTS, true, true) ;
-
-
+		final Database dbAnchorTexts = we.getDatabase(DatabaseName.ANCHOR_TEXTS, true, true) ;
 
 		int passes = 5 ;
 		if (pn==null) pn = new ProgressNotifier(passes * 2) ;
@@ -889,7 +1030,7 @@ public class WikipediaEnvironmentLoader {
 
 				Matcher m = p.matcher(line) ;
 				if (m.matches()) {
-					String anchor = m.group(1) ;
+					String anchor = m.group(1).trim() ;
 					int destination = Integer.parseInt(m.group(2)) ;
 					int totalCount = Integer.parseInt(m.group(3)) ;
 					int distinctCount = Integer.parseInt(m.group(3)) ;
@@ -915,43 +1056,53 @@ public class WikipediaEnvironmentLoader {
 			//save all stored anchor texts
 			pn.startTask(tempAnchorTexts.size(), "storing anchor texts by destination (pass " + (pass+1) + " of " + passes + ")") ;
 
-			final StoredMap sm = smAnchorTexts ;
 			final ProgressNotifier pn2 = pn ;
 
 			tempAnchorTexts.forEachEntry(new TObjectObjectProcedure<Integer,Vector<DbAnchorText>>() {
 				public boolean execute(Integer destination, Vector<DbAnchorText> anchorTexts) {
 
-					DbAnchorText[] sortedAnchorTexts = anchorTexts.toArray(new DbAnchorText[anchorTexts.size()]) ;
-					Arrays.sort(sortedAnchorTexts) ;
-
-					sm.put(destination, sortedAnchorTexts) ;
+					try {
+						DbAnchorText[] sortedAnchorTexts = anchorTexts.toArray(new DbAnchorText[anchorTexts.size()]) ;
+						Arrays.sort(sortedAnchorTexts) ;
+	
+						DatabaseEntry k = new DatabaseEntry() ;
+						we.intBinding.objectToEntry(destination, k) ;
+						
+						DatabaseEntry v = new DatabaseEntry() ;
+						we.anchorTextArrayBinding.objectToEntry(sortedAnchorTexts, v) ;
+		
+						dbAnchorTexts.put(null, k, v) ;
+					} catch (DatabaseException e) {
+						e.printStackTrace() ;
+						return false ;
+					}
+					
 					pn2.update() ;
 					return true ;
 				}
 			} ) ;
 
-			tempAnchorTexts = null ;
+			System.out.print("Syncing database... ") ;
+			tempAnchorTexts.clear() ;
+			dbAnchorTexts.sync() ;
 			we.cleanLog() ;
 			we.checkpoint(null) ;
 			we.evictMemory() ;
-
+			
 			System.gc();
+			
+			System.out.println("...done.") ;
+			
+			
 			input.close();
 		}
-
-		System.out.print("Syncing database... ") ;
-
-		smAnchorTexts = we.getStoredMap(DatabaseName.ANCHOR_TEXTS, false, false) ;
-		System.out.println("...done.") ;
-
-
 	}
 
 	private void loadLinkCounts(File dataDirectory, ProgressNotifier pn) throws IOException, ParseException, DatabaseException {
 
 		File pageLinksFile = new File(dataDirectory.getPath() + File.separatorChar + "pagelink.csv") ;
 
-		StoredMap<Integer,int[]> smLinkCounts = we.getStoredMap(DatabaseName.LINK_COUNTS, true, true) ;
+		Database dbLinkCounts = we.getDatabase(DatabaseName.LINK_COUNTS, true, true) ;
 
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(pageLinksFile), "UTF-8")) ;
 
@@ -1031,7 +1182,15 @@ public class WikipediaEnvironmentLoader {
 		TIntObjectIterator<int[]> iter = tempLinkCounts.iterator() ; 
 		for (int i = tempLinkCounts.size(); i-- > 0;) {
 			iter.advance();
-			smLinkCounts.put(iter.key(), iter.value()) ;
+			
+			DatabaseEntry k = new DatabaseEntry() ;
+			we.intBinding.objectToEntry(iter.key(), k) ;
+			
+			DatabaseEntry v = new DatabaseEntry() ;
+			we.intArrayBinding.objectToEntry(iter.value(), v) ;
+
+			dbLinkCounts.put(null, k, v) ;
+		
 			pn.update() ;
 		}
 		tempLinkCounts = null ;
@@ -1040,10 +1199,10 @@ public class WikipediaEnvironmentLoader {
 
 
 		System.out.print("Syncing database... ") ;
+		dbLinkCounts.sync() ;
 		we.cleanLog() ;
 		we.checkpoint(null) ;
 		we.evictMemory() ;
-		smLinkCounts = we.getStoredMap(DatabaseName.LINK_COUNTS, false, false) ;
 		System.out.println("...done.") ;
 
 		input.close();
@@ -1053,12 +1212,12 @@ public class WikipediaEnvironmentLoader {
 
 		File translationsFile = new File(dataDirectory.getPath() + File.separatorChar + "translation.csv") ;
 
-		StoredMap<Integer,String[]> smTranslations = we.getStoredMap(DatabaseName.TRANSLATIONS, true, true) ; 
+		Database dbTranslations = we.getDatabase(DatabaseName.TRANSLATIONS, true, true) ; 
 
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(translationsFile), "UTF-8")) ;
 
 		if (pn==null) pn = new ProgressNotifier(1) ;
-		pn.startTask(translationsFile.length(), "loading translations") ;
+		pn.startTask(translationsFile.length(), "gathering and storing translations") ;
 
 		long bytesRead = 0 ;
 		int linesRead = 0 ;
@@ -1084,8 +1243,17 @@ public class WikipediaEnvironmentLoader {
 
 					if (lastId >= 0) {
 						//need to save translations gathered for lastId
-						if (!tempTranslations.isEmpty())
-							smTranslations.put(lastId, tempTranslations.toArray(new String[tempTranslations.size()])) ;
+						if (!tempTranslations.isEmpty()) {
+							
+							DatabaseEntry k = new DatabaseEntry() ;
+							we.intBinding.objectToEntry(lastId, k) ;
+							
+							DatabaseEntry v = new DatabaseEntry() ;
+							we.strArrayBinding.objectToEntry(tempTranslations.toArray(new String[tempTranslations.size()]), v) ;
+
+							dbTranslations.put(null, k, v) ;
+						}
+							
 					}
 
 					tempTranslations = new Vector<String>() ;
@@ -1101,21 +1269,28 @@ public class WikipediaEnvironmentLoader {
 		}
 
 		//need to save last stored translations
-		if (!tempTranslations.isEmpty())
-			smTranslations.put(lastId, tempTranslations.toArray(new String[tempTranslations.size()])) ;
+		if (!tempTranslations.isEmpty()) {
+			DatabaseEntry k = new DatabaseEntry() ;
+			we.intBinding.objectToEntry(lastId, k) ;
+			
+			DatabaseEntry v = new DatabaseEntry() ;
+			we.strArrayBinding.objectToEntry(tempTranslations.toArray(new String[tempTranslations.size()]), v) ;
+
+			dbTranslations.put(null, k, v) ;
+		}
 
 		System.out.print("Syncing database... ") ;
+		dbTranslations.sync() ;
 		we.cleanLog() ;
 		we.checkpoint(null) ;
 		we.evictMemory() ;
-		smTranslations = we.getStoredMap(DatabaseName.TRANSLATIONS, false, false) ;
 		System.out.println("...done.") ;
 
 		input.close();
 	}
 
 
-	private void indexArticles() throws IOException {
+	private void indexArticles() throws IOException, DatabaseException {
 
 		IndexWriter w = new IndexWriter(we.index, we.analyzer, true, IndexWriter.MaxFieldLength.UNLIMITED);
 
@@ -1125,15 +1300,14 @@ public class WikipediaEnvironmentLoader {
 		MarkupStripper stripper = new MarkupStripper() ;
 		//String[] unwantedSections = {"see also", "references", "further sources", "further reading", "footnotes", "external links", "bibliography", "notes", "notes and references", "other websites"} ;
 
-		Iterator<Integer> iter = we.getPageIdIterator() ;
+		DbPageIterator iter = new DbPageIterator(we) ; 
 		while (iter.hasNext()) {
 
-			int id = iter.next() ;
-			DbPage page = we.getPageDetails(id) ;
+			Page page = iter.next();
 
 			if (page.getType() == Page.ARTICLE || page.getType() == Page.DISAMBIGUATION) {
 
-				String markup = we.getPageContent(id) ;
+				String markup = we.getPageContent(page.getId()) ;
 
 				if (markup == null) {
 					//System.out.println("no content") ;
@@ -1142,7 +1316,7 @@ public class WikipediaEnvironmentLoader {
 					
 					StringBuffer anchorText = new StringBuffer() ;
 					
-					DbAnchorText[] ats = we.getAnchorTexts(id) ;
+					DbAnchorText[] ats = we.getAnchorTexts(page.getId()) ;
 					if (ats != null) {
 						for (DbAnchorText at:ats) {
 							if (at.getTotalCount() >= 3) {
@@ -1156,7 +1330,7 @@ public class WikipediaEnvironmentLoader {
 					doc.add(new Field("title", page.getTitle(), Field.Store.NO, Field.Index.ANALYZED)) ;
 					doc.add(new Field("synonyms", anchorText.toString(), Field.Store.NO, Field.Index.ANALYZED)) ;
 					doc.add(new Field("content", markup, Field.Store.NO, Field.Index.ANALYZED));
-					doc.add(new Field("id", String.valueOf(id), Field.Store.YES, Field.Index.NO));
+					doc.add(new Field("id", String.valueOf(page.getId()), Field.Store.YES, Field.Index.NO));
 
 					w.addDocument(doc);
 				}
@@ -1177,9 +1351,20 @@ public class WikipediaEnvironmentLoader {
 		File luceneDir = new File(args[1]) ;
 		File dumpDir = new File(args[2]) ;
 
-		WikipediaEnvironmentLoader loader = new WikipediaEnvironmentLoader(berkeleyDir, luceneDir) ;
+		WikipediaEnvironmentLoader loader = null ;
+		
+		try {
+			loader = new WikipediaEnvironmentLoader(berkeleyDir, luceneDir) ;
+			loader.load(dumpDir, true) ;
+		} catch (Exception e) {
+			e.printStackTrace() ;
+			
+		} finally {
+			if (loader != null)
+				loader.we.close();
+		}
 
-		loader.load(dumpDir, true) ; 
+		 
 	}
 
 }

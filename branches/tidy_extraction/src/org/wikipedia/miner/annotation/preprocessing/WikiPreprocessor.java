@@ -28,6 +28,8 @@ import org.wikipedia.miner.annotation.preprocessing.PreprocessedDocument.RegionT
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
 
+import com.sleepycat.je.DatabaseException;
+
 /**
  * This class prepares documents in MediaWiki markup format so that they can be tagged by a document tagger.
  * 
@@ -48,7 +50,7 @@ public class WikiPreprocessor extends DocumentPreprocessor {
 		this.wikipedia = wikipedia ;
 	}
 
-	public PreprocessedDocument preprocess(String content) {
+	public PreprocessedDocument preprocess(String content) throws DatabaseException {
 
 		StringBuffer context = new StringBuffer() ;
 		RegionTag[] regionTags = getRegionTags(content) ;
@@ -187,7 +189,7 @@ public class WikiPreprocessor extends DocumentPreprocessor {
 
 
 
-	private String blankLinks(String markup, StringBuffer context, HashSet<Integer> bannedTopics) {
+	private String blankLinks(String markup, StringBuffer context, HashSet<Integer> bannedTopics) throws DatabaseException {
 
 		Vector<Integer> linkStack = new Vector<Integer>() ; 
 
@@ -256,7 +258,7 @@ public class WikiPreprocessor extends DocumentPreprocessor {
 	
 	
 
-	private void processLink(String markup, StringBuffer context, HashSet<Integer> bannedTopics) {
+	private void processLink(String markup, StringBuffer context, HashSet<Integer> bannedTopics) throws DatabaseException {
 
 		//ignore everything that is not in main namespace
 		if (markup.indexOf(":") > 0) 

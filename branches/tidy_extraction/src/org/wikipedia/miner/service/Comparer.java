@@ -32,6 +32,8 @@ import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.util.text.*;
 
+import com.sleepycat.je.DatabaseException;
+
 
 /**
  * This service measures the semantic relatedness between terms.
@@ -334,7 +336,7 @@ public class Comparer {
 		return response ;
 	}
 
-	private Element addMutualLinksOrSnippets(Element response, Article art1, Article art2, boolean getArtsInCommon, boolean getSnippets, int artsInCommonLimit, int snippetLimit, int format, int linkFormat) {
+	private Element addMutualLinksOrSnippets(Element response, Article art1, Article art2, boolean getArtsInCommon, boolean getSnippets, int artsInCommonLimit, int snippetLimit, int format, int linkFormat) throws DatabaseException {
 
 		//Build a list of pages that link to both art1 and art2, ordered by average relatedness to them
 		TreeSet<Article> mutualLinks = new TreeSet<Article>() ;
@@ -355,9 +357,13 @@ public class Comparer {
 
 			if (compare == 0) {
 				if (link1.compareTo(art1)!= 0 && link2.compareTo(art2)!= 0) {
+					
 					float weight = (rc.getRelatedness(link1, art1) + rc.getRelatedness(link1, art2))/2 ;
 					link1.setWeight(weight) ;
 					mutualLinks.add(link1) ;
+					
+					//a rough santity check, so this can't take forever
+					if (mutualLinks.size() > 10000) break  ;
 				}
 
 				index1 ++ ;
@@ -487,7 +493,7 @@ public class Comparer {
 
 
 
-private String highlightTopics(String markup, Article topic1, Article topic2) {
+private String highlightTopics(String markup, Article topic1, Article topic2) throws DatabaseException {
 
 
 	Matcher m = wms.definer.linkPattern.matcher(markup) ;

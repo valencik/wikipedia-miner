@@ -613,8 +613,8 @@ public class Disambiguator {
 		File dataDirectory = new File("/research/wikipediaminer/data/en/20080727") ;
 		ProgressNotifier pn = new ProgressNotifier(4) ;
 		
-		/*
-		TIntHashSet ids = wikipedia.getDatabase().getValidPageIds(dataDirectory, 2, pn) ;
+		
+		TIntHashSet ids = wikipedia.getEnvironment().getValidPageIds(2, pn) ;
 		wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;
 		wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 2, pn) ;
 		wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;

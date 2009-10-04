@@ -73,7 +73,7 @@ public class Wikipedia {
 	 * 
 	 * @return the root (fundamental) category
 	 */
-	public Category getRootCategory() {
+	public Category getRootCategory() throws DatabaseException {
 		return new Category(environment, environment.getStatisticValue(Statistic.ROOT_ID)) ;
 	}
 
@@ -84,7 +84,7 @@ public class Wikipedia {
 	 * @param id	the id of the Page to retrieve.
 	 * @return the Page referenced by the given id, or null if one does not exist. 
 	 */
-	public Page getPageById(int id) {
+	public Page getPageById(int id) throws DatabaseException {
 		return Page.createPage(environment, id) ;
 	}
 
@@ -98,7 +98,7 @@ public class Wikipedia {
 	 * @param title	the title of an Article (or it's redirect).
 	 * @return the Article referenced by the given title, or null if one does not exist
 	 */
-	public Article getArticleByTitle(String title) {
+	public Article getArticleByTitle(String title) throws DatabaseException {
 		
 		title = title.substring(0,1).toUpperCase() + title.substring(1) ;
 		Anchor anchor = new Anchor(environment, title) ;
@@ -317,7 +317,7 @@ public class Wikipedia {
 	/**
 	 * @return an iterator for all pages in the database, in order of ascending ids.
 	 */
-	public PageIterator getPageIterator() {
+	public PageIterator getPageIterator() throws DatabaseException {
 		return new PageIterator(environment) ;
 	}
 	
@@ -325,7 +325,7 @@ public class Wikipedia {
 	 * @param pageType the type of page of interest (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
 	 * @return an iterator for all pages in the database of the given type, in order of ascending ids.
 	 */
-	public PageIterator getPageIterator(short pageType) {
+	public PageIterator getPageIterator(short pageType) throws DatabaseException {
 		return new PageIterator(environment, pageType) ;		
 	}
 
