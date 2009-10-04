@@ -37,6 +37,7 @@ import org.w3c.dom.Element;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.util.text.*;
+import org.wikipedia.miner.db.WikipediaEnvironment.DatabaseName ;
 import org.xml.sax.InputSource;
 
 import com.sun.org.apache.xerces.internal.dom.DocumentImpl;
@@ -73,20 +74,18 @@ public class WikipediaMinerServlet extends HttpServlet {
 		super.init(config);
 		context = config.getServletContext() ;
 
-		tp = null ; //new CaseFolder() ; 
+		tp = new CaseFolder() ; 
 
 		try {
 
 			//TODO: get from context parameters
 			File dataDir = new File("/Users/dmilne/Research/wikipedia/databases/en/20090822") ;
-			File indexDir = new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
+			File indexDir = null ; //new File("/Users/dmilne/Research/wikipedia/indexes/en/20090822") ;
 
 			wikipedia = new Wikipedia(dataDir, indexDir) ;
 
 			//	new Wikipedia(context.getInitParameter("mysql_server"), context.getInitParameter("mysql_database"), context.getInitParameter("mysql_user"), context.getInitParameter("mysql_password")) ;
 		} catch (Exception e) {
-
-
 			throw new ServletException("Could not connect to wikipedia database.") ;
 		}
 
@@ -439,7 +438,8 @@ public class WikipediaMinerServlet extends HttpServlet {
 		}
 
 		public void run() {
-			pn = new ProgressNotifier(2) ;
+			pn = new ProgressNotifier(3) ;
+			//pn.startTask(3, "Preloading data") ;
 
 			try {
 				TIntHashSet ids = wikipedia.getEnvironment().getValidPageIds(5, pn) ;
@@ -448,7 +448,16 @@ public class WikipediaMinerServlet extends HttpServlet {
 				//wikipedia.getEnvironment().cachePages(ids, pn) ;
 				//wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 3, pn) ;
 				wikipedia.getEnvironment().cacheInLinks(ids, pn) ;
-
+				wikipedia.getEnvironment().cacheAnchors(tp, ids, 3, (float)0.02, (float)0.03, pn) ;
+				
+				/*
+				wikipedia.getEnvironment().preloadDatabase(DatabaseName.PAGE_DETAILS) ;
+				pn.update() ;
+				wikipedia.getEnvironment().preloadDatabase(DatabaseName.ANCHOR) ;
+				pn.update() ;
+				wikipedia.getEnvironment().preloadDatabase(DatabaseName) ;
+				pn.update();
+				*/
 				ids = null ;
 				System.gc() ;
 			} catch (Exception e) {

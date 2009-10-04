@@ -26,6 +26,8 @@ import java.util.regex.*;
 import org.wikipedia.miner.annotation.preprocessing.PreprocessedDocument.RegionTag;
 import org.wikipedia.miner.util.* ;
 
+import com.sleepycat.je.DatabaseException;
+
 /**
  * This abstract class specifies the methods required to pre-process documents so that they can be tagged by a document tagger.
  * 
@@ -65,7 +67,7 @@ public abstract class DocumentPreprocessor {
 	 * @param content the string to be pre-processed
 	 * @return the preprocessedString
 	 */
-	public abstract PreprocessedDocument preprocess(final String content) ;
+	public abstract PreprocessedDocument preprocess(final String content) throws DatabaseException ;
 	
 	
 	/**
@@ -75,7 +77,7 @@ public abstract class DocumentPreprocessor {
 	 * @return the pre-processed content of the file.
 	 * @throws IOException if the file cannot be read.
 	 */
-	public PreprocessedDocument preprocess(File file) throws IOException {
+	public PreprocessedDocument preprocess(File file) throws IOException, DatabaseException {
 		return preprocess(getContent(file)) ;		
 	}
 	

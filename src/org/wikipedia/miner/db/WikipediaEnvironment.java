@@ -3,9 +3,8 @@ package org.wikipedia.miner.db;
 import gnu.trove.*;
 
 import java.io.* ;
+import java.text.DecimalFormat;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -21,15 +20,14 @@ import org.wikipedia.miner.util.ProgressNotifier;
 import org.wikipedia.miner.util.text.* ;
 
 import com.sleepycat.bind.tuple.*;
-import com.sleepycat.collections.StoredIterator;
-import com.sleepycat.collections.StoredKeySet;
-import com.sleepycat.collections.StoredMap;
+//import com.sleepycat.collections.StoredIterator;
+//import com.sleepycat.collections.StoredKeySet;
+//import com.sleepycat.collections.StoredMap;
 import com.sleepycat.je.*;
 
-@SuppressWarnings("unchecked")
 public class WikipediaEnvironment extends Environment {
 
-	protected enum DatabaseName  
+	public enum DatabaseName  
 	{
 		STATS, PAGE_DETAILS, PAGE_CONTENT, LINKS_IN, LINKS_OUT, REDIRECTS_IN, REDIRECTS_OUT, PARENTS,
 		CHILD_ARTICLES, CHILD_CATEGORIES, DEPTHS, LINK_COUNTS, TRANSLATIONS, ANCHOR, ANCHOR_TEXTS, PAGE_STRUCTURE ;
@@ -41,38 +39,42 @@ public class WikipediaEnvironment extends Environment {
 
 	protected File databaseDir ;
 	protected File indexDir ;
-	
-	
+
+
 	protected FSDirectory index ;
 	protected StandardAnalyzer analyzer = new StandardAnalyzer();
 	private QueryParser queryParser ;
 	private Searcher searcher ;
-	
 
-	private HashMap<DatabaseName, StoredMap> openStoredMaps ;
-	private HashMap<DatabaseName, Database> openDatabases ;
 
-	private HashMap<String, StoredMap<String, DbAnchor>> anchorMaps ;
-	private HashMap<String, Database> anchorDatabases ;
-	
-	
+	//private HashMap<DatabaseName, StoredMap> openStoredMaps ;
+	protected HashMap<String, Database> openDatabases ;
+	protected HashMap<String, Database> tempDatabases ;
+
+	//private HashMap<String, StoredMap<String, DbAnchor>> anchorMaps ;
+	//private HashMap<String, Database> anchorDatabases ;
+
+
 	private TIntObjectHashMap<DbPage> cachedPages ;
 	private TIntObjectHashMap<int[]>cachedInLinks ;
-	
-	private DatabaseConfig normalConfig ;
-	private DatabaseConfig writingConfig ;
+	//private THashMap<String,DbAnchor> cachedAnchors ;
+	private TextProcessor cachedProcessor ;
 
-	private DbPageBinding pageDetailsBinding = new DbPageBinding() ;
-	private IntegerBinding intBinding = new IntegerBinding() ;
-	private StringBinding strBinding = new StringBinding() ;
-	private IntArrayBinding intArrayBinding = new IntArrayBinding() ;
-	private StringArrayBinding strArrayBinding = new StringArrayBinding() ;
-	private DbLinkArrayBinding linkArrayBinding = new DbLinkArrayBinding() ;
-	private DbAnchorBinding anchorBinding = new DbAnchorBinding() ;
-	private DbAnchorTextArrayBinding anchorTextArrayBinding = new DbAnchorTextArrayBinding() ;
-	private DbStructureNodeBinding structureBinding = new DbStructureNodeBinding() ;
-	private StatisticBinding statBinding = new StatisticBinding() ;
-	
+	protected DatabaseConfig normalConfig ;
+	protected DatabaseConfig writingConfig ;
+	protected DatabaseConfig tempConfig ;
+
+	protected DbPageBinding pageDetailsBinding = new DbPageBinding() ;
+	protected IntegerBinding intBinding = new IntegerBinding() ;
+	protected StringBinding strBinding = new StringBinding() ;
+	protected IntArrayBinding intArrayBinding = new IntArrayBinding() ;
+	protected StringArrayBinding strArrayBinding = new StringArrayBinding() ;
+	protected DbLinkArrayBinding linkArrayBinding = new DbLinkArrayBinding() ;
+	protected DbAnchorBinding anchorBinding = new DbAnchorBinding() ;
+	protected DbAnchorTextArrayBinding anchorTextArrayBinding = new DbAnchorTextArrayBinding() ;
+	protected DbStructureNodeBinding structureBinding = new DbStructureNodeBinding() ;
+	protected StatisticBinding statBinding = new StatisticBinding() ;
+
 	public WikipediaEnvironment(File databaseDir, File indexDir, final boolean loading) throws EnvironmentLockedException, DatabaseException, IOException {
 
 		super(databaseDir, new EnvironmentConfig() {
@@ -83,44 +85,54 @@ public class WikipediaEnvironment extends Environment {
 			public boolean getTransactional() {
 				return false ;
 			}
-			/*
+
+			public boolean getReadOnly() {
+				return !loading ;
+			}
+
 			public int getCachePercent() {
-				if (loading) {
-					return 20 ;
-				} else {
-					return 50 ;
-				}
-			}*/
+				return 50 ;
+			}
 		}) ;
 
 		EnvironmentConfig ec = this.getConfig() ;
+
 		//ec.setConfigParam(EnvironmentConfig.ENV_RUN_CHECKPOINTER, "false") ;
 		//ec.setConfigParam(EnvironmentConfig.ENV_RUN_CLEANER, "false") ;
-		
+
 		this.databaseDir = databaseDir ;
 		this.indexDir = indexDir ;
-		
+
 		if (this.indexDir != null) {
 			index = FSDirectory.getDirectory(indexDir) ;
-			
+
 			String[] fields = {"title", "content"} ;
-			
+
 			queryParser = new MultiFieldQueryParser(fields, analyzer);
 			searcher = new IndexSearcher(index);
 		}
-		
+
 		normalConfig = new DatabaseConfig() ;
 		normalConfig.setReadOnly(true) ;
+		normalConfig.setTransactional(false) ;
 
 		writingConfig = new DatabaseConfig() ;
 		writingConfig.setDeferredWrite(true) ;
 		writingConfig.setAllowCreate(true) ;
+		writingConfig.setExclusiveCreate(true) ;
+		writingConfig.setTransactional(false) ;
 
-		openDatabases = new HashMap<DatabaseName, Database>() ;
-		openStoredMaps = new HashMap<DatabaseName, StoredMap>() ;
+		tempConfig = new DatabaseConfig() ;
+		tempConfig.setTemporary(true) ;
+		tempConfig.setAllowCreate(true) ;
+		tempConfig.setTransactional(false) ;
 
-		anchorMaps = new HashMap<String, StoredMap<String, DbAnchor>>() ;
-		anchorDatabases = new HashMap<String, Database>() ;
+		openDatabases = new HashMap<String, Database>() ;
+		tempDatabases = new HashMap<String, Database>() ; 
+		//openStoredMaps = new HashMap<DatabaseName, StoredMap>() ;
+
+		//anchorMaps = new HashMap<String, StoredMap<String, DbAnchor>>() ;
+		//anchorDatabases = new HashMap<String, Database>() ;
 
 
 		for (DatabaseName dbName:DatabaseName.values()) {
@@ -128,7 +140,7 @@ public class WikipediaEnvironment extends Environment {
 			try {
 
 				//if (dbName != DatabaseName.PAGE_CONTENT) 
-					getStoredMap(dbName, false, false) ;
+				getDatabase(dbName, false, false) ;
 			} catch (DatabaseException e) {
 				if (!loading) {
 					throw e ;
@@ -137,13 +149,15 @@ public class WikipediaEnvironment extends Environment {
 		}
 	}
 
+	protected Database getDatabase(DatabaseName dbName, boolean writable, boolean clear) throws DatabaseException {
+		return getDatabase(dbName.toString(), writable, clear) ;
+	}
 
-	protected StoredMap getStoredMap(DatabaseName dbName, boolean writable, boolean clear) throws DatabaseException {
+	protected Database getDatabase(String dbName, boolean writable, boolean clear) throws DatabaseException {
 
 		Database db = openDatabases.get(dbName) ;
 
 		if (writable) {
-			//if loading, then completely remove existing database, and start a new one
 
 			if (db != null) 
 				db.close();
@@ -156,9 +170,16 @@ public class WikipediaEnvironment extends Environment {
 				} ;
 			}
 
-			this.getConfig().setAllowCreate(true) ;
+			if (clear)
+				this.getConfig().setAllowCreate(true) ;
+			else
+				writingConfig.setExclusiveCreate(false) ;
+
 			db = openDatabase(null, dbName.toString(), writingConfig);
+
 			this.getConfig().setAllowCreate(false) ;
+			writingConfig.setExclusiveCreate(true) ;
+
 		} else {
 
 			if (db == null) {
@@ -171,64 +192,8 @@ public class WikipediaEnvironment extends Environment {
 			}
 		}
 
-		openDatabases.put(dbName, db) ;
-
-		StoredMap sm = null ;
-		if (!writable) {
-			sm = openStoredMaps.get(dbName) ;
-			if(sm != null && sm.isWriteAllowed() == writable)
-				return sm ;
-		}
-
-		switch (dbName) {
-
-		case STATS:
-			sm = new StoredMap<Statistic,Integer>(db, statBinding, intBinding, writable) ;
-			break ;
-		case PAGE_DETAILS: 
-			sm = new StoredMap<Integer,DbPage>(db, intBinding, pageDetailsBinding, writable) ;
-			break ;
-		case PAGE_STRUCTURE:
-			sm = new StoredMap<Integer, DbStructureNode>(db, intBinding, structureBinding, writable) ;
-			break ;
-		case DEPTHS: 
-			sm = new StoredMap<Integer,Integer>(db, intBinding, intBinding, writable) ;
-			break ;
-		case REDIRECTS_IN:
-			sm = new StoredMap<Integer,int[]>(db, intBinding, intArrayBinding, writable) ;
-			break ;
-		case REDIRECTS_OUT:
-			sm = new StoredMap<Integer,Integer>(db, intBinding, intBinding, writable) ;
-			break ;
-		case PARENTS: 
-		case CHILD_CATEGORIES:
-		case CHILD_ARTICLES:
-			sm = new StoredMap<Integer,int[]>(db, intBinding, intArrayBinding, writable) ;
-			break ;
-		case PAGE_CONTENT:
-			sm  = new StoredMap<Integer,String>(db, intBinding, strBinding, writable) ;
-			break ;
-		case LINKS_IN:
-		case LINKS_OUT:
-			sm  = new StoredMap<Integer,DbLink[]>(db, intBinding, linkArrayBinding, writable) ;
-			break ;	
-		case LINK_COUNTS:
-			sm = new StoredMap<Integer, int[]>(db, intBinding, intArrayBinding, writable) ;
-			break ;
-		case ANCHOR:
-			sm = new StoredMap<String, DbAnchor>(db, strBinding, anchorBinding, writable) ;
-			break ;
-		case ANCHOR_TEXTS:
-			sm = new StoredMap<Integer, DbAnchorText[]>(db, intBinding, anchorTextArrayBinding, writable) ;
-			break ;
-		case TRANSLATIONS: 
-			sm = new StoredMap<Integer,String[]>(db, intBinding, strArrayBinding, writable) ;
-			break ;
-		}
-
-		openStoredMaps.put(dbName, sm) ;
-
-		return sm ;
+		openDatabases.put(dbName.toString(), db) ;
+		return db ;
 	}
 
 
@@ -236,21 +201,38 @@ public class WikipediaEnvironment extends Environment {
 
 	public void close() throws DatabaseException {
 
+		System.out.println("Closing") ;
+		super.sync() ;
+
+		boolean anyCleaned = false;
+		while (cleanLog() > 0) {
+			System.out.println("cleaning") ;
+			anyCleaned = true;
+			
+		}
+
+		if (anyCleaned) {
+			CheckpointConfig force = new CheckpointConfig();
+			force.setForce(true);
+			checkpoint(force);
+		}
+
+
 		if (index != null) {
 			try {
 				searcher.close() ;
 			} catch (Exception e) {} ;
-			
+
 			index.close() ;
 		}
-		
+
 		for (Database db:openDatabases.values()) {
 			try { 
 				db.close() ;
 			} catch (Exception e) {} ;	
 		}
 
-		for (Database db:anchorDatabases.values()) {
+		for (Database db:tempDatabases.values()) {
 			try { 
 				db.close() ;
 			} catch (Exception e) {} ;	
@@ -258,24 +240,24 @@ public class WikipediaEnvironment extends Environment {
 
 		super.close();
 	}
-	
-	
+
+
 	public Article[] doFullTextSearch(String query, int limit) throws IOException, ParseException{
-		
+
 		TopDocs docs = searcher.search(queryParser.parse(query), null, limit);
 
 		Article[] results = new Article[docs.scoreDocs.length] ;
 		int i = 0 ;
 		for ( ScoreDoc sd:docs.scoreDocs) {
 			Document d = searcher.doc(sd.doc);
-			
+
 			Integer id = Integer.parseInt(d.get("id")) ;
 			Article art = new Article(this, id) ;
 			art.setWeight(sd.score) ;
-			
+
 			results[i++] = art ;
 		}
-		
+
 		return results ;
 	}
 
@@ -287,16 +269,11 @@ public class WikipediaEnvironment extends Environment {
 	 */
 	public boolean isPreparedForTextProcessor(TextProcessor tp) {
 
-		StoredMap<String, DbAnchor> smAnchor = anchorMaps.get(tp.getName()) ; 
-		if (smAnchor == null) {
-			try {
-				Database dbAnchor = this.openDatabase(null, DatabaseName.ANCHOR + "-" + tp.getName(), normalConfig) ;
-				anchorDatabases.put(tp.getName(), dbAnchor) ;
-				smAnchor = new StoredMap<String, DbAnchor>(dbAnchor, strBinding, anchorBinding, false) ;
-				anchorMaps.put(tp.getName(), smAnchor) ;
-			} catch (DatabaseException e){
-				return false ;
-			}
+		try {
+			getDatabase(DatabaseName.ANCHOR + "-" + tp.getName(), false, false) ;
+
+		} catch (DatabaseException e){
+			return false ;
 		}
 
 		return true ;
@@ -313,70 +290,117 @@ public class WikipediaEnvironment extends Environment {
 		System.out.println("Preparing anchors for " + tp.getName()) ;
 		String dbName =DatabaseName.ANCHOR + "-" + tp.getName() ;
 
-
 		//make sure database is available and empty
-		Database db = anchorDatabases.get(tp.getName()) ;
-		if (db != null) 
+		System.out.print("Deleting old anchors... ") ;
+		try {
+
 			this.removeDatabase(null, dbName) ;
 
-		db = this.openDatabase(null, dbName, writingConfig) ;
-		anchorDatabases.put(tp.getName(), db)	 ;
+		} catch (DatabaseException e) {
+			//no database to delete
+		}
+
+		cleanLog() ;
+		checkpoint(null) ;
+		sync() ;
+
+		System.out.println(" ...done.") ;
+
+		Database dbProcessedAnchors = this.openDatabase(null, dbName, writingConfig) ;
+		openDatabases.put(dbName, dbProcessedAnchors) ;
 
 
 
-		StoredMap<String,DbAnchor> smAnchors = openStoredMaps.get(DatabaseName.ANCHOR) ;
-		Database dbAnchors = openDatabases.get(DatabaseName.ANCHOR) ;
-		StoredKeySet<String> setAnchors = new StoredKeySet<String>(dbAnchors, strBinding,false) ;
 
-		int passes = 5 ;
+
+
+
+
+
+		Database dbOrigAnchors = openDatabases.get(DatabaseName.ANCHOR) ;
+		//dbOrigAnchors.getConfig() ;
+
+
+		int passes = 8 ;
 		ProgressNotifier pn = new ProgressNotifier(2*passes) ;
 
 		for (int pass=0 ; pass<passes ; pass++) {
 
-			StoredIterator<String> iterAnchors = setAnchors.storedIterator(false) ;
-
-			pn.startTask(dbAnchors.count(), "Gathering and processing anchors (pass " + (pass+1) + " of " + passes + ")") ;
+			pn.startTask(dbOrigAnchors.count(), "Gathering and processing anchors (pass " + (pass+1) + " of " + passes + ")") ;
 
 			THashMap<String,DbAnchor> tmpProcessedAnchors = new THashMap<String, DbAnchor>() ;
 
-			while (iterAnchors.hasNext()) {
-				String origAnchor = iterAnchors.next() ;
-				String processedAnchor = tp.processText(origAnchor) ;
+			DatabaseEntry key = new DatabaseEntry() ;
+			DatabaseEntry value = new DatabaseEntry() ;
+			Cursor c = dbOrigAnchors.openCursor(null, null) ;
+			//int count = 0 ;
+			while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
 
-				if (Math.abs(processedAnchor.hashCode()) % passes == pass) {
+				//if (count++ > 1000) break ;
 
-					DbAnchor anchorToStore = smAnchors.get(origAnchor) ;
+				String origText = strBinding.entryToObject(key) ;
+				String processedText = tp.processText(origText) ;
 
-					DbAnchor storedAnchor = tmpProcessedAnchors.get(processedAnchor) ;
+
+
+				if (Math.abs(processedText.hashCode()) % passes == pass) {
+
+					//System.out.println("\"" + origText + "\",\"" + processedText + "\"") ;
+
+					DbAnchor anchorToStore = anchorBinding.entryToObject(value) ;
+
+					DbAnchor storedAnchor = tmpProcessedAnchors.get(processedText) ; 
 
 					if (storedAnchor == null) {
-						tmpProcessedAnchors.put(processedAnchor, anchorToStore) ;
+						tmpProcessedAnchors.put(processedText, anchorToStore) ;
 					} else {
 						//need to merge anchors
 						storedAnchor.mergeWith(anchorToStore) ;
-						tmpProcessedAnchors.put(processedAnchor, storedAnchor) ;
+						tmpProcessedAnchors.put(processedText, storedAnchor) ;
 					}
 				}
 				pn.update() ;
 			}
 
+			System.out.println(tmpProcessedAnchors.size() + " anchors to store") ;
+
 			//Save gathered anchors
 			pn.startTask(tmpProcessedAnchors.size(), "Storing processed anchors (pass " + (pass+1) + " of " + passes + ")") ;
 
-			final StoredMap<String, DbAnchor> sm = new StoredMap<String, DbAnchor>(db, strBinding, anchorBinding, true) ;
+			//final StoredMap<String, DbAnchor> sm = new StoredMap<String, DbAnchor>(db, strBinding, anchorBinding, true) ;
 			final ProgressNotifier pn2 = pn ;
+			final Database db = dbProcessedAnchors ;
+
+			//final DatabaseEntry k = new DatabaseEntry() ;
+			//final DatabaseEntry v = new DatabaseEntry() ;
 
 			tmpProcessedAnchors.forEachEntry(new TObjectObjectProcedure<String, DbAnchor>() {
 				public boolean execute(String text, DbAnchor anchor) {
-					sm.put(text, anchor) ;
+
+
+					DatabaseEntry k = new DatabaseEntry() ;
+					strBinding.objectToEntry(text, k) ;
+
+					DatabaseEntry v = new DatabaseEntry() ;
+					anchorBinding.objectToEntry(anchor, v) ;
+
+
+
+					try {
+						//System.out.println(text + db.count()) ;
+
+						db.put(null, k, v) ;
+					} catch (DatabaseException e) { System.out.println("huh?") ; } ;
+
 					pn2.update() ;
 					return true ;
 				}
 			}) ;
-			
+
 			tmpProcessedAnchors.clear() ;
 			System.gc() ;
 
+			dbProcessedAnchors.sync() ;
 			cleanLog() ;
 			checkpoint(null) ;
 			evictMemory() ;
@@ -385,71 +409,150 @@ public class WikipediaEnvironment extends Environment {
 
 
 		System.out.print("Syncing database... ") ;
-		db.close();
-		db = this.openDatabase(null, dbName, normalConfig) ;
-		anchorDatabases.put(tp.getName(), db) ;
+		dbProcessedAnchors.close();
+		dbProcessedAnchors = this.openDatabase(null, dbName, normalConfig) ;
+		openDatabases.put(dbName, dbProcessedAnchors) ;
 
-		StoredMap<String, DbAnchor> smAnchorSenses = new StoredMap<String, DbAnchor>(db, strBinding, anchorBinding, false) ;
-		anchorMaps.put(tp.getName(), smAnchorSenses) ;
+		//StoredMap<String, DbAnchor> smAnchorSenses = new StoredMap<String, DbAnchor>(dbProcessedAnchors, strBinding, anchorBinding, false) ;
+		//anchorMaps.put(tp.getName(), smAnchorSenses) ;
 		System.out.println("...done.") ;
 	}
 
 
 
 
-	public DbPage getPageDetails(int id)  {
-		
+	public DbPage getPageDetails(int id) throws DatabaseException {
+
 		if (arePagesCached()) 
 			return cachedPages.get(id) ;
-		
-		StoredMap<Integer, DbPage> smPageDetails = openStoredMaps.get(DatabaseName.PAGE_DETAILS) ;
-		return smPageDetails.get(id) ;
-	}
 
-	public String getPageContent(int id) {
-		StoredMap<Integer,String> smPageContent = openStoredMaps.get(DatabaseName.PAGE_CONTENT) ;
+		DatabaseEntry k = new DatabaseEntry() ;
+		this.intBinding.objectToEntry(id, k) ;
 
-		if (smPageContent == null)
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.PAGE_DETAILS, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return pageDetailsBinding.entryToObject(v) ;
+		else
 			return null ;
 
-		return smPageContent.get(id) ;
 	}
 
-	public DbStructureNode getPageStructure(int id) {
-		StoredMap<Integer,DbStructureNode> smPageStructure = openStoredMaps.get(DatabaseName.PAGE_STRUCTURE) ;
-		return smPageStructure.get(id) ;
+	public String getPageContent(int id) throws DatabaseException {
+
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.PAGE_CONTENT, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return strBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public int getRedirectTarget(int id) {
-		StoredMap<Integer,Integer> smRedirectsOut = openStoredMaps.get(DatabaseName.REDIRECTS_OUT) ;
-		return smRedirectsOut.get(id) ;
+	public DbStructureNode getPageStructure(int id) throws DatabaseException {
+
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.PAGE_STRUCTURE, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return structureBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public int[] getRedirects(int id) {
-		StoredMap<Integer,int[]> smRedirectsIn = openStoredMaps.get(DatabaseName.REDIRECTS_IN) ;
-		return smRedirectsIn.get(id) ;
+	public Integer getRedirectTarget(int id) throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.REDIRECTS_OUT, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return intBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public int[] getParents(int id) {
-		StoredMap<Integer,int[]> smParents = openStoredMaps.get(DatabaseName.PARENTS) ;
-		return smParents.get(id) ;
+	public int[] getRedirects(int id) throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.REDIRECTS_IN, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return intArrayBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public int[] getChildCategories(int id) {
-		StoredMap<Integer,int[]> smChildCategories = openStoredMaps.get(DatabaseName.CHILD_CATEGORIES) ;
-		return smChildCategories.get(id) ;
+	public int[] getParents(int id) throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.PARENTS, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return intArrayBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public int[] getChildArticles(int id) {
-		StoredMap<Integer,int[]> smChildArticles = openStoredMaps.get(DatabaseName.CHILD_ARTICLES) ;
-		return smChildArticles.get(id) ;
+	public int[] getChildCategories(int id)  throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.CHILD_CATEGORIES, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return intArrayBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public DbAnchor getAnchor(String text) {
+	public int[] getChildArticles(int id) throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
 
-		StoredMap<String, DbAnchor> smAnchor =  openStoredMaps.get(DatabaseName.ANCHOR) ;
-		return smAnchor.get(text) ;
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.CHILD_ARTICLES, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return intArrayBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
+
+	public DbAnchor getAnchor(String text) throws DatabaseException {
+
+		Database db ;
+
+		if (this.areAnchorsCached(null))
+			db = tempDatabases.get(DatabaseName.ANCHOR.toString()) ;
+		else
+			db = getDatabase(DatabaseName.ANCHOR, false, false) ;
+
+		DatabaseEntry k = new DatabaseEntry() ;
+		strBinding.objectToEntry(text, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = db.get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return anchorBinding.entryToObject(v) ;
+		else
+			return null ;
+	}
+
 
 	public DbAnchor getAnchor(String text, TextProcessor tp) throws DatabaseException {
 
@@ -459,60 +562,124 @@ public class WikipediaEnvironment extends Environment {
 		if (!isPreparedForTextProcessor(tp)) 
 			throw new DatabaseException("WikipediaEnvironment is not prepared for " + tp.getName()) ;
 
-		StoredMap<String, DbAnchor>smAnchor = this.anchorMaps.get(tp.getName()) ;
-		return smAnchor.get(tp.processText(text)) ;
+		String dbName = DatabaseName.ANCHOR + "-" + tp.getName() ;
+		Database db ;
+		if (this.areAnchorsCached(tp))
+			db = tempDatabases.get(dbName) ;
+		else
+			db = getDatabase(dbName, false, false) ;
+
+		DatabaseEntry k = new DatabaseEntry() ;
+		strBinding.objectToEntry(tp.processText(text), k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = db.get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return anchorBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public DbAnchorText[] getAnchorTexts(int id) {
-		StoredMap<String, DbAnchorText[]> smAnchorTexts = openStoredMaps.get(DatabaseName.ANCHOR_TEXTS);
-		return smAnchorTexts.get(id) ;
+	public DbAnchorText[] getAnchorTexts(int id) throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.ANCHOR_TEXTS, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return anchorTextArrayBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public Integer getDepth(int id) {
-		StoredMap<Integer, Integer> smDepths = openStoredMaps.get(DatabaseName.DEPTHS) ;
-		return smDepths.get(id) ;
+	public Integer getDepth(int id) throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.DEPTHS, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return intBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public DbLink[] getLinksOut(int id)  {
-		StoredMap<Integer, DbLink[]> smLinksOut = openStoredMaps.get(DatabaseName.LINKS_OUT) ;
-		return smLinksOut.get(id) ;
+	public DbLink[] getLinksOut(int id) throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.LINKS_OUT, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return linkArrayBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public DbLink[] getLinksIn(int id) {
-		StoredMap<Integer, DbLink[]> smLinksIn = openStoredMaps.get(DatabaseName.LINKS_IN) ;
-		return smLinksIn.get(id) ;
+	public DbLink[] getLinksIn(int id) throws DatabaseException {
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.LINKS_IN, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return linkArrayBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
-	
-	public int[] getLinkIdsIn(int id) {
-		
+
+	public int[] getLinkIdsIn(int id) throws DatabaseException {
+
 		if (areInLinksCached()) 
 			return cachedInLinks.get(id) ;
-		
+
 		DbLink[] dbLinks = getLinksIn(id) ;
-		
+
 		if (dbLinks == null)
 			return null ;
-		
+
 		int[] linkIds = new int[dbLinks.length] ;
-		
+
 		for (int i=0 ; i<dbLinks.length ; i++)
 			linkIds[i] = dbLinks[i].id ;
-		
+
 		return linkIds ;
 	}
 
-	public int[] getLinkCounts(int id) {
-		StoredMap<Integer, int[]> smLinkCounts = openStoredMaps.get(DatabaseName.LINK_COUNTS) ;
-		return smLinkCounts.get(id) ;
+	public int[] getLinkCounts(int id) throws DatabaseException{
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.LINK_COUNTS, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return intArrayBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public HashMap<String,String> getTranslations(int id) {
+	public HashMap<String,String> getTranslations(int id) throws DatabaseException {
 
-		StoredMap<Integer, String[]> smTranslations =  openStoredMaps.get(DatabaseName.TRANSLATIONS) ;
+		DatabaseEntry k = new DatabaseEntry() ;
+		intBinding.objectToEntry(id, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+		String[] t  ;
+
+		OperationStatus s = getDatabase(DatabaseName.TRANSLATIONS, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			t =  strArrayBinding.entryToObject(v) ;
+		else
+			t = null ;
 
 		HashMap<String, String> translations = new HashMap<String,String>() ;
 
-		String[] t = smTranslations.get(id) ;
 		if (t != null) {	
 			for (int i=0 ; i<t.length ; i+=2) 
 				translations.put(t[i], t[i+1]) ;
@@ -521,18 +688,20 @@ public class WikipediaEnvironment extends Environment {
 		return translations ;
 	}
 
-	public Integer getStatisticValue(Statistic stat)  {
-		StoredMap<Statistic, Integer> smStats = openStoredMaps.get(DatabaseName.STATS) ; 
-		return smStats.get(stat) ;
+	public Integer getStatisticValue(Statistic stat) throws DatabaseException {
+
+		DatabaseEntry k = new DatabaseEntry() ;
+		statBinding.objectToEntry(stat, k) ;
+
+		DatabaseEntry v = new DatabaseEntry() ;
+
+		OperationStatus s = getDatabase(DatabaseName.STATS, false, false).get(null, k, v, LockMode.READ_COMMITTED) ; 
+		if (s.equals(OperationStatus.SUCCESS)) 
+			return intBinding.entryToObject(v) ;
+		else
+			return null ;
 	}
 
-	public Iterator<Integer> getPageIdIterator() {
-
-		Database dbPageDetails = openDatabases.get(DatabaseName.PAGE_DETAILS) ;
-		StoredKeySet<Integer> pageIds = new StoredKeySet<Integer>(dbPageDetails, intBinding,false) ;
-		return pageIds.storedIterator(false) ;
-	}
-	
 	/**
 	 * Identifies the set of valid article ids which fit the given constrains. Useful for specifying a subset of 
 	 * articles that we are interested in caching.
@@ -542,32 +711,34 @@ public class WikipediaEnvironment extends Environment {
 	 * @return the set of valid ids which fit the given constrains. 
 	 */
 	public TIntHashSet getValidPageIds(int minLinkCount, ProgressNotifier pn) throws DatabaseException {
-		
+
 		TIntHashSet pageIds = new TIntHashSet() ;
-				
+
 		if (pn == null) pn = new ProgressNotifier(1) ;
-				
-		Database dbLinkCounts = this.openDatabases.get(DatabaseName.LINK_COUNTS) ;
+
+		Database dbLinkCounts = getDatabase(DatabaseName.LINK_COUNTS, false, false) ;
 		pn.startTask(dbLinkCounts.count(), "gathering valid page ids") ;
-		
+
 		Cursor c = dbLinkCounts.openCursor(null, null) ;
-		
+		c.setCacheMode(CacheMode.UNCHANGED) ;
+
 		DatabaseEntry key = new DatabaseEntry() ;
 		DatabaseEntry value = new DatabaseEntry() ;
-		
+
 		while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
-	        Integer id = intBinding.entryToObject(key) ;
-	        int[] linkCounts = intArrayBinding.entryToObject(value) ;
-	        
-	        	pn.update();
-	
+			Integer id = intBinding.entryToObject(key) ;
+			int[] linkCounts = intArrayBinding.entryToObject(value) ;
+
+			pn.update();
+
 			if (linkCounts[1] > minLinkCount && linkCounts[3] >= minLinkCount)
 				pageIds.add(id) ;
 		}
-		
+
+		c.close() ;
 		return pageIds ;
 	}
-	
+
 	/**
 	 * Caches pages, so that titles and types can be retrieved 
 	 * very quickly without consulting the database.
@@ -577,33 +748,42 @@ public class WikipediaEnvironment extends Environment {
 	 * @throws DatabaseException if there is a problem with the underlying data.
 	 */
 	public void cachePages(TIntHashSet validIds, ProgressNotifier pn) throws DatabaseException {
-		
-		Database dbPage = this.openDatabases.get(DatabaseName.PAGE_DETAILS) ;
-		
+
+		Database dbPage = getDatabase(DatabaseName.PAGE_DETAILS, false, false) ;
+
 		if (pn == null) pn = new ProgressNotifier(1) ;
 		pn.startTask(dbPage.count(), "caching pages") ;
-		
-		if (validIds == null)
-			cachedPages = new TIntObjectHashMap<DbPage>((int)dbPage.count(), 1) ;
-		else
-			cachedPages = new TIntObjectHashMap<DbPage>(validIds.size(), 1) ;
-		
+
+		//if (validIds == null)
+		//	cachedPages = new TIntObjectHashMap<DbPage>((int)dbPage.count(), 1) ;
+		//else
+		//	cachedPages = new TIntObjectHashMap<DbPage>(validIds.size(), 1) ;
+
 		Cursor c = dbPage.openCursor(null, null) ;
-		
+		//c.setCacheMode(CacheMode.UNCHANGED) ;
+
 		DatabaseEntry key = new DatabaseEntry() ;
 		DatabaseEntry value = new DatabaseEntry() ;
-		
+
 		while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
-	       Integer id = intBinding.entryToObject(key) ;
-	       DbPage page = pageDetailsBinding.entryToObject(value) ;
-	       
-	       if (validIds == null || validIds.contains(id) || page.getType() == Page.CATEGORY || page.getType()==Page.REDIRECT) 
-				cachedPages.put(id, page) ;
-		
+			Integer id = intBinding.entryToObject(key) ;
+			DbPage page = pageDetailsBinding.entryToObject(value) ;
+
+			if (validIds == null || validIds.contains(id) || page.getType() == Page.CATEGORY || page.getType()==Page.REDIRECT) {
+
+				//this is a page we think is likely to get used a lot, so do this sneaky trick to ensure it is cached.
+				c.setCacheMode(CacheMode.KEEP_HOT) ;
+				c.getCurrent(key, value, LockMode.DEFAULT) ;
+				c.setCacheMode(CacheMode.DEFAULT) ;
+			}
+			cachedPages.put(id, page) ;
+
 			pn.update() ;
 		}
+
+		c.close() ;
 	}
-	
+
 	/**
 	 * Caches links in to pages, so these and relatedness measures can be calculated very quickly,
 	 * without consulting the database.
@@ -614,49 +794,215 @@ public class WikipediaEnvironment extends Environment {
 	 * @throws IOException if the relevant files cannot be read.
 	 */
 	public void cacheInLinks(TIntHashSet validIds, ProgressNotifier pn) throws DatabaseException {
-		
-		Database dbLinks = this.openDatabases.get(DatabaseName.LINKS_IN) ;
-		
+
+		Database dbLinks = getDatabase(DatabaseName.LINKS_IN, false, false) ;
+
 		if (pn == null) pn = new ProgressNotifier(1) ;
 		pn.startTask(dbLinks.count(), "caching links into pages") ;
-		
-		if (validIds == null)
-			cachedInLinks = new TIntObjectHashMap<int[]>((int)dbLinks.count(), 1) ;
-		else
-			cachedInLinks = new TIntObjectHashMap<int[]>(validIds.size(), 1) ;
-		
+
+		//if (validIds == null)
+		//	cachedInLinks = new TIntObjectHashMap<int[]>((int)dbLinks.count(), 1) ;
+		//	else
+		//		cachedInLinks = new TIntObjectHashMap<int[]>(validIds.size(), 1) ;
+
 		Cursor c = dbLinks.openCursor(null, null) ;
-		
+		c.setCacheMode(CacheMode.UNCHANGED) ;
+
 		DatabaseEntry key = new DatabaseEntry() ;
 		DatabaseEntry value = new DatabaseEntry() ;
-		
+
 		while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
 			Integer id = intBinding.entryToObject(key) ;
-			
+
 			if (validIds == null || validIds.contains(id)) {
-				
-				DbLink[] links = linkArrayBinding.entryToObject(value) ;
-			
-				TIntArrayList linkIds = new TIntArrayList() ;
-				
-				for (DbLink l:links) {
-					if (validIds == null || validIds.contains(l.id)) 
-						linkIds.add(l.id) ;
-				}
-				
-				cachedInLinks.put(id, linkIds.toNativeArray()) ;
+
+				c.setCacheMode(CacheMode.KEEP_HOT) ;
+				c.getCurrent(key, value, LockMode.DEFAULT) ;
+				c.setCacheMode(CacheMode.DEFAULT) ;
+
+				/*
+						DbLink[] links = linkArrayBinding.entryToObject(value) ;
+
+						TIntArrayList linkIds = new TIntArrayList() ;
+
+						for (DbLink l:links) {
+							if (validIds == null || validIds.contains(l.id)) 
+								linkIds.add(l.id) ;
+						}
+
+						cachedInLinks.put(id, linkIds.toNativeArray()) ;
+				 */
 			}
 
 			pn.update() ;
 		}
+
+		c.close() ;
+	}
+
+
+	/**
+	 * Caches anchors, destinations, and occurrence counts (if these have been summarized), so that they can 
+	 * be searched very quickly without consulting the database.
+	 * 
+	 * @param dir	the directory containing csv files extracted from a Wikipedia dump.
+	 * @param tp	an optional text processor
+	 * @param validIds an optional set of ids. Only anchors that point to these ids, and only destinations within this list will be cached.
+	 * @param minLinkCount the minimum number of times a destination must occur for a particular anchor before it is cached. 
+	 * @param pn an optional progress notifier
+	 * @throws IOException if the relevant files cannot be read.
+	 */
+	public void cacheAnchors(TextProcessor tp, TIntHashSet validIds, Integer minLinkCount, Float minLinkProbability, Float minSenseProbability, ProgressNotifier pn) throws DatabaseException{
+
+		if (tp != null && !isPreparedForTextProcessor(tp)) 
+			throw new DatabaseException("WikipediaEnvironment is not prepared for " + tp.getName()) ;
+
+		String dbName = DatabaseName.ANCHOR.toString();
+		if (tp != null) 
+			dbName = dbName + "-" + tp.getName() ;
+
+		Database dbOrig = getDatabase(dbName, false, false) ;
+
+		Database dbTemp = this.openDatabase(null, "tmp" + dbName, tempConfig) ;
+		tempDatabases.put(dbName, dbTemp) ;
+
+		if (pn == null) pn = new ProgressNotifier(1) ;
+		pn.startTask(dbOrig.count(), "caching anchors") ;
+
+		Cursor c = dbOrig.openCursor(null, null) ;
+		c.setCacheMode(CacheMode.UNCHANGED) ;
+
+		DatabaseEntry key = new DatabaseEntry() ;
+		DatabaseEntry value = new DatabaseEntry() ;
+
+		int count = 0 ;
+		int totalAnchors = 0 ;
+		int cachedAnchors = 0 ;
+
+		long totalSenses = 0 ;
+		long cachedSenses = 0 ;
+
+		DecimalFormat df = new DecimalFormat("0%") ;
+
+
+		while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
+
+			pn.update();	
+
+
+
+			String text = strBinding.entryToObject(key) ;
+			DbAnchor anchor = anchorBinding.entryToObject(value) ;
+
+			totalAnchors++ ;
+			totalSenses = totalSenses + anchor.getSenses().length ;
+
+
+
+			if (count++ == 100000)  {
+
+				StatsConfig config = new StatsConfig() ;
+				config.setClear(true) ;
+
+				System.err.println(getStats(config)) ;
+				System.err.println("\n\n=========================================\n\n") ;
+
+
+				//System.out.println(" - anchors: " + cachedAnchors + " out of " + totalAnchors + ", " + df.format((float)cachedAnchors/totalAnchors)) ;
+				//System.out.println(" - senses: " + cachedSenses + " out of " + totalSenses + ", " + df.format((float)cachedSenses/totalSenses)) ;
+
+				count = 0 ;
+			}
+
+
+
+			if (minLinkCount != null && anchor.getTotalLinks() < minLinkCount) 
+				continue ;
+
+
+
+			float linkProb ;
+			if (anchor.getDistinctReferences() == 0)
+				linkProb = 0 ;
+			else
+				linkProb = (float)anchor.getDistinctLinks() / anchor.getDistinctReferences() ;
+
+			if (minLinkProbability != null && linkProb < minLinkProbability)
+				continue ;
+
+			//System.out.println(text) ;
+
+			Vector<DbSense> trimmedSenses = new Vector<DbSense>() ;
+			int trimmedTotalLinks = 0 ;
+			int trimmedDistinctLinks = 0 ;
+
+			for (DbSense sense:anchor.getSenses()) {
+				if (validIds == null || validIds.contains(sense.getDestination())) {
+
+					if (minLinkCount != null && sense.getTotalCount() < minLinkCount) 
+						continue ;
+
+					float senseProb ;
+					if (anchor.getTotalLinks() == 0)
+						senseProb = 0 ;
+					else
+						senseProb = (float)sense.getTotalCount()/anchor.getTotalLinks() ;
+
+					//System.out.println(" - " + sense.getTotalCount() + ", " + anchor.getTotalLinks() + ", " + senseProb ) ; 
+
+					if (minSenseProbability != null && senseProb < minSenseProbability)
+						break ;
+
+					trimmedSenses.add(sense) ;
+					cachedSenses ++ ;
+
+					trimmedTotalLinks += sense.getTotalCount() ;
+					trimmedDistinctLinks += sense.getDistinctCount() ;
+				}
+			}
+
+			if (trimmedSenses.size() > 0) {
+				DbSense[] ts = trimmedSenses.toArray(new DbSense[trimmedSenses.size()]) ;
+				DbAnchor a = new DbAnchor(trimmedDistinctLinks, trimmedDistinctLinks, anchor.getTotalReferences(), anchor.getDistinctReferences(), ts) ;
+
+				DatabaseEntry data = new DatabaseEntry() ;
+				anchorBinding.objectToEntry(a, data) ;
+
+				dbTemp.put(null, key, data) ;
+				cachedAnchors++ ;
+			}
+
+		}
+
+		c.close() ;
+
+		this.cachedProcessor = tp ;
 	}
 
 	public boolean arePagesCached() {
 		return cachedPages != null ;
 	}
-	
+
 	public boolean areInLinksCached() {
 		return cachedInLinks != null ;
+	}
+
+
+	public boolean preloadDatabase(DatabaseName dbName) throws DatabaseException{
+
+		Database dbInLinks = getDatabase(dbName, false, false) ;
+		PreloadStats s = dbInLinks.preload(new PreloadConfig()) ;
+
+		return s.getStatus() == PreloadStatus.SUCCESS ;
+	}
+
+	public boolean areAnchorsCached(TextProcessor tp) {
+
+		String dbName = DatabaseName.ANCHOR.toString() ;
+		if (tp != null)
+			dbName = dbName + "-" + tp.getName() ;
+
+		return (tempDatabases.containsKey(dbName)) ;
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -664,43 +1010,70 @@ public class WikipediaEnvironment extends Environment {
 		if (args.length != 2) {
 			System.out.println("Please specify two directories, one for the berkeley database, and one for the lucene index") ;
 		}
-		
+
 		File berkeleyDir = new File(args[0]) ;
 		File luceneDir = new File(args[1]) ;
-		
+
 		WikipediaEnvironment we = new WikipediaEnvironment(berkeleyDir, luceneDir, false) ;
 
 		try {
-			
-			//System.gc();
-			//long memStart = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
-			TextProcessor tp = new CaseFolder() ;
-			
-			String query = "Best Landmarks in New Zealand" ;
-			
+			//System.out.println(we.getStats(null)) ;
+
+			System.gc();
+			long memStart = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+
+			TextProcessor tp = null ;//new CaseFolder() ;
+
+
+
 			//TIntHashSet validIds = we.getValidPageIds(5, null) ;
 			//we.cacheInLinks(validIds, null) ;
-			
-			//System.gc();
-			//long memEnd = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+			//we.cacheAnchors(tp, validIds, 5, (float)0.02, (float)0.03, null) ;
 
-			Article[] arts = we.doFullTextSearch(query, 100) ;
-			for (Article art:arts) {
-				
-				System.out.println(art + "," + art.getWeight()) ;
-				
+			System.gc();
+			long memEnd = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+
+			System.out.println( (memEnd-memStart) + " bytes") ;
+
+			System.out.println("are anchors cached: " + we.areAnchorsCached(tp)) ;
+
+			DbAnchor anch = we.getAnchor("TED", tp) ;
+			System.out.println(anch.getTotalLinks() + ", " + anch.getTotalReferences());
+
+			for (DbSense s:anch.getSenses()) {
+
+				float senseProb = (float)s.getTotalCount()/anch.getTotalLinks() ;
+
+				//DbPage p = we.getPageDetails(s.getDestination()) ;
+
+				Page p = Page.createPage(we, s.getDestination()) ;
+
+				System.out.println(" - " + p.getTitle() + ", " + senseProb + ", " + s.getTotalCount()) ;
+
+
+
 			}
-
-			//System.out.println( (memEnd-memStart) + " bytes") ;
 			
+			StatsConfig config = new StatsConfig() ;
+			config.setClear(true) ;
+
+			System.err.println(we.getStats(config)) ;
+			System.err.println("\n\n=========================================\n\n") ;
+
+
+			//System.out.println(we.getStats(null)) ;
+
 		} catch (Exception e) {
 
 			throw e ;
 
-		}
+		} finally {
 
-		we.close();
+			System.out.println("Blah") ;
+
+			we.close();
+		}
 
 	}
 

@@ -20,6 +20,9 @@
 package org.wikipedia.miner.util;
 
 import org.wikipedia.miner.model.Article;
+
+import com.sleepycat.je.DatabaseException;
+
 import gnu.trove.* ;
 import java.sql.*;
 
@@ -48,7 +51,7 @@ public class RelatednessCache {
 	 * @param art2
 	 * @return the semantic relatedness of art1 and art2
 	 */
-	public float getRelatedness(Article art1, Article art2) {
+	public float getRelatedness(Article art1, Article art2) throws DatabaseException {
 		
 		//generate unique key for this pair
 		long min = Math.min(art1.getId(), art2.getId()) ;

@@ -24,6 +24,8 @@ import org.w3c.dom.*;
 import org.wikipedia.miner.model.* ;
 import org.wikipedia.miner.util.* ;
 
+import com.sleepycat.je.DatabaseException;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.Authenticator;
@@ -335,7 +337,7 @@ public class Definer {
 	
 
 	
-	protected String format(String markup, int format, int linkFormat){
+	protected String format(String markup, int format, int linkFormat) throws DatabaseException {
 		
 		markup = ms.stripAllButLinksAndEmphasis(markup, null) ;
 		markup = ms.stripNonArticleInternalLinks(markup, null) ;

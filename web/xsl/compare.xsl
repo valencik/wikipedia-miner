@@ -4,10 +4,10 @@
 
 <xsl:variable name="service_name" select="/WikipediaMinerResponse/@service_name"/>
 <xsl:variable name="server_path" select="/WikipediaMinerResponse/@server_path"/>
-<xsl:variable name="term1" select="/WikipediaMinerResponse/RelatednessResponse/@term1"/>
-<xsl:variable name="term2" select="/WikipediaMinerResponse/RelatednessResponse/@term2"/>
+<xsl:variable name="term1" select="/WikipediaMinerResponse/CompareResponse/@term1"/>
+<xsl:variable name="term2" select="/WikipediaMinerResponse/CompareResponse/@term2"/>
 
-<xsl:template match="WikipediaMinerResponse/RelatednessResponse">
+<xsl:template match="WikipediaMinerResponse/CompareResponse">
   <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
   	<xsl:choose>
@@ -28,7 +28,7 @@
 			<input type="hidden" name="task" value="compare"></input>
 			<input type="hidden" name="getSenses" value="true"></input>
 			<input type="hidden" name="getSnippets" value="true"></input>
-			<input type="hidden" name="getArticlesInCommon" value="true"></input>
+			<input type="hidden" name="getMutualLinks" value="true"></input>
 			<input type="text" name="term1" style="width: 150px" value="{$term1}"></input>&#160;
 			<input type="text" name="term2" style="width: 150px" value="{$term2}"></input>&#160;
 			<input type="submit" value="Compare" style="width: 75px;"></input>

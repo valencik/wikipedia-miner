@@ -56,7 +56,7 @@ public class Anchor implements Comparable<Anchor>{
 	 * @param wd an active WikipediaDatabase
 	 * @throws DatabaseException if there is a problem with the Wikipedia database
 	 */
-	public Anchor(WikipediaEnvironment environment, String text)  {
+	public Anchor(WikipediaEnvironment environment, String text) throws DatabaseException {
 
 		this.environment = environment ;
 		this.tp = null ;
@@ -366,7 +366,7 @@ public class Anchor implements Comparable<Anchor>{
 		
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );			
 
-		TextProcessor tp = null ; //new CaseFolder() ; 
+		TextProcessor tp = new CaseFolder() ; 
 
 		while (true) {
 			System.out.println("Enter a term (or press ENTER to quit): ") ;

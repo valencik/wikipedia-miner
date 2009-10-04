@@ -23,8 +23,11 @@ import java.util.* ;
 import java.io.File;
 import java.sql.* ;
 
+import org.wikipedia.miner.db.DbPageIterator;
 import org.wikipedia.miner.db.WikipediaEnvironment;
 import org.wikipedia.miner.model.* ;
+
+import com.sleepycat.je.DatabaseException;
 
 /**
  * @author David Milne
@@ -33,9 +36,7 @@ import org.wikipedia.miner.model.* ;
  */
 public class PageIterator implements Iterator<Page> {
 
-	WikipediaEnvironment environment ;
-
-	Iterator<Integer> idIterator ;
+	DbPageIterator iter ;
 	
 	Page nextPage = null ;
 	
@@ -46,11 +47,9 @@ public class PageIterator implements Iterator<Page> {
 	 * 
 	 * @param database an active (connected) Wikipedia database.
 	 */
-	public PageIterator(WikipediaEnvironment environment) {
-		this.environment = environment ;
-		
-		idIterator = environment.getPageIdIterator() ;
-		
+	public PageIterator(WikipediaEnvironment environment) throws DatabaseException {
+		iter = new DbPageIterator(environment) ;
+
 		queueNext() ;
 	}
 
@@ -61,11 +60,9 @@ public class PageIterator implements Iterator<Page> {
 	 * @param pageType the type of page to restrict the iterator to (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
 	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
-	public PageIterator(WikipediaEnvironment environment, short pageType)  {
-		this.environment = environment ;
+	public PageIterator(WikipediaEnvironment environment, short pageType) throws DatabaseException {
+		iter = new DbPageIterator(environment) ;
 		this.pageType = pageType ;
-		
-		idIterator = environment.getPageIdIterator() ;
 		
 		queueNext() ;
 	}
@@ -90,17 +87,16 @@ public class PageIterator implements Iterator<Page> {
 	}
 	
 	private void queueNext() {
-		nextPage=null ;
-		while (nextPage==null) {
-			if (idIterator.hasNext()) {
-				int id = idIterator.next() ;
-				
-				nextPage = Page.createPage(environment, id) ;
-				
-				if (pageType >= 0 && nextPage.getType() != pageType)
+		nextPage=iter.next() ;
+		
+		if (pageType >=0) {
+			while (nextPage.getType() != pageType) {
+				try {
+					nextPage = iter.next();
+				} catch (NoSuchElementException e) {
 					nextPage = null ;
-			} else {
-				break ;
+					break ;
+				}
 			}
 		}
 	}

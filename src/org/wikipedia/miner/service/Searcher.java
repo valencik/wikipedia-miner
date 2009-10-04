@@ -30,6 +30,8 @@ import org.wikipedia.miner.model.Article.AnchorText;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.util.text.*;
 
+import com.sleepycat.je.DatabaseException;
+
 /**
  * @author David Milne
  * 
@@ -211,7 +213,7 @@ public class Searcher {
 		return response ;
 	}
 	
-	private Element getArticleDetails(Page page, int linkLimit) {
+	private Element getArticleDetails(Page page, int linkLimit) throws DatabaseException {
 		
 		Article article = (Article)page ;
 		
@@ -358,7 +360,7 @@ public class Searcher {
 	}
 	
 	
-	private Element getCategoryDetails(Page page, int linkLimit) {
+	private Element getCategoryDetails(Page page, int linkLimit) throws DatabaseException {
 		
 		Category category = (Category)page ;
 		
@@ -443,7 +445,7 @@ public class Searcher {
 		return xmlDmb ;
 	}
 	
-	private Element getRedirectDetails(Page page) {
+	private Element getRedirectDetails(Page page) throws DatabaseException {
 		
 		Redirect redirect = (Redirect)page ;
 		

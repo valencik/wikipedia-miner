@@ -19,12 +19,14 @@
 
 package org.wikipedia.miner.annotation;
 
-import java.sql.SQLException;
 import java.util.* ;
 import java.text.* ;
 
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
+
+import com.sleepycat.je.DatabaseException;
+import com.sleepycat.je.DatabaseNotFoundException;
 
 /**
  * A selection of unambiguous terms and their corresponding articles, which are used to resolve ambiguous terms.
@@ -44,7 +46,7 @@ public class Context {
 	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated. This may be null. 
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
 	 */
-	public Context(Collection<Anchor> unambigAnchors, RelatednessCache relatednessCache, double maxSize) {
+	public Context(Collection<Anchor> unambigAnchors, RelatednessCache relatednessCache, double maxSize) throws DatabaseException {
 		
 		if (relatednessCache == null)
 			this.relatednessCache = new RelatednessCache() ;
@@ -102,7 +104,7 @@ public class Context {
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
 	 * @param minSenseLimit the minimum prior probability of an anchors sense that will be used as context.  
 	 */
-	public Context(Collection<Anchor> ambigAnchors, RelatednessCache relatednessCache, double maxSize, double minSenseLimit) {
+	public Context(Collection<Anchor> ambigAnchors, RelatednessCache relatednessCache, double maxSize, double minSenseLimit) throws DatabaseException {
 		
 		if (relatednessCache == null)
 			this.relatednessCache = new RelatednessCache() ;
@@ -165,7 +167,7 @@ public class Context {
 	 * @param art the article to be compared
 	 * @return the average relatedness between the article and context anchors
 	 */
-	public float getRelatednessTo(Article art) {
+	public float getRelatednessTo(Article art) throws DatabaseException {
 		
 		if (contextArticles.size() == 0 || totalWeight == 0)
 			return 0 ;
