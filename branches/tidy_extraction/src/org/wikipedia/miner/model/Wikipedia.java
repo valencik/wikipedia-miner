@@ -29,6 +29,7 @@ import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.util.text.*;
 
 import com.sleepycat.je.DatabaseException;
+import com.sleepycat.je.EnvironmentConfig;
 
 
 /**
@@ -53,7 +54,9 @@ public class Wikipedia {
 	 * @throws Exception if there is a problem connecting to the database, or if the database is not complete.
 	 */
 	public Wikipedia(File databaseDirectory, File indexDirectory) throws Exception{
-		environment = new WikipediaEnvironment(databaseDirectory, indexDirectory, false) ; 
+		
+		EnvironmentConfig ec = WikipediaEnvironment.getEnvironmentConfig(false) ;
+		environment = new WikipediaEnvironment(databaseDirectory, indexDirectory, ec) ; 
 	}
 	
 	public Wikipedia(WikipediaEnvironment environment) {
