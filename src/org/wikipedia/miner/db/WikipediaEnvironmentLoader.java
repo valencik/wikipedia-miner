@@ -26,6 +26,7 @@ import com.sleepycat.je.Database;
 import com.sleepycat.je.DatabaseEntry;
 import com.sleepycat.je.DatabaseException;
 import com.sleepycat.je.Environment;
+import com.sleepycat.je.EnvironmentConfig;
 import com.sleepycat.je.OperationStatus;
 
 @SuppressWarnings("unchecked")
@@ -36,7 +37,8 @@ public class WikipediaEnvironmentLoader {
 
 	public WikipediaEnvironmentLoader(File databaseDir, File indexDir) throws DatabaseException, IOException {
 
-		we = new WikipediaEnvironment(databaseDir, indexDir, true) ;
+		EnvironmentConfig ec = WikipediaEnvironment.getEnvironmentConfig(true) ;
+		we = new WikipediaEnvironment(databaseDir, indexDir, ec) ;
 
 		//pn = new ProgressNotifier() ;
 

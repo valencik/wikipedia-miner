@@ -75,30 +75,9 @@ public class WikipediaEnvironment extends Environment {
 	protected DbStructureNodeBinding structureBinding = new DbStructureNodeBinding() ;
 	protected StatisticBinding statBinding = new StatisticBinding() ;
 
-	public WikipediaEnvironment(File databaseDir, File indexDir, final boolean loading) throws EnvironmentLockedException, DatabaseException, IOException {
+	public WikipediaEnvironment(File databaseDir, File indexDir, EnvironmentConfig config) throws EnvironmentLockedException, DatabaseException, IOException {
 
-		super(databaseDir, new EnvironmentConfig() {
-
-			public boolean getAllowCreate() {
-				return loading ;
-			}
-			public boolean getTransactional() {
-				return false ;
-			}
-
-			public boolean getReadOnly() {
-				return !loading ;
-			}
-
-			public int getCachePercent() {
-				return 50 ;
-			}
-		}) ;
-
-		EnvironmentConfig ec = this.getConfig() ;
-
-		//ec.setConfigParam(EnvironmentConfig.ENV_RUN_CHECKPOINTER, "false") ;
-		//ec.setConfigParam(EnvironmentConfig.ENV_RUN_CLEANER, "false") ;
+		super(databaseDir, config) ;
 
 		this.databaseDir = databaseDir ;
 		this.indexDir = indexDir ;
@@ -129,24 +108,17 @@ public class WikipediaEnvironment extends Environment {
 
 		openDatabases = new HashMap<String, Database>() ;
 		tempDatabases = new HashMap<String, Database>() ; 
-		//openStoredMaps = new HashMap<DatabaseName, StoredMap>() ;
-
-		//anchorMaps = new HashMap<String, StoredMap<String, DbAnchor>>() ;
-		//anchorDatabases = new HashMap<String, Database>() ;
-
 
 		for (DatabaseName dbName:DatabaseName.values()) {
-
 			try {
-
-				//if (dbName != DatabaseName.PAGE_CONTENT) 
 				getDatabase(dbName, false, false) ;
 			} catch (DatabaseException e) {
-				if (!loading) {
+				if (!config.getAllowCreate()) {
 					throw e ;
 				}
 			}
 		}
+		
 	}
 
 	protected Database getDatabase(DatabaseName dbName, boolean writable, boolean clear) throws DatabaseException {
@@ -204,18 +176,18 @@ public class WikipediaEnvironment extends Environment {
 		System.out.println("Closing") ;
 		super.sync() ;
 
-		boolean anyCleaned = false;
-		while (cleanLog() > 0) {
-			System.out.println("cleaning") ;
-			anyCleaned = true;
+		//boolean anyCleaned = false;
+		//while (cleanLog() > 0) {
+		//	System.out.println("cleaning") ;
+		//	anyCleaned = true;
 			
-		}
+		//}
 
-		if (anyCleaned) {
+		//if (anyCleaned) {
 			CheckpointConfig force = new CheckpointConfig();
 			force.setForce(true);
 			checkpoint(force);
-		}
+		//}
 
 
 		if (index != null) {
@@ -884,7 +856,6 @@ public class WikipediaEnvironment extends Environment {
 
 		DecimalFormat df = new DecimalFormat("0%") ;
 
-
 		while (c.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
 
 			pn.update();	
@@ -901,13 +872,7 @@ public class WikipediaEnvironment extends Environment {
 
 			if (count++ == 100000)  {
 
-				StatsConfig config = new StatsConfig() ;
-				config.setClear(true) ;
-
-				System.err.println(getStats(config)) ;
-				System.err.println("\n\n=========================================\n\n") ;
-
-
+				
 				//System.out.println(" - anchors: " + cachedAnchors + " out of " + totalAnchors + ", " + df.format((float)cachedAnchors/totalAnchors)) ;
 				//System.out.println(" - senses: " + cachedSenses + " out of " + totalSenses + ", " + df.format((float)cachedSenses/totalSenses)) ;
 
@@ -987,7 +952,19 @@ public class WikipediaEnvironment extends Environment {
 		return cachedInLinks != null ;
 	}
 
+	public void printStats() throws DatabaseException {
+		System.err.println("\n\n=========================================\n\n") ;
 
+		
+		StatsConfig config = new StatsConfig() ;
+		config.setClear(true) ;
+
+		System.err.println(getStats(config)) ;
+		
+		System.err.println("\n\n=========================================\n\n") ;
+
+	}
+	
 	public boolean preloadDatabase(DatabaseName dbName) throws DatabaseException{
 
 		Database dbInLinks = getDatabase(dbName, false, false) ;
@@ -1014,24 +991,30 @@ public class WikipediaEnvironment extends Environment {
 		File berkeleyDir = new File(args[0]) ;
 		File luceneDir = new File(args[1]) ;
 
-		WikipediaEnvironment we = new WikipediaEnvironment(berkeleyDir, luceneDir, false) ;
+		WikipediaEnvironment we = new WikipediaEnvironment(berkeleyDir, luceneDir, getEnvironmentConfig(false)) ;
 
 		try {
 
 			//System.out.println(we.getStats(null)) ;
 
-			System.gc();
 			long memStart = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
-			TextProcessor tp = null ;//new CaseFolder() ;
+			TextProcessor tp = new CaseFolder() ;
 
+			TIntHashSet ids = we.getValidPageIds(5, null) ;
+			we.printStats() ;
+			//wikipedia.getDatabase().cacheParentIds(dataDirectory, pn) ;
+			//wikipedia.getDatabase().cacheGenerality(dataDirectory, ids, null) ;
+			//wikipedia.getEnvironment().cachePages(ids, pn) ;
+			//wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 3, pn) ;
+			we.cacheInLinks(ids, null) ;
+			we.printStats() ;
+			
+			we.cacheAnchors(tp, ids, 3, (float)0.02, (float)0.03, null) ;
+			we.printStats() ;
 
-
-			//TIntHashSet validIds = we.getValidPageIds(5, null) ;
-			//we.cacheInLinks(validIds, null) ;
-			//we.cacheAnchors(tp, validIds, 5, (float)0.02, (float)0.03, null) ;
-
-			System.gc();
+			ids.clear() ;
+			
 			long memEnd = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
 			System.out.println( (memEnd-memStart) + " bytes") ;
@@ -1058,9 +1041,7 @@ public class WikipediaEnvironment extends Environment {
 			StatsConfig config = new StatsConfig() ;
 			config.setClear(true) ;
 
-			System.err.println(we.getStats(config)) ;
-			System.err.println("\n\n=========================================\n\n") ;
-
+			
 
 			//System.out.println(we.getStats(null)) ;
 
@@ -1075,6 +1056,30 @@ public class WikipediaEnvironment extends Environment {
 			we.close();
 		}
 
+	}
+	
+	
+	public static EnvironmentConfig getEnvironmentConfig(boolean loading) {
+		
+		EnvironmentConfig config = new EnvironmentConfig() ;
+		
+		//config.setReadOnly(readonly) ;
+		config.setAllowCreate(loading) ;
+		
+		config.setTransactional(false) ;
+		config.setLocking(false) ;
+		
+		if (loading)
+			config.setCachePercent(30) ;
+		else
+			config.setCachePercent(80) ;
+		
+		
+		config.setConfigParam(EnvironmentConfig.LOG_FAULT_READ_SIZE, String.valueOf(1024*32)) ;
+		//config.setConfigParam(EnvironmentConfig.ENV_RUN_CHECKPOINTER, "false") ;
+		//config.setConfigParam(EnvironmentConfig.ENV_RUN_CLEANER, "false") ;
+		
+		return config ;
 	}
 
 
