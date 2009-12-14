@@ -56,19 +56,21 @@
 
 
 	<Language code="de" name="German" localName="Deutsch">
+                <!--Still unsure about the right root category to put here-->
+		<!--<RootCategory>!Hauptkategorie</RootCategory>-->
+		<RootCategory>sachsystematik</RootCategory>
 
-		<RootCategory></RootCategory>
+		<DisambiguationCategory>begriffsklärung</DisambiguationCategory>
+		<DisambiguationCategory>abkürzung</DisambiguationCategory>
 
-		<DisambiguationCategory></DisambiguationCategory>
-
-		<DisambiguationTemplate></DisambiguationTemplate>
+		<DisambiguationTemplate>begriffsklärung</DisambiguationTemplate>
 
 	</Language>
 
 
 	<Language code="fr" name="French" localName="Français">
 
-		<RootCategory>Espace encyclopédique</RootCategory>
+		<RootCategory>espace encyclopédique</RootCategory>
 
 		<DisambiguationCategory>homonymie</DisambiguationCategory>
 		<DisambiguationCategory>homonymie dynastique</DisambiguationCategory>

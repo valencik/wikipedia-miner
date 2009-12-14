@@ -264,7 +264,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 					
 					senseDetails.put(an_text + ":" + an_to, countAndType) ;
 					
-				} catch (Exception e) {e.printStackTrace() ;} ;
+				} catch (Exception e) {e.printStackTrace() ;}
 				
 				currRow++ ;
 			}
@@ -283,7 +283,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 		
 		currRow = 0 ;
 		
-		StringBuffer insertQuery = new StringBuffer() ; ;
+		StringBuffer insertQuery = new StringBuffer() ;
 		
 		for(String key:senseDetails.keySet()) {
 			currRow ++ ;
@@ -294,7 +294,7 @@ public class WikipediaDatabase extends MySqlDatabase {
 			long an_to = new Long(key.substring(pos+1)).longValue() ;
 			int[] countAndType = senseDetails.get(key) ;
 			
-			if (an_text != "") 
+			if (!an_text.equals(""))
 				insertQuery.append(" (\"" + addEscapes(an_text) + "\"," + an_to + "," + countAndType[0] + "," + countAndType[1] + "),") ;
 			
 			if (currRow%chunkSize == 0) {
