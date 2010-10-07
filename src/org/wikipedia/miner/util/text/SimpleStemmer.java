@@ -41,7 +41,7 @@ public class SimpleStemmer extends TextProcessor{
 		String[] terms = cleaner.processText(text).split(" ") ;
 		
 		for (String term: terms) {
-			if (!term.equals(""))
+			if (term != "") 
 				processedText = processedText + " " + stem(term) ;
 		}
 		

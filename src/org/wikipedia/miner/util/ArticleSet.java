@@ -25,7 +25,10 @@ import java.text.DecimalFormat;
 import java.util.*;
 import java.util.regex.*;
 
+import org.apache.log4j.Logger;
+import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.model.*;
+import org.wikipedia.miner.model.Page.PageType;
 
 /**
  * @author David Milne
@@ -35,8 +38,7 @@ import org.wikipedia.miner.model.*;
  */
 public class ArticleSet {
 	private TreeSet<Integer> articleIds = new TreeSet<Integer>() ;
-	
-	int x = 0 ;
+	private MarkupStripper stripper = new MarkupStripper() ;
 	
 	/**
 	 * Loads this article set from file. The file must contain a list of article ids, separated by newlines. 
@@ -83,7 +85,7 @@ public class ArticleSet {
 	 * @param maxListProportion the maximum proportion of list items (over total line count) that an article may contain. 
 	 * @throws SQLException if there is a problem with the wikipedia database.
 	 */
-	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) throws SQLException{
+	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion) throws SQLException{
 		
 		DecimalFormat df = new DecimalFormat("#0.00 %") ;
 		
@@ -92,7 +94,7 @@ public class ArticleSet {
 				
 		articleIds = new TreeSet<Integer>() ;
 		
-		ProgressNotifier pn = new ProgressNotifier(totalRoughCandidates, "Refining candidates (ETA is worst case)") ;
+		ProgressTracker pn = new ProgressTracker(totalRoughCandidates, "Refining candidates (ETA is worst case)", ArticleSet.class) ;
 		
 		double lastWarningProgress = 0 ;
 		
@@ -154,18 +156,20 @@ public class ArticleSet {
 	private Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks) throws SQLException {
 		
 		Vector<Article> articles = new Vector<Article>() ;
-		ProgressNotifier pn = new ProgressNotifier(wikipedia.getDatabase().getArticleCount(), "Gathering rough candidates") ;
+		int totalArticles = wikipedia.getEnvironment().retrieveStatistic(StatisticName.articleCount).intValue() ;
 		
-		Iterator<Page> i = wikipedia.getPageIterator(Page.ARTICLE) ;
+		ProgressTracker pn = new ProgressTracker(totalArticles, "Gathering rough candidates", ArticleSet.class) ;
+		
+		Iterator<Page> i = wikipedia.getPageIterator(PageType.article) ;
 		
 		while (i.hasNext()) {
 			Article art = (Article)i.next() ;
 			pn.update() ;
 			
-			if (minOutLinks >= 0 && art.getLinksOutCount() < minOutLinks)
+			if (minOutLinks >= 0 && art.getLinksOut().length < minOutLinks)
 				continue ;
 			
-			if (minInLinks >= 0 && art.getLinksInCount() < minInLinks)
+			if (minInLinks >= 0 && art.getLinksIn().length < minInLinks)
 				continue ;
 			
 			articles.add(art) ;
@@ -177,28 +181,26 @@ public class ArticleSet {
 	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) throws SQLException{
 				
 		//we don't want any disambiguations
-		if (art.getType() == Page.DISAMBIGUATION) 
+		if (art.getType() == PageType.disambiguation) 
 			return false ;	
 		
-		//we don't want any list pages
-		if (art.getTitle().toLowerCase().startsWith("list")) 
-			return false ;	
+		//TODO: check that list identification works
+		//if (art.getType() == PageType.list) 
+		//	return false ;	
 	
 		//check if there are any other constraints
 		if (minLinkProportion < 0 && maxLinkProportion < 0 && minWordCount < 0 && maxWordCount < 0 && maxListProportion < 0)
 			return true ;
 		
 		// get and prepare markup
-		String markup = art.getContent() ;
+		String markup = art.getMarkup() ;
 		
 		if (markup == null)
 			return false ;
 		
-		markup = MarkupStripper.stripTemplates(markup) ;
-		markup = MarkupStripper.stripTables(markup) ;
-		markup = MarkupStripper.stripLinks(markup) ;
-		markup = MarkupStripper.stripHTML(markup) ;
-		markup = MarkupStripper.stripExcessNewlines(markup) ;
+		markup = stripper.stripToPlainText(markup, null) ; 
+		
+		markup = stripper.stripExcessNewlines(markup) ;
 		
 		
 		if (maxListProportion >= 0) {
@@ -223,7 +225,7 @@ public class ArticleSet {
 				}
 			}
 			
-			double listProportion = ((double)listCount) / lineCount ;
+			float listProportion = ((float)listCount) / lineCount ;
 			if (listProportion > 0.50)
 				return false ;
 		}
@@ -233,8 +235,7 @@ public class ArticleSet {
 			//we need to count words
 			
 			int wordCount = 0 ;
-			markup = MarkupStripper.stripFormatting(markup) ;
-		
+					
 			Pattern wordPattern = Pattern.compile("\\W(\\w+)\\W") ; 
 			Matcher wordMatcher = wordPattern.matcher(markup) ;
 		
@@ -247,8 +248,8 @@ public class ArticleSet {
 			if (wordCount > maxWordCount && maxWordCount != -1) 
 				return false ;
 			
-			int linkCount = art.getLinksOutIds().length ;
-			double linkProportion = (double)linkCount/wordCount ;
+			int linkCount = art.getLinksOut().length ;
+			float linkProportion = (float)linkCount/wordCount ;
 			if (linkProportion < minLinkProportion || linkProportion > maxLinkProportion)
 				return false ;
 		}

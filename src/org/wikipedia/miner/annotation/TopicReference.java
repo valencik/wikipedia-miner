@@ -32,7 +32,7 @@ import org.wikipedia.miner.util.*;
  */
 public class TopicReference implements Comparable<TopicReference>{
 	
-	private Anchor anchor ;
+	private Label label ;
 	private int topicId ;
 	private Position position ;
 	//private double disambigConfidence ;
@@ -40,12 +40,12 @@ public class TopicReference implements Comparable<TopicReference>{
 	/**
 	 * Initializes a disambiguated topic reference.
 	 * 
-	 * @param anchor the anchor from which the reference was mined
+	 * @param label the label from which the reference was mined
 	 * @param topicId the id of the topic it was disambiguated to
 	 * @param position the location (start and end character indices) from which this reference was mined
 	 */
-	public TopicReference(Anchor anchor, int topicId, Position position) {
-		this.anchor = anchor ;
+	public TopicReference(Label label, int topicId, Position position) {
+		this.label = label ;
 		this.topicId = topicId ;
 		this.position = position ;
 		//this.disambigConfidence = disambigConfidence ;
@@ -54,18 +54,18 @@ public class TopicReference implements Comparable<TopicReference>{
 	/**
 	 * Initializes a topic reference that may or may not be ambiguous
 	 * 
-	 * @param anchor the anchor from which the reference was mined
+	 * @param label the label from which the reference was mined
 	 * @param position the location (start and end character indices) from which this reference was mined
-	 * @throws SQLException if there is a problem with the Wikipedia database that the anchor was obtained from
+	 * @throws SQLException if there is a problem with the Wikipedia database that the label was obtained from
 	 */
-	public TopicReference(Anchor anchor, Position position) throws SQLException{
-		this.anchor = anchor ;
+	public TopicReference(Label label, Position position) throws SQLException{
+		this.label = label ;
 		this.position = position ;
 		
-		SortedVector<Anchor.Sense> senses = anchor.getSenses() ;
+		Label.Sense[] senses = label.getSenses() ;
 		
-		if (senses.size() == 1) {
-			topicId = senses.first().getId() ;
+		if (senses.length == 1) {
+			topicId = senses[0].getId() ;
 			//disambigConfidence = 1 ;
 		} else {
 			topicId = 0 ;
@@ -89,10 +89,10 @@ public class TopicReference implements Comparable<TopicReference>{
 	}
 	
 	/**
-	 * @return the anchor that reference was mined from
+	 * @return the label that reference was mined from
 	 */
-	public Anchor getAnchor() {
-		return anchor ;
+	public Label getLabel() {
+		return label ;
 	}
 	
 	/**

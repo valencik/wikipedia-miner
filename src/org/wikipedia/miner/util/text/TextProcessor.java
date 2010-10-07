@@ -40,6 +40,10 @@ public abstract class TextProcessor {
 		return this.getClass().getSimpleName() ;
 	}
 	
+	public int getHash() {
+		return this.getClass().hashCode() ;
+	}
+	
 	/**
 	 * Returns the modified copy of the argument text
 	 * 

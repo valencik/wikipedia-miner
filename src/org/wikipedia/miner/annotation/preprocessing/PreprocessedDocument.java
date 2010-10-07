@@ -21,7 +21,6 @@
 package org.wikipedia.miner.annotation.preprocessing;
 
 import java.util.* ;
-import org.wikipedia.miner.util.* ;
 
 /**
  * This class stores a document that is ready to be processed by linkDetector, disambiguator, documentTagger, etc.
@@ -34,7 +33,7 @@ public class PreprocessedDocument {
 	private String preprocessedText ;
 	private String contextText ;
 	private HashSet<Integer> bannedTopics ;
-	private SortedVector<RegionTag> regionTags ;
+	private ArrayList<RegionTag> regionTags ;
 
 	//region tracking
 	private Vector<HashSet<Integer>> doneIdsStack ;
@@ -50,7 +49,7 @@ public class PreprocessedDocument {
 	 * @param regionTags the region tags detected in the document.
 	 * @param bannedTopics a set of ids for topics that you don't want to be detected in the document.
 	 */
-	public PreprocessedDocument(String originalText, String preprocessedText, String contextText, SortedVector<RegionTag> regionTags, HashSet<Integer>bannedTopics) {
+	public PreprocessedDocument(String originalText, String preprocessedText, String contextText, ArrayList<RegionTag> regionTags, HashSet<Integer>bannedTopics) {
 		this.originalText = originalText ;
 		this.preprocessedText = preprocessedText ;
 		this.contextText = contextText ;
@@ -141,7 +140,7 @@ public class PreprocessedDocument {
 
 		while (nextTagIndex < regionTags.size()) {
 
-			RegionTag nextTag = regionTags.elementAt(nextTagIndex) ;
+			RegionTag nextTag = regionTags.get(nextTagIndex) ;
 			//System.out.println(" - nextTag=" + nextTag) ;
 
 			if (nextTag.getPosition() < pos) {

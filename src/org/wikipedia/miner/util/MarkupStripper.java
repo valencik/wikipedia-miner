@@ -1,6 +1,6 @@
 /*
  *    MarkupStripper.java
- *    Copyright (C) 2007 David Milne, d.n.milne@gmail.com
+ *    Copyright (C) 2007 David Milne, d.n.milnegmail.com
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -17,584 +17,735 @@
  *    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-package org.wikipedia.miner.util;
+package org.wikipedia.miner.util ;
 
 import java.util.*;
 import java.util.regex.*;
+
 
 /**
  * This provides tools to strip out markup from wikipedia articles, or anything else that has been written
  * in mediawiki's format. It's all pretty simple, so don't expect perfect parsing. It is particularly bad at 
  * dealing with templates (these are simply removed rather than resolved).  
  * 
- * @author David Milne
+ * author David Milne
  */
 public class MarkupStripper {
-	
+
+	private Pattern linkPattern = Pattern.compile("\\[\\[(.*?:)?(.*?)(\\|.*?)?\\]\\]") ;
+
 	/**
-	 * Strips a string of all markup; tries to turn it into plain text	 
+	 * Returns a copy of the given markup, where all markup has been removed except for 
+	 * internal links to other wikipedia pages (e.g. to articles or categories), section 
+	 * headers, list markers, and bold/italic markers. 
 	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
+	 * By default, unwanted markup is completely discarded. You can optionally specify 
+	 * a character to replace the regions that are discared, so that the length of the 
+	 * string and the locations of unstripped characters is not modified.
 	 */
-	public static String stripEverything(String markup)  {
+	public String stripAllButInternalLinksAndEmphasis(String markup, Character replacement) {
+
+		//deal with comments and math regions entirely seperately. 
+		//Comments often contain poorly nested items that the remaining things will complain about.
+		//Math regions contain items that look confusingly like templates.
+		Vector<int[]> regions = gatherSimpleRegions(markup, "\\<\\!--(.*?)--\\>") ;
+		regions = mergeRegionLists(regions, gatherComplexRegions(markup, "\\<math(\\s*?)([^>\\/]*?)\\>", "\\<\\/math(\\s*?)\\>")) ;
+		String clearedMarkup = stripRegions(markup, regions, replacement) ;
+
+		//deal with templates entirely seperately. They often end in |}} which confuses the gathering of tables.
+		regions = gatherTemplates(clearedMarkup) ;
+		clearedMarkup = stripRegions(clearedMarkup, regions, replacement) ;
+
+		//now gather all of the other regions we want to ignore	
+		regions = gatherTables(clearedMarkup) ;
+
+		regions = mergeRegionLists(regions, gatherHTML(clearedMarkup)) ;
+		regions = mergeRegionLists(regions, gatherExternalLinks(clearedMarkup)) ;
+		regions = mergeRegionLists(regions, gatherMagicWords(clearedMarkup)) ;
+
+		//ignore these regions now (they need to be blanked before we can correctly identify the remaining regions)
+		clearedMarkup = stripRegions(clearedMarkup, regions, replacement) ;
+
+		regions = gatherMisformattedStarts(clearedMarkup) ;
+		clearedMarkup = stripRegions(clearedMarkup, regions, replacement) ;
 		
-		String strippedMarkup = stripTemplates(markup) ;
-		strippedMarkup = MarkupStripper.stripSection(strippedMarkup, "see also") ;
-		strippedMarkup = MarkupStripper.stripSection(strippedMarkup, "references") ;
-		strippedMarkup = MarkupStripper.stripSection(strippedMarkup, "further reading") ;
-		strippedMarkup = MarkupStripper.stripSection(strippedMarkup, "external links") ;
-		strippedMarkup = stripTables(strippedMarkup) ;
-		strippedMarkup = stripIsolatedLinks(strippedMarkup) ;
-		strippedMarkup = stripLinks(strippedMarkup) ;
-		strippedMarkup = stripHTML(strippedMarkup) ;
-		strippedMarkup = stripExternalLinks(strippedMarkup) ;
-		strippedMarkup = stripFormatting(strippedMarkup) ;
-		strippedMarkup = stripExcessNewlines(strippedMarkup) ;
 		
-		return strippedMarkup ;
+		return clearedMarkup ;
 	}
-	
+
+
 	/**
-	 * Strips all links from the given markup; anything like [[this]] is replaced. If it is a link to a wikipedia article, 
-	 * then it is replaced with its anchor text. Only links to images are treated differently: they are discarded entirely. 
+	 * Returns a copy of the given markup, where all links to wikipedia pages 
+	 * (categories, articles, etc) have been removed. Links to articles are 
+	 * replaced with the appropriate anchor markup. All other links are removed completely.
 	 * 
-	 * You may want to first strip non-article links, isolated links, category links etc before calling this method. 	 
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
+	 * By default, unwanted markup is completely discarded. You can optionally specify 
+	 * a character to replace the regions that are discarded, so that the length of the 
+	 * string and the locations of unstripped characters is not modified.
 	 */
-	public static String stripLinks(String markup) {
-		
-		HashSet<String> discardPrefixes = new HashSet<String>() ;
-		discardPrefixes.add("image") ;
-		
-		Vector<Integer> linkStack = new Vector<Integer>() ; 
-		
-		Pattern p = Pattern.compile("(\\[\\[|\\]\\])") ;
-		Matcher m = p.matcher(markup) ;
-		
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
-		
-		while (m.find()) {
-			String tag = markup.substring(m.start(), m.end()) ;
-			
-			if (tag.equals("[["))
-				linkStack.add(m.start()) ;
-			else {
-				if (!linkStack.isEmpty()) {
-					int linkStart = linkStack.lastElement() ;
-					linkStack.remove(linkStack.size()-1) ;
-					
-					if (linkStack.isEmpty()) {
-						sb.append(markup.substring(lastIndex, linkStart)) ;
-						
-						//we have the whole link, with other links nested inside if it's an image
-						String linkMarkup = markup.substring(linkStart+2, m.start()) ;
-						sb.append(stripLink(linkMarkup, discardPrefixes, false)) ;
-						
-						lastIndex = m.end() ;
-					}
-				}
-			}
-		}
-		
-		if (!linkStack.isEmpty()) {
-			System.err.println("MarkupStripper | Warning: links were not well formed, so we cannot guarantee that they were stripped out correctly. ") ;
-		}
-		
-		sb.append(markup.substring(lastIndex)) ;
-		return sb.toString() ;
-	}
-	
-	/**
-	 * Removes all references to images in the given markup
-	 * 
-	 * @param markup the markup to be stripped
-	 * @return the stripped markup
-	 */
-	public static String stripImages(String markup) {
-			
-		Vector<Integer> linkStack = new Vector<Integer>() ; 
-		
-		Pattern p = Pattern.compile("(\\[\\[|\\]\\])") ;
-		Matcher m = p.matcher(markup) ;
-		
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
-		
-		while (m.find()) {
-			String tag = markup.substring(m.start(), m.end()) ;
-			
-			if (tag.equals("[["))
-				linkStack.add(m.start()) ;
-			else {
-				if (!linkStack.isEmpty()) {
-					int linkStart = linkStack.lastElement() ;
-					linkStack.remove(linkStack.size()-1) ;
-					
-					if (linkStack.isEmpty()) {
-						sb.append(markup.substring(lastIndex, linkStart)) ;
-						
-						//we have the whole link, with other links nested inside if it's an image
-						String linkMarkup = markup.substring(linkStart+2, m.start()) ;
-						if (!linkMarkup.toLowerCase().startsWith("image:")){
-							sb.append("[[") ;
-							sb.append(linkMarkup) ;
-							sb.append("]]") ;							
-						}
-						lastIndex = m.end() ;
-					}
-				}
-			}
-		}
-		
-		if (!linkStack.isEmpty()) {
-			System.err.println("MarkupStripper | Warning: links were not well formed, so we cannot guarantee that they were stripped out correctly. ") ;
-		}
-		
-		sb.append(markup.substring(lastIndex)) ;
-		return sb.toString() ;
-	}
-	
-	/**
-	 * Strips all non-article links from the given markup; anything like [[this]] is removed unless it
-	 * goes to a wikipedia article, redirect, or disambiguation page. 
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
-	 */
-	public static String stripNonArticleLinks(String markup) {
-				
-		Vector<Integer> linkStack = new Vector<Integer>() ; 
-		
-		Pattern p = Pattern.compile("(\\[\\[|\\]\\])") ;
-		Matcher m = p.matcher(markup) ;
-		
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
-		
-		while (m.find()) {
-			String tag = markup.substring(m.start(), m.end()) ;
-			
-			if (tag.equals("[["))
-				linkStack.add(m.start()) ;
-			else {
-				if (!linkStack.isEmpty()) {
-					int linkStart = linkStack.lastElement() ;
-					linkStack.remove(linkStack.size()-1) ;
-					
-					if (linkStack.isEmpty()) {
-						sb.append(markup.substring(lastIndex, linkStart)) ;
-						
-						//we have the whole link, with other links nested inside if it's an image
-						String linkMarkup = markup.substring(linkStart+2, m.start()) ;
-						if (linkMarkup.indexOf(":") < 0)
-							sb.append("[[" + linkMarkup + "]]") ;
-						else						
-							sb.append(stripLink(linkMarkup, null, true)) ;
-						
-						lastIndex = m.end() ;
-					}
-				}
-			}
-		}
-		
-		if (! linkStack.isEmpty()) 
-			System.err.println("MarkupStripper | Warning: links were not well formed, so we cannot guarantee that they were stripped out correctly. ") ;
-		
-		sb.append(markup.substring(lastIndex)) ;
-		return sb.toString() ; 
-	}
-	
-	/**
-	 * Strips all non-article links from the given markup; anything like [[this]] is removed unless it
-	 * goes to a wikipedia article, redirect, or disambiguation page. 
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
-	 */
-	public static String stripIsolatedLinks(String markup) {
-				
-		Vector<Integer> linkStack = new Vector<Integer>() ; 
-		
-		Pattern p = Pattern.compile("(\\[\\[|\\]\\])") ;
-		Matcher m = p.matcher(markup) ;
-		
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
-		
-		while (m.find()) {
-			String tag = markup.substring(m.start(), m.end()) ;
-			
-			if (tag.equals("[["))
-				linkStack.add(m.start()) ;
-			else {
-				if (!linkStack.isEmpty()) {
-					int linkStart = linkStack.lastElement() ;
-					linkStack.remove(linkStack.size()-1) ;
-					
-					if (linkStack.isEmpty()) {
-						sb.append(markup.substring(lastIndex, linkStart)) ;
-						
-						//we have the whole link, with other links nested inside if it's an image
-						String linkMarkup = markup.substring(linkStart+2, m.start()) ;
-						
-						//System.out.println(" - " + linkStart + ", " + m.end() + ", " + markup.length()) ;
-						
-						if (markup.substring(Math.max(0, linkStart-10), linkStart).matches("(?s).*(\\W*)\n") && (m.end() >= markup.length()-1 || markup.substring(m.end(), Math.min(markup.length()-1, m.end()+10)).matches("(?s)(\\W*)(\n.*|$)"))) {
-							//discarding link
+	public String stripInternalLinks(String markup, Character replacement) {
+
+		Vector<int[]> regions = gatherComplexRegions(markup, "\\[\\[", "\\]\\]") ;
+
+		StringBuffer strippedMarkup = new StringBuffer() ;
+		int lastPos = markup.length() ;
+
+		//because regions are sorted by end position, we work backwards through them
+		int i = regions.size() ;
+
+		while (i > 0) {
+			i -- ;
+
+			int[] region = regions.elementAt(i) ;
+
+			//only deal with this region is not within a region we have already delt with. 
+			if (region[0] < lastPos) {
+
+				//copy everything between this region and start of last one we dealt with. 
+				strippedMarkup.insert(0,markup.substring(region[1], lastPos)) ;
+
+				String linkMarkup = markup.substring(region[0], region[1]) ;
+
+				// by default (if anything goes wrong) we will keep the link as it is
+				String strippedLinkMarkup = linkMarkup ;
+
+
+				Matcher m = linkPattern.matcher(linkMarkup) ;
+				if (m.matches()) {
+
+					String prefix = m.group(1) ;
+					String dest = m.group(2) ;
+					String anchor = m.group(3) ;
+
+					if (prefix != null) {
+						// this is not a link to another article, so get rid of it entirely
+						if (replacement != null) 
+							strippedLinkMarkup = linkMarkup.replaceAll(".",replacement.toString()) ;			
+						else 
+							strippedLinkMarkup = "" ;
+					} else {
+						if (anchor != null) {
+							//this has an anchor defined, so use that but blank out everything else
+
+							if (replacement != null) 
+								strippedLinkMarkup = replacement + replacement + dest.replaceAll(".", replacement.toString()) + replacement + anchor.substring(1) + anchor.substring(1) + replacement ;
+							else
+								strippedLinkMarkup = anchor.substring(1) ;
+
 						} else {
-							sb.append("[[") ;
-							sb.append(linkMarkup) ;
-							sb.append("]]") ;
+							//this has no anchor defined, so treat dest as anchor and blank out everything else
+
+							if (replacement != null) {
+								strippedLinkMarkup = replacement + replacement + dest + replacement + replacement ;
+							} else {
+								strippedLinkMarkup = dest ;
+							}
 						}
-						
-						lastIndex = m.end() ;
-					}
+					}				
+				} else {
+					//logProblem("our pattern for delimiting links has a problem") ;
 				}
+
+				strippedMarkup.insert(0,strippedLinkMarkup) ;
+				lastPos = region[0] ;
 			}
-		}
-		
-		if (!linkStack.isEmpty())
-			System.err.println("MarkupStripper | Warning: links were not well formed, so we cannot guarantee that they were stripped out correctly. ") ;
-		
-		sb.append(markup.substring(lastIndex)) ;
-		return sb.toString() ;
+		}	
+
+		if (lastPos > 0) 
+			strippedMarkup.insert(0,markup.substring(0, lastPos)) ;
+
+		return strippedMarkup.toString() ; 	
 	}
 	
-	
-	private static String stripLink(String linkMarkup, HashSet<String> discardedPrefixes, boolean discardAllPrefixes) {
-		
-		int colonPos = linkMarkup.indexOf(":") ;
-		if (colonPos>0) {
-			//prefix is specified
-			
-			String prefix = linkMarkup.substring(0, colonPos) ;
-			if (discardAllPrefixes || (discardedPrefixes != null && discardedPrefixes.contains(prefix.toLowerCase()))) {
-				//prefix indicates a link we want cleared
-				return "" ;
-			} else {
-				linkMarkup = linkMarkup.substring(colonPos+1) ;
-			}
-		}
-		
-		int pos = linkMarkup.lastIndexOf("|") ;
-			
-		if (pos>0) {
-			//link is piped 
-			return linkMarkup.substring(pos+1) ;
-		} else {
-			//link is not piped ;
-			return linkMarkup ;
-		}
-	}
-	
-	
+
 	/**
-	 * Removes all sections (both header and content) with the given sectionName
+	 * Returns a copy of the given markup, where all links to wikipedia pages
+	 * that are not articles (categories, language links, etc) have been removed.
+	 * 
+	 * By default, unwanted markup is completely discarded. You can optionally specify
+	 * a character to replace the regions that are discarded, so that the length of the
+	 * string and the locations of unstripped characters is not modified.
+	 */
+	public String stripNonArticleInternalLinks(String markup, Character replacement) {
+
+		//currItem = "non-article internal links" ;
+
+		Vector<int[]> regions = gatherComplexRegions(markup, "\\[\\[", "\\]\\]") ;
+
+		StringBuffer strippedMarkup = new StringBuffer() ;
+		int lastPos = markup.length() ;
+
+		//because regions are sorted by end position, we work backwards through them
+		int i = regions.size() ;
+
+		while (i > 0) {
+			i -- ;
+
+			int[] region = regions.elementAt(i) ;
+
+			//only deal with this region is not within a region we have already delt with. 
+			if (region[0] < lastPos) {
+
+				//copy everything between this region and start of last one we dealt with. 
+				strippedMarkup.insert(0, markup.substring(region[1], lastPos)) ;
+
+				String linkMarkup = markup.substring(region[0], region[1]) ;
+
+				//print("link [region[0],region[1]] = linkMarkup\n\n") ;
+
+				// by default (if anything goes wrong) we will keep the link as it is
+				String strippedLinkMarkup = linkMarkup ;
+				Matcher m = linkPattern.matcher(linkMarkup) ;
+				if (m.matches()) {
+
+					String prefix = m.group(1) ;
+					String dest = m.group(2) ;
+					String anchor = m.group(3) ;
+
+					if (prefix != null) {
+						// this is not a link to another article, so get rid of it entirely
+						if (replacement != null) {
+							strippedLinkMarkup = linkMarkup.replaceAll(".", replacement.toString()) ;			
+						} else {
+							strippedLinkMarkup = "" ;
+						}
+					} 
+
+				} else {
+					//logProblem("our pattern for delimiting links has a problem") ;
+				}
+
+				strippedMarkup.insert(0, strippedLinkMarkup) ;
+				lastPos = region[0] ;
+			}
+		}	
+
+		if (lastPos > 0) 
+			strippedMarkup.insert(0, markup.substring(0, lastPos)) ;
+
+		return strippedMarkup.toString() ; 	
+	}
+
+
+	/**
+	 * Removes all sections (both header and content, including nested sections) with the given sectionNames
 	 * 
 	 * @param sectionName the name of the section (case insensitive) to remove.
 	 * @param markup the markup to be stripped
 	 * @return the stripped markup
 	 */
-	public static String stripSection(String markup, String sectionName) {
+	public String stripSections(String markup, String[] sectionNames, Character replacement) {
 		
-		Pattern p = Pattern.compile("(={2,})\\s*" + sectionName + "\\s*\\1.*?([^=]\\1[^=])", Pattern.CASE_INSENSITIVE + Pattern.DOTALL) ;
-		Matcher m = p.matcher(markup) ;
+		Vector<int[]> regions = new Vector<int[]>() ;
 		
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
+		for (String sectionName:sectionNames) 
+			regions = mergeRegionLists(regions, gatherSection(markup, sectionName)) ;
+
+		return stripRegions(markup, regions, replacement) ;
+	}
+	
+	public String stripSectionHeaders(String markup, Character replacement) {
 		
-		while (m.find()) {				
-			sb.append(markup.substring(lastIndex, m.start())) ;
-			sb.append(m.group(2)) ;
-			lastIndex = m.end() ;	
-		}
+		Vector<int[]> regions = this.gatherSectionHeaders(markup) ;
+		return stripRegions(markup, regions, replacement) ;
 		
-		sb.append(markup.substring(lastIndex)) ;
-		markup = sb.toString() ;
-		
-		//if this was the last section in the doc, then it won't be discarded because we can't tell where it ends.
-		//best we can do is delete the title and the paragraph below it.
-		
-		p = Pattern.compile("(={2,})\\s*" + sectionName + "\\s*\\1\\W*.*?\n\n", Pattern.CASE_INSENSITIVE + Pattern.DOTALL) ;
-		m = p.matcher(markup) ;
-		
-		sb = new StringBuffer() ;
-		lastIndex = 0 ;
-		
-		while (m.find()) {		
-			sb.append(markup.substring(lastIndex, m.start())) ;
-			lastIndex = m.end()-2 ;	
-		}
-		
-		sb.append(markup.substring(lastIndex)) ;	
-		return sb.toString() ;
 	}
 
 	/**
-	 * Strips all templates from the given markup; anything like {{this}}. 
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
+	 * Convenience method which combines both of the above methods - i.e. returns a copy of the
+	 * given markup, where all markup has been removed except for section headers and list markers.
+	 *
+	 * By default, unwanted markup is completely discarded. You can optionally specify 
+	 * a character to replace the regions that are discared, so that the length of the 
+	 * string and the locations of unstripped characters is not modified. 
 	 */
-	public static String stripTemplates(String markup) {
-		
-		Vector<Integer> templateStack = new Vector<Integer>() ; 
-		
-		Pattern p = Pattern.compile("(\\{\\{|\\}\\})") ;
-		Matcher m = p.matcher(markup) ;
-		
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
-		
-		while (m.find()) {
-			
-			String tag = markup.substring(m.start(), m.end()) ;
-			
-			if (tag.equals("{{"))
-				templateStack.add(m.start()) ;
-			else {
-				if (!templateStack.isEmpty()) {
-					int templateStart = templateStack.lastElement() ;
-					templateStack.remove(templateStack.size()-1) ;
-					
-					if (templateStack.isEmpty()) {
-						sb.append(markup.substring(lastIndex, templateStart)) ;
-						
-						//TODO: here is where we would resolve a template, instead of just removing it.
-						//sb.append(stripTemplate(markup.substring(templateStart+2, m.start()))) ;
-						
-						//we have the whole template, with other templates nested inside					
-						lastIndex = m.end() ;
-					}
+
+	public String stripToPlainText(String markup, Character replacement) {
+
+		String clearedMarkup = stripAllButInternalLinksAndEmphasis(markup, replacement) ;
+		clearedMarkup = stripInternalLinks(clearedMarkup, replacement) ;
+
+		return clearedMarkup ;	
+	}
+
+
+
+	/**
+	 * Returns a copy of the given markup, where the given regions have been removed. 
+	 * Regions are identified using one of the gather methods.
+	 * 
+	 * By default, unwanted markup is completely discarded. You can optionally specify
+	 * a character to replace the regions that are discared, so that the length of the 
+	 * string and the locations of unstripped characters is not modified.
+	 */
+	public String stripRegions(String markup, Vector<int[]> regions, Character replacement) {
+
+		StringBuffer clearedMarkup = new StringBuffer() ;
+
+		int lastPos = markup.length() ;
+
+		//because regions are sorted by end position, we work backwards through them
+		int i = regions.size() ;
+
+		while (i > 0) {
+			i -- ;
+
+			int[] region = regions.elementAt(i) ;
+
+
+			//only deal with this region is not within a region we have already delt with. 
+			if (region[0] < lastPos) {
+
+				//print (" - - dealing with it\n") ;
+
+				//copy markup after this region and before beginning of the last region we delt with
+				if (region[1] < lastPos) 
+					clearedMarkup.insert(0, markup.substring(region[1], lastPos)) ;
+
+				if (replacement != null) {
+					String fill = markup.substring(region[0],region[1]).replaceAll(".", replacement.toString()) ;
+					clearedMarkup.insert(0, fill) ;
 				}
+
+				lastPos = region[0] ;
+			} else {
+				//print (" - - already dealt with\n") ;
+
 			}
 		}
-		
-		if (!templateStack.isEmpty())
-			System.err.println("MarkupStripper | Warning: templates were not well formed, so we cannot guarantee that they were stripped out correctly. ") ;
-		
-		sb.append(markup.substring(lastIndex)) ;
-		return sb.toString() ;
+
+		clearedMarkup.insert(0, markup.substring(0, lastPos)) ;	
+		return clearedMarkup.toString() ;
 	}
 	
-	/*
-	private static String stripTemplate(String markup) {
-		//TODO: ideally we would have all the templates summarized, so here we could looking up the template and resolve it to html. For now we just get rid of all templates.
+	public String stripExcessNewlines(String markup) {
 		
-		return "" ;
-	}*/
+		String strippedMarkup = markup.replaceAll("\n{3,}", "\n\n") ;
+		return strippedMarkup.trim();
+	}
+
+
+//	======================================================================================================
+
+	/**
+	 * Gathers areas within the markup which correspond to links to other wikipedia pages
+	 * (as identified by [[ and ]] pairs). Note: these can be nested (e.g. for images)
+	 */
+	public Vector<int[]> gatherInternalLinks(String markup) {
+		//currItem = "internal links" ;
+
+		return gatherComplexRegions(markup, "\\[\\[", "\\]\\]") ;
+	}
+
+	/**
+	 * Gathers areas within the markup which correspond to templates (as identified by {{ and }} pairs). 
+	 */
+	public Vector<int[]> gatherTemplates(String markup) {
+		//currItem = "templates" ;
+		return gatherComplexRegions(markup, "\\{\\{", "\\}\\}") ;
+	}
+
+	/**
+	 * Gathers areas within the markup which correspond to tables (as identified by {| and |} pairs). 
+	 */
+	public Vector<int[]> gatherTables(String markup) {
+		//currItem = "tables" ;
+		return gatherComplexRegions(markup, "\\{\\|", "\\|\\}") ;
+	}
+	
+	
+	
+
+	/**
+	 * Gathers areas within the markup which correspond to html tags. 
+	 * 
+	 * DIV and REF regions will enclose beginning and ending tags, and everything in between,
+	 * since we assume this content is supposed to be discarded. All other regions will only include the
+	 * individual tag, since we assume the content between such pairs is supposed to be retained. 
+	 */
+	public Vector<int[]> gatherHTML(String markup) {
+
+		//currItem = "html" ;
+
+		//gather and merge references
+		Vector<int[]> regions = gatherReferences(markup) ;
+
+		//gather <div> </div> pairs
+		regions = mergeRegionLists(regions, gatherComplexRegions(markup, "\\<div(\\s*?)([^>\\/]*?)\\>", "\\<\\/div(\\s*?)\\>")) ;
+		
+		//gather remaining tags
+		regions = mergeRegionLists(regions, gatherSimpleRegions(markup, "\\<(.*?)\\>")) ;
+		
+		return regions ;
+	}
+
+
+	/**
+	 * Gathers areas within the markup which correspond to references (markup to support claims or facts).
+	 * The regions will enclose beginning and ending tags, and everything in between,
+	 * since we assume this content is supposed to be discarded. 
+	 */
+	public Vector<int[]> gatherReferences(String markup) {
+
+		//currItem = "references" ;
+
+		//gather <ref/>
+		Vector<int[]> regions = gatherSimpleRegions(markup, "\\<ref(\\s*?)([^>]*?)\\/\\>") ;
+
+		//gather <ref> </ref> pairs (these shouldnt be nested, but what the hell...)
+		regions = mergeRegionLists(regions, gatherComplexRegions(markup, "\\<ref(\\s*?)([^>\\/]*?)\\>", "\\<\\/ref(\\s*?)\\>")) ;
+
+		return regions ;
+	}
+
+
+	/**
+	 * Gathers items which MediaWiki documentation mysteriously refers to as "majic words": e.g. __NOTOC__
+	 */
+	public Vector<int[]> gatherMagicWords(String markup) {
+
+		//currItem = "magic words" ;
+		return gatherSimpleRegions(markup, "\\_\\_([A-Z]+)\\_\\_") ;
+	}
+
+	/**
+	 * Gathers all links to external web pages
+	 */
+	public Vector<int[]> gatherExternalLinks(String markup) {
+		//currItem = "external links" ;
+		return gatherSimpleRegions(markup, "\\[(http|www|ftp).*?\\]") ;
+	}
+
+	/**
+	 * Gathers bold and italic markup
+	 */
+	public Vector<int[]> gatherEmphasis(String markup) {
+		//currItem = "emphasis" ;
+		return gatherSimpleRegions(markup, "'{2,}") ; 
+	}
+	
 	
 	/**
-	 * Strips all tables from the given markup; anything like {|this|}. 
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
+	 * Gathers section headers
 	 */
-	public static String stripTables(String markup) {
+	public Vector<int[]> gatherSectionHeaders(String markup) {
+
+		Vector<int[]> regions = new Vector<int[]>() ;
 		
-		Vector<Integer> tableStack = new Vector<Integer>() ; 
-		
-		Pattern p = Pattern.compile("(\\{\\||\\|\\})") ;
+		Pattern p = Pattern.compile("\\n\\s*((={2,})[^=].*?\\2)[^=]") ;
 		Matcher m = p.matcher(markup) ;
 		
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
-		
 		while (m.find()) {
-			
-			String tag = markup.substring(m.start(), m.end()) ;
-			
-			if (tag.equals("{|"))
-				tableStack.add(m.start()) ;
-			else {
-				if (!tableStack.isEmpty()) {
-					int templateStart = tableStack.lastElement() ;
-					tableStack.remove(tableStack.size()-1) ;
-					
-					if (tableStack.isEmpty()) {
-						sb.append(markup.substring(lastIndex, templateStart)) ;
-						
-						//we have the whole table, with other tables nested inside					
-						lastIndex = m.end() ;
-					}
-				}
-			}
+			int[] region = {m.start(1), m.end(1)} ;
+			regions.add(region) ;
 		}
-		
-		if (!tableStack.isEmpty())
-			System.err.println("MarkupStripper | Warning: tables were not well formed, so we cannot guarantee that they were stripped out correctly. ") ;
-		
-		sb.append(markup.substring(lastIndex)) ;		
-		return sb.toString() ;
+		return regions ;
 	}
 	
 	
-	/**
-	 * Strips all <ref> tags from the given markup; both those that provide links to footnotes, and the footnotes themselves.
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
-	 */
-	public static String stripRefs(String markup) {
+	public Vector<int[]> gatherSection(String markup, String sectionName) {
 		
-		String strippedMarkup = markup.replaceAll("<ref\\\\>", "") ;					//remove simple ref tags
-		strippedMarkup = strippedMarkup.replaceAll("(?s)<ref>(.*?)</ref>", "") ;			//remove ref tags and all content between them. 
-		strippedMarkup = strippedMarkup.replaceAll("(?s)<ref\\s(.*?)>(.*?)</ref>", "") ; 	//remove ref tags and all content between them (with attributes).
-	    
-		return strippedMarkup ;
-	}
-	
-	/**
-	 * Strips all html tags and comments from the given markup. Text found between tags is not removed.
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
-	 */
-	public static String stripHTML(String markup) {
+		Vector<int[]> regions = new Vector<int[]>() ;
 		
-		String strippedMarkup = markup.replaceAll("(?s)\\<\\!\\-\\-(.*?)\\-\\-\\>","") ;	//strip comments
+		//find start of section
+		Pattern startP = Pattern.compile("\\n\\s*(={2,})\\s*" + sectionName + "\\s*\\1", Pattern.CASE_INSENSITIVE) ;
+		Matcher startM = startP.matcher(markup) ;
 		
-		strippedMarkup = stripRefs(strippedMarkup) ;
-		strippedMarkup = strippedMarkup.replaceAll("<(.*?)>", "") ;	// remove remaining tags ;	
-		
-		return strippedMarkup ;
-	}
-	
-	
-	/**
-	 * Strips all links to external web pages; anything like [this] that starts with "http" or "www". 
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped text
-	 */
-	public static String stripExternalLinks(String markup) {
-		
-		String strippedMarkup = markup.replaceAll("\\[(http|www)(.*?)\\]", "") ;
-		return strippedMarkup ;
-	}
-	
-	/**
-	 * Strips all wiki formatting, the stuff that makes text bold, italicised, intented, listed, or made into headers. 
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped markup
-	 */
-	public static String stripFormatting(String markup) {
-		
-		String strippedMarkup = markup.replaceAll("'{2,}", "") ;       //remove all bold and italic markup ;
-		strippedMarkup = strippedMarkup.replaceAll("={2,}","") ;	   //remove all header markup
-		strippedMarkup = strippedMarkup.replaceAll("\n:+", "\n") ;	   //remove indents.
-		strippedMarkup = strippedMarkup.replaceAll("\n(\\*+)\\W*", "\n") ; //remove list markers.
-		
-		
-		
-		return strippedMarkup ;
-	}
-	
-	
-	
-	/**
-	 * Removes anything at the start of the markup that is indented. Normally this indicates notes that the author
-	 * should have used a template for, such as a "For other uses, see ****" note.
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped markup
-	 */
-	public static String stripIndentedStart(String markup) {
-		
-		Pattern p = Pattern.compile("(.*?)\n", Pattern.DOTALL) ;
-		Matcher m = p.matcher(markup) ;
-		
-		StringBuffer sb = new StringBuffer() ;
-		int newStart = 0 ;
-		
-		while (m.find()) {
-			//System.out.println(" - \"" + m.group() + "\"\n\n") ;
+		if(startM.find()) {
 			
-			if (m.group().matches("(?s)([\\s\\W]*)([\\:\\*]+)(.*)")||m.group().matches("\\W*"))
-				newStart = m.end() ;
+			int start = startM.start(1) ;
+			int level = startM.group(1).length() ;
+			int end ;
+			
+			//look for start of section that is at same level or higher
+			Pattern endP = Pattern.compile("\\n\\s*(={2,"+level+"})[^=].*\\1") ;
+			
+			Matcher endM = endP.matcher(markup) ;
+			
+			if (endM.find(startM.end())) 
+				end = endM.start() ;
 			else
+				end = markup.length() -1 ;
+				
+			int[] region = {start, end} ;
+			regions.add(region) ;
+		}
+			
+		return regions ;
+	}
+	
+	
+
+	/**
+	 * Gathers markup which indicates indented items, or numbered and unnumbered list items
+	 */
+	public Vector<int[]> gatherListAndIndentMarkers(String markup) {
+		//currItem = "list and intent markers" ;
+
+		Vector<int[]> regions = gatherSimpleRegions(markup, "\n( *)([//*:]+)") ;
+
+		//increment start positions of all regions by one, so they don't include the newline character
+		for (int[] region:regions)
+			region[0]++ ;
+
+		//add occurance of list item on first line (if there is one)
+		regions = mergeRegionLists(regions, gatherSimpleRegions(markup, "^( *)([//*:]+)")) ;
+		return regions ;
+	}
+
+	/**
+	 * Gathers paragraphs within the markup referred to by the given pointer, which are at the 
+	 * start and either begin with an indent or are entirely encased in italics. These correspond to quotes or disambiguation and 
+	 * navigation notes that the author should have used templates to identify, but didn't. 
+	 * This will only work after templates, and before list markers have been cleaned out.
+	 */
+	public Vector<int[]> gatherMisformattedStarts(String markup) {
+
+		//currItem = "starts" ;
+
+		String[] lines = markup.split("\n") ;
+
+		int ignoreUntil = 0 ;
+
+		for (String line:lines) {
+
+			
+
+			boolean isWhitespace = line.matches("^(\\s*)$") ;
+			boolean isIndented = line.matches("^(\\s*):.*") ;
+			boolean isItalicised = line.matches("^(\\s*)'{2,}(.*?)'{2,}\\.?(\\s*)") ;
+			boolean isImage = line.matches("^(\\s*)\\[\\[Image\\:(.*?)\\]\\](\\s*)") ;
+			
+			
+			//System.out.println(" - - '" + line + "' " + isIndented + "," + isItalicised) ;
+			
+			if (isWhitespace || isIndented || isItalicised || isImage)  {
+				//want to ignore this line
+				ignoreUntil = ignoreUntil + line.length() + 1 ;	
+				//print(" - - - discard\n") ;		
+			} else {
+				//print(" - - - keep\n") ;
 				break ;
+			}		
 		}
 		
-		sb.append(markup.substring(newStart)) ;		
-		return sb.toString() ;
+		int[] region = {0, ignoreUntil} ;
+
+		Vector<int[]> regions = new Vector<int[]>() ;
+		regions.add(region) ;
+		
+		return regions ;
 	}
-	
-	
+
+
 	/**
-	 * Collapses consecutive newlines into at most two newlines. 
-	 * This is provided because stripping out templates and tables often leaves large gaps in the text.  
+	 * Gathers simple regions: ones which cannot be nested within each other.
 	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped markup
-	 */
-	public static String stripExcessNewlines(String markup) {
+	 *  The returned regions (an array of start and end positions) will be sorted 
+	 *  by end position (and also by start position, since they can't overlap) 
+	 */ 
+	public Vector<int[]> gatherSimpleRegions(String markup, String regex) {
+
+		//an array of regions we have identified
+		//each region is given as an array containing start and end character indexes of the region. 
+		Vector<int[]> regions = new Vector<int[]>() ;
 		
-		String strippedMarkup = markup.replaceAll("\n{3,}", "\n\n") ;		
-		return strippedMarkup ;
-	}	
-	
-	/**
-	 * Removes all ordered and unordered list items.
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped markup
-	 */
-	public static String stripListItems(String markup) {
-		
-		String strippedMarkup = markup.replaceAll("\n\\s*[\\#\\*]+\\s*(.*?)\n", "\n") ;		
-		return strippedMarkup ;
-	}	
-	
-	
-	/**
-	 * Removes all brackets that have nothing in them but space. This is a hack, a symptom of not dealing with templates very well.
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped markup
-	 */
-	public static String stripOrphanedBrackets(String markup) {
-		
-		String strippedMarkup = markup.replaceAll("\\([\\W]*?\\)", "") ;		
-		return strippedMarkup ;
+		Pattern p = Pattern.compile(regex, Pattern.DOTALL) ;
+		Matcher m = p.matcher(markup) ;
+
+		while(m.find()) {
+			int[] region = {m.start(), m.end()} ;
+			regions.add(region) ;
+		}
+
+		return regions ;
 	}
-	
+
+
 	/**
-	 * Removes special "magic word" (???) syntax, such as __NOTOC__
+	 * Gathers complex regions: ones which can potentially be nested within each other.
 	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped markup
-	 */
-	public static String stripMagicWords(String markup) {
+	 * The returned regions (an array of start and end positions) will be either
+	 * non-overlapping or cleanly nested, and sorted by end position. 
+	 */ 
+	public Vector<int[]> gatherComplexRegions(String markup, String startRegex, String endRegex) {
+
+		//an array of regions we have identified
+		//each region is given as an array containing start and end character indexes of the region. 
+		Vector<int[]> regions = new Vector<int[]>() ;
+
+		//a stack of region starting positions
+		Vector<Integer> startStack = new Vector<Integer>() ;
 		
-		String strippedMarkup = markup.replaceAll("\\_\\_(\\p{Upper}+\\_\\_)", "") ;		
-		return strippedMarkup ;
-	}
-	
-	/**
-	 * Removes all section headers. 
-	 * 
-	 * @param markup the text to be stripped
-	 * @return the stripped markup
-	 */
-	public static String stripHeadings(String markup) {
-		Pattern p = Pattern.compile("(={2,})([^=]+)(\\1)") ;
+		
+		Pattern p = Pattern.compile("((" + startRegex + ")|(" + endRegex + "))", Pattern.DOTALL) ;
 		Matcher m = p.matcher(markup) ;
 		
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
-		
-		while (m.find()) {
-			sb.append(markup.substring(lastIndex, m.start())) ;
-			lastIndex = m.end() ;		
+		while(m.find()) {
+
+			Integer p1 = m.start() ;
+			Integer p2 = m.end() ;  
+			
+
+			if (m.group(2) != null) {
+				//this is the start of an item
+				startStack.add(p1) ;
+			} else {
+				//this is the end of an item
+				if (!startStack.isEmpty()) {
+					int start = startStack.elementAt(startStack.size()-1) ;
+					startStack.removeElementAt(startStack.size()-1) ;
+					
+					int[] region = {start, p2} ;
+					regions.add(region) ;
+
+					//print (" - item [region[0],region[1]]: ".substr(markup, region[0], region[1]-region[0])."\n") ;
+				} else {
+					//logProblem("oops, we found the end of an item, but have no idea where it started") ;
+				}
+			}
 		}
-		
-		sb.append(markup.substring(lastIndex)) ;
-		return sb.toString() ;		
+
+		if (!startStack.isEmpty()) {
+			//logProblem("oops, we got to the end of the markup and still have items that have been started but not finished") ;
+		}
+
+		return regions ;
 	}
+
+
+	/**
+	 * Collapses a region list, by discarding any regions which are contained within 
+	 * other regions.
+	 * 
+	 * The resulting region list will be non-overlapping and sorted by end positions.
+	 */
+	private Vector<int[]> collapseRegionList(Vector<int[]> regions) {
+
+		Vector<int[]> newRegions = new Vector<int[]>() ;
+
+		int index = regions.size() -1 ;
+
+		int lastPos = -1 ;
+
+		while (index >= 0) {
+
+			int[] region = regions.elementAt(index) ;
+
+			if (lastPos <0 || region[1] <= lastPos) {
+				newRegions.add(0, region) ;
+				lastPos = region[0] ;
+			}
+			
+			index-- ;
+		}
+
+		return newRegions ;	
+	}
+
+	/**
+	 * Merges two lists of regions into one sorted list. Regions that are contained
+	 * within other regions are discarded.
+	 * 
+	 * The resulting region list will be non-overlapping and sorted by end positions.
+	 */
+	private Vector<int[]> mergeRegionLists(Vector<int[]> regionsA, Vector<int[]> regionsB) {
+
+		int indexA = regionsA.size() -1 ;
+		int indexB = regionsB.size() - 1;
+
+		Vector<int[]> newRegions = new Vector<int[]>() ;
+
+		int lastPos = -1 ;
+
+		while (indexA >= 0 && indexB >= 0) {
+
+			int[] regionA = regionsA.elementAt(indexA) ;
+			int[] regionB = regionsB.elementAt(indexB) ;
+
+			if (lastPos >= 0 && regionA[0] >= lastPos && regionA[0] >= lastPos) {
+				//both of these are inside regions that we have already dealt with, so discard them
+				indexA-- ;
+				indexB-- ;
+			} else {
+				if (regionB[1] > regionA[1]) {
+
+					//lets see if we need to copy B across
+					if ((regionB[0] >= regionA[0] && regionB[1] <= regionA[1]) || (lastPos>=0 && regionB[0] >= lastPos)) {
+						//either A or the last region we dealt with completely contains B, so we just discard B
+					} else {
+						//deal with B now
+						int[] newRegion = {regionB[0], min(regionB[1], lastPos)} ;
+						newRegions.add(0, newRegion) ;
+						lastPos = regionB[0] ;
+					}
+
+					indexB-- ;				
+				} else {
+
+					//lets see if we need to copy A across
+
+					if ((regionA[0] >= regionB[0] && regionA[1] <= regionB[1]) || (lastPos>=0 && regionA[0] >= lastPos)) {
+						//either B or the last region we dealt with completely contains A, so we just discard A
+					} else {
+						//deal with A now
+						int[] newRegion = {regionA[0], min(regionA[1], lastPos)} ;
+						newRegions.add(0, newRegion) ;
+						lastPos = regionA[0] ;
+					}
+
+					indexA-- ;	
+				}
+			}
+		}
+
+		//deal with any remaining A regions
+		while (indexA >= 0) {
+
+			int[] regionA = regionsA.elementAt(indexA) ;
+
+			if (lastPos >= 0 && regionA[0] > lastPos) {
+				//this is already covered, so ignore it
+			} else {
+				int[] newRegion = {regionA[0], min(regionA[1], lastPos)} ;
+				newRegions.add(0, newRegion) ;
+				lastPos = regionA[0] ;
+			}
+
+			indexA-- ;
+		}
+
+		//deal with any remaining B regions
+		while (indexB >= 0) {
+
+			int[] regionB = regionsB.elementAt(indexB) ;
+
+			if (lastPos >= 0 && regionB[0] > lastPos) {
+				//this is already covered, so ignore it
+			} else {
+				int[] newRegion = {regionB[0], min(regionB[1], lastPos)} ;
+				newRegions.add(0, newRegion) ;
+				lastPos = regionB[0] ;
+			}
+
+			indexB-- ;
+		}
+
+		return newRegions ;
+	}
+
+	
+	private int min(int a, int b) {
+
+		if (a>=0 && b>=0) {
+			return Math.min(a,b) ;
+		} else {
+			if (a>=0)
+				return a ;
+			else 
+				return b ;
+		}
+	}
+	
+
 }

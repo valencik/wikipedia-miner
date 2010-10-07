@@ -20,18 +20,19 @@
 
 package org.wikipedia.miner.annotation;
 
-import gnu.trove.TIntHashSet;
-
 import java.io.*;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.log4j.Logger;
+import org.wikipedia.miner.annotation.ArticleCleaner.SnippetLength;
+import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.util.text.*;
-import org.wikipedia.miner.model.Anchor.Sense;
+import org.wikipedia.miner.model.Label.Sense;
 
 import weka.classifiers.*;
 import weka.classifiers.meta.* ;
@@ -58,42 +59,37 @@ public class Disambiguator {
 	private Classifier classifier ;
 
 	private double minSenseProbability ; 
-	private int maxAnchorLength = 20 ;
+	private int maxLabelLength = 20 ;
 	private double minLinkProbability ;
 	private int maxContextSize ;
 
-	/**
-	 * Initializes the Disambiguator with default parameters.
-	 * 
-	 * @param wikipedia an initialized Wikipedia instance, preferably with relatedness measures cached.
-	 * @param textProcessor an optional text processor (may be null) that will be used to alter terms before they are searched for.
-	 */
-	public Disambiguator(Wikipedia wikipedia, TextProcessor textProcessor) {
+	
+	
+	public Disambiguator(Wikipedia wikipedia) throws IOException, Exception {
+		
+		WikipediaConfiguration conf = wikipedia.getConfig() ;
+		init(wikipedia, conf.getDefaultTextProcessor(), conf.getMinSenseProbability(), conf.getMinLinkProbability(), 50) ;
 
-		init(wikipedia, textProcessor, 0.02, 0.03, 25) ;
 		
-		if (!wikipedia.getDatabase().arePagesCached())
-			System.err.println("Disambiguator | Warning: pages have not been cached, so this will run significantly slower than it needs to.") ;
-		
-		if (tp != null && !wikipedia.getDatabase().areAnchorsCached(tp))
-			System.err.println("Disambiguator | Warning: anchors have not been cached, so this will run significantly slower than it needs to.") ;
-		
-		if (!wikipedia.getDatabase().areInLinksCached())
-			System.err.println("Disambiguator | Warning: links into pages have not been cached, so this will run significantly slower than it needs to.") ;
+		if (conf.getDisambigModel() != null)
+			loadClassifier(conf.getDisambigModel()) ;
 	}
-
+	
+	
 	/**
 	 * Initializes the Disambiguator with custom parameters. You should train and build a new classifier for
 	 * each configuration.
 	 * 
 	 * @param wikipedia an initialized Wikipedia instance, preferably with relatedness measures cached.
 	 * @param textProcessor an optional text processor (may be null) that will be used to alter terms before they are searched for.
-	 * @param minSenseProbability the lowest probability (as a destination for the ambiguous anchor term) for which senses will be considered. 
+	 * @param minSenseProbability the lowest probability (as a destination for the ambiguous Label term) for which senses will be considered. 
 	 * @param minLinkProbability the lowest probability (as a link in Wikipedia) for which terms will be mined from surrounding text
 	 * @param maxContextSize the maximum number of concepts that are used as context.
 	 */
 	public Disambiguator(Wikipedia wikipedia,  TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) {
 		init(wikipedia, textProcessor, minSenseProbability, minLinkProbability, maxContextSize) ;
+		
+		
 	}
 
 
@@ -101,7 +97,6 @@ public class Disambiguator {
 		this.wikipedia = wikipedia ;
 		this.cleaner = new ArticleCleaner() ;
 		this.tp = textProcessor ;
-		//this.ss = new SentenceSplitter() ;
 
 		this.minSenseProbability = minSenseProbability ;
 		this.minLinkProbability = minLinkProbability ;
@@ -120,6 +115,12 @@ public class Disambiguator {
 
 		this.header = new Instances("disambiguation_headerOnly", attributes, 0) ;
 		header.setClassIndex(header.numAttributes() -1) ;
+		
+		if (wikipedia.getConfig().getCachePriority(DatabaseType.label) == null)
+			Logger.getLogger(Disambiguator.class).warn("'label' database has not been cached, so this will run significantly slower than it needs to.") ;
+		
+		if (wikipedia.getConfig().getCachePriority(DatabaseType.pageLinksIn) == null)
+			Logger.getLogger(Disambiguator.class).warn("'pageLinksIn' database has not been cached, so this will run significantly slower than it needs to.") ;
 	}
 
 	/**
@@ -132,7 +133,7 @@ public class Disambiguator {
 	 * @return the probability that the sense implied here is valid.
 	 * @throws Exception if we cannot classify this sense.
 	 */
-	public double getProbabilityOfSense(double commonness, double relatedness, Context context) throws Exception {
+	public float getProbabilityOfSense(float commonness, float relatedness, Context context) throws Exception {
 
 		double[] values = new double[attributes.size()];
 
@@ -148,7 +149,8 @@ public class Disambiguator {
 		Instance i = new Instance(1.0, values) ;
 		i.setDataset(header) ;
 
-		return classifier.distributionForInstance(i)[0] ;		
+		//TODO: is this stupid?
+		return (float)classifier.distributionForInstance(i)[0] ;		
 	}
 
 	/**
@@ -161,19 +163,19 @@ public class Disambiguator {
 	 * @param rc a cache in which relatedness measures will be saved so they aren't repeatedly calculated. Make this null if using extremely large training sets, so that caches will be reset from document to document, and won't grow too large.   
 	 * @throws Exception 
 	 */
-	public void train(ArticleSet articles, int snippetLength, String datasetName, RelatednessCache rc) throws Exception{
+	public void train(ArticleSet articles, SnippetLength snippetLength, String datasetName, RelatednessCache rc) throws Exception{
 
 		initializeTrainingData(datasetName) ;
 
-		ProgressNotifier pn = new ProgressNotifier(articles.getArticleIds().size(), "Disambiguator| training") ;
+		ProgressTracker pn = new ProgressTracker(articles.getArticleIds().size(), "training", Disambiguator.class) ;
 		for (int id: articles.getArticleIds()) {
 			
 			Article art = null;
 			
 			try{ 
-				art = new Article(wikipedia.getDatabase(), id) ;
+				art = new Article(wikipedia.getEnvironment(), id) ;
 			} catch (Exception e) {
-				System.err.println("Warning: " + id + " is not a valid article") ;
+				Logger.getLogger(Disambiguator.class).warn(id + " is not a valid article") ;
 			}
 			
 			if (art != null)
@@ -194,7 +196,7 @@ public class Disambiguator {
 	 * @throws Exception if the disambiguator has not been trained yet.
 	 */
 	public void saveTrainingData(File file) throws IOException, Exception {
-		System.out.println("Disambiguator: saving training data...") ;
+		Logger.getLogger(Disambiguator.class).info("saving training data") ;
 		
 		if (trainingData == null)
 			throw new Exception("You need to train the disambiguator first!") ;
@@ -212,7 +214,7 @@ public class Disambiguator {
 	 * @throws IOException if the file cannot be read
 	 */
 	public void loadTrainingData(File file) throws IOException{
-		System.out.println("Disambiguator: loading training data...") ;
+		Logger.getLogger(Disambiguator.class).info("loading training data") ;
 
 		trainingData = new Instances(new BufferedReader(new FileReader(file)));
 		trainingData.setClassIndex(trainingData.numAttributes() - 1);
@@ -231,7 +233,7 @@ public class Disambiguator {
 	 * @throws Exception unless the disambiguator has been trained and a classifier has been built.
 	 */
 	public void saveClassifier(File file) throws IOException, Exception {
-		System.out.println("Disambiguator: saving classifier...") ;
+		Logger.getLogger(Disambiguator.class).info("saving classifier") ;
 		
 		if (classifier == null)
 			throw new Exception("You must train the disambiguator and build a classifier first!") ;
@@ -250,7 +252,7 @@ public class Disambiguator {
 	 * @throws Exception if the file does not contain a valid classifier. 
 	 */
 	public void loadClassifier(File file) throws IOException, Exception {
-		System.out.println("Disambiguator: loading classifier...") ;
+		Logger.getLogger(Disambiguator.class).info("loading classifier") ;
 
 		ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file));
 		classifier = (Classifier) ois.readObject();
@@ -266,7 +268,7 @@ public class Disambiguator {
 	 * @throws Exception if there is no training data
 	 */
 	public void buildClassifier(Classifier classifier) throws Exception {
-		System.out.println("Disambiguator: Building classifier...") ;
+		Logger.getLogger(Disambiguator.class).info("building classifier") ;
 
 		weightTrainingInstances() ;
 
@@ -278,9 +280,9 @@ public class Disambiguator {
 		}
 	}
 
-	private void train(Article article, int snippetLength, RelatednessCache rc) throws Exception {
+	private void train(Article article, SnippetLength snippetLength, RelatednessCache rc) throws Exception {
 
-		Vector<Anchor> unambigAnchors = new Vector<Anchor>() ;
+		Vector<Label> unambigLabels = new Vector<Label>() ;
 		Vector<TopicReference> ambigRefs = new Vector<TopicReference>() ;
 
 		String content = cleaner.getMarkupLinksOnly(article, snippetLength) ;
@@ -294,30 +296,30 @@ public class Disambiguator {
 			
 			
 
-			String anchorText = linkText ;
+			String labelText = linkText ;
 			String destText = linkText ;
 
 			int pos = linkText.lastIndexOf('|') ;
 			if (pos>0) {
 				destText = linkText.substring(0, pos) ;
-				anchorText = linkText.substring(pos+1) ;
+				labelText = linkText.substring(pos+1) ;
 			}
 
-			//System.out.println(linkText + ", " + anchorText + ", " + destText) ;
+			//System.out.println(linkText + ", " + LabelText + ", " + destText) ;
 			
-			Anchor anchor = new Anchor(anchorText, tp, wikipedia.getDatabase()) ;
-			int senseCount = anchor.getSenses().size() ;
+			Label label = new Label(wikipedia.getEnvironment(), labelText, tp) ;
+			Label.Sense[] senses = label.getSenses() ;
 			Article dest = wikipedia.getArticleByTitle(destText) ;
 			
 			//if (dest == null) {
 			//	System.err.println("Could not locate article entitled \"" + destText + "\"") ;
 			//}
 
-			if (dest != null && senseCount >= 1) {
-				TopicReference ref = new TopicReference(anchor, dest.getId(), new Position(0, 0)) ;
+			if (dest != null && senses.length >= 1) {
+				TopicReference ref = new TopicReference(label, dest.getId(), new Position(0, 0)) ;
 
-				if (senseCount == 1 || anchor.getSenses().first().getProbability() >= (1-minSenseProbability))
-					unambigAnchors.add(anchor) ;
+				if (senses.length == 1 || senses[0].getPriorProbability() >= (1-minSenseProbability))
+					unambigLabels.add(label) ;
 				else
 					ambigRefs.add(ref) ;
 			}
@@ -328,17 +330,17 @@ public class Disambiguator {
 		Context context = getContext(article, snippetLength, rc) ;
 		
 		//only use links
-		//Context context = new Context(unambigAnchors, rc, maxContextSize) ;
+		//Context context = new Context(unambigLabels, rc, maxContextSize) ;
 
 		//resolve ambiguous links
 		for (TopicReference ref: ambigRefs) {
-			for (Sense sense:ref.getAnchor().getSenses()) {
+			for (Sense sense:ref.getLabel().getSenses()) {
 
-				if (sense.getProbability() < minSenseProbability) break ;
+				if (sense.getPriorProbability() < minSenseProbability) break ;
 
 				double[] values = new double[attributes.size()];
 
-				values[0] = sense.getProbability() ;
+				values[0] = sense.getPriorProbability() ;
 				values[1] = context.getRelatednessTo(sense) ;
 				values[2] = context.getQuality() ;
 
@@ -400,36 +402,63 @@ public class Disambiguator {
 	 * @throws SQLException if there is a problem with the WikipediaMiner database.
 	 * @throws Exception if there is a problem with the classifier
 	 */
-	public Result<Integer> test(ArticleSet testSet, int snippetLength, RelatednessCache rc) throws SQLException, Exception{
-
+	public Result<Integer> test(ArticleSet testSet, Wikipedia wikipedia2, SnippetLength snippetLength, RelatednessCache rc) throws SQLException, Exception{
+		
+		if (wikipedia2 == null)
+			wikipedia2 = wikipedia ;
+		
 		if (classifier == null) 
 			throw new WekaException("You must build (or load) classifier first.") ;
 
 		Result<Integer> r = new Result<Integer>() ;
 		Article art = null ;
 		
-		ProgressNotifier pn = new ProgressNotifier(testSet.getArticleIds().size(), "Testing") ;
+		double worstRecall = 1 ;
+		double worstPrecision = 1 ;
+		
+		int articlesTested = 0 ;
+		int perfectRecall = 0 ;
+		int perfectPrecision = 0 ;
+		
+		ProgressTracker pn = new ProgressTracker(testSet.getArticleIds().size(), "Testing", Disambiguator.class) ;
 		for (int id: testSet.getArticleIds()) {
 			try {
-				art = new Article(wikipedia.getDatabase(), id) ;
+				art = new Article(wikipedia2.getEnvironment(), id) ;
 			} catch (Exception e) {
 				System.err.println("Warning: " + id + " is not a valid article") ;
 			} ;
 			
-			if (art != null)
-				r.addIntermediateResult(test(art, snippetLength, rc)) ;
+			if (art != null) {
+				articlesTested ++ ;
+				
+				Result<Integer> ir = test(art, snippetLength, rc) ;
+				
+				if (ir.getRecall() ==1) perfectRecall++ ;
+				if (ir.getPrecision() == 1) perfectPrecision++ ;
+				
+				worstRecall = Math.min(worstRecall, ir.getRecall()) ;
+				worstPrecision = Math.min(worstPrecision, ir.getPrecision()) ;
+				
+				r.addIntermediateResult(ir) ;
+				
+			}
+				
 			
 			pn.update() ;
 		}
 
+		System.out.println("worstR:" + worstRecall + ", worstP:" + worstPrecision) ;
+		System.out.println("tested:" + articlesTested + ", perfectR:" + perfectRecall + ", perfectP:" + perfectPrecision) ;
+		
 		return r ;
 	}
 
-	private Result<Integer> test(Article article, int snippetLength, RelatednessCache rc) throws Exception {
+	private Result<Integer> test(Article article,  SnippetLength snippetLength, RelatednessCache rc) throws Exception {
 
 		System.out.println(" - testing " + article) ;
 
-		Vector<Anchor> unambigAnchors = new Vector<Anchor>() ;
+
+		Vector<Label> unambigLabels = new Vector<Label>() ;
 		Vector<TopicReference> ambigRefs = new Vector<TopicReference>() ;
 
 		String content = cleaner.getMarkupLinksOnly(article, snippetLength) ;
@@ -443,30 +472,30 @@ public class Disambiguator {
 		while (linkMatcher.find()) {			
 			String linkText = content.substring(linkMatcher.start()+2, linkMatcher.end()-2) ;
 
-			String anchorText = linkText ;
+			String labelText = linkText ;
 			String destText = linkText ;
 
 			int pos = linkText.lastIndexOf('|') ;
 			if (pos>0) {
 				destText = linkText.substring(0, pos) ;
-				anchorText = linkText.substring(pos+1) ;
+				labelText = linkText.substring(pos+1) ;
 			}
 
 			destText = Character.toUpperCase(destText.charAt(0)) + destText.substring(1) ;     // Get first char and capitalize
 
-			Anchor anchor = new Anchor(anchorText, tp, wikipedia.getDatabase()) ;
-			int senseCount = anchor.getSenses().size() ;
+			Label label = new Label(wikipedia.getEnvironment(), labelText, tp) ;
+			Label.Sense[] senses = label.getSenses() ;
 			Article dest = wikipedia.getArticleByTitle(destText) ;
 
-			if (senseCount > 0 && dest != null) {
+			if (senses.length > 0 && dest != null) {
 
 				goldStandard.add(dest.getId()) ;
 
-				if (senseCount == 1 || anchor.getSenses().first().getProbability() >= (1-minSenseProbability)) { 
-					unambigAnchors.add(anchor) ;
+				if (senses.length == 1 || senses[0].getPriorProbability() >= (1-minSenseProbability)) { 
+					unambigLabels.add(label) ;
 					disambiguatedLinks.add(dest.getId()) ;
 				} else {
-					TopicReference ref = new TopicReference(anchor, dest.getId(), null) ;
+					TopicReference ref = new TopicReference(label, dest.getId(), null) ;
 					ambigRefs.add(ref) ;
 				}
 			}
@@ -476,21 +505,21 @@ public class Disambiguator {
 		Context context = getContext(article, snippetLength, rc) ;
 		
 		//only use links
-		//Context context = new Context(unambigAnchors, rc, maxContextSize) ;
+		//Context context = new Context(unambigLabels, rc, maxContextSize) ;
 
 		// resolve senses		
 		for (TopicReference ref: ambigRefs) {
 
 			TreeSet<Article> validSenses = new TreeSet<Article>() ;
 
-			for (Sense sense:ref.getAnchor().getSenses()) {
+			for (Sense sense:ref.getLabel().getSenses()) {
 
-				if (sense.getProbability() < minSenseProbability) break ;
+				if (sense.getPriorProbability() < minSenseProbability) break ;
 
 				double[] values = new double[attributes.size()];
 
 
-				values[0] = sense.getProbability() ;
+				values[0] = sense.getPriorProbability() ;
 				values[1] = context.getRelatednessTo(sense) ;
 				values[2] = context.getQuality() ;
 				values[3] = Instance.missingValue() ;
@@ -498,10 +527,10 @@ public class Disambiguator {
 				Instance i = new Instance(1.0, values) ;
 				i.setDataset(header) ;
 
-				double prob = classifier.distributionForInstance(i)[0] ;
+				float prob = (float)classifier.distributionForInstance(i)[0] ;
 
 				if (prob>0.5) {
-					Article art = new Article(wikipedia.getDatabase(), sense.getId()) ;
+					Article art = new Article(wikipedia.getEnvironment(), sense.getId()) ;
 					art.setWeight(prob) ;
 					validSenses.add(art) ;					
 				}
@@ -519,9 +548,9 @@ public class Disambiguator {
 		return result ;
 	}
 
-	private Context getContext(Article article, int snippetLength, RelatednessCache rc) throws Exception{
+	private Context getContext(Article article, SnippetLength snippetLength, RelatednessCache rc) throws Exception{
 
-		Vector<Anchor> unambigAnchors = new Vector<Anchor>() ;
+		Vector<Label> unambigLabels = new Vector<Label>() ;
 
 		String content = cleaner.getMarkupLinksOnly(article, snippetLength) ;
 		String s = "$ " + content + " $" ;
@@ -538,29 +567,32 @@ public class Disambiguator {
 
 			int startIndex = matchIndexes.elementAt(i) + 1 ;
 
-			for (int j=Math.min(i + maxAnchorLength, matchIndexes.size()-1) ; j > i ; j--) {
+			for (int j=Math.min(i + maxLabelLength, matchIndexes.size()-1) ; j > i ; j--) {
 				int currIndex = matchIndexes.elementAt(j) ;	
 				String ngram = s.substring(startIndex, currIndex) ;
 
 				if (! (ngram.length()==1 && s.substring(startIndex-1, startIndex).equals("'"))&& !ngram.trim().equals("")) {
-					Anchor anchor = new Anchor(wikipedia.getDatabase().addEscapes(ngram), tp, wikipedia.getDatabase()) ;
+					Label label = new Label(wikipedia.getEnvironment(), ngram, tp) ;
 
-
-					if (anchor.getLinkProbability() > minLinkProbability)
-						if (anchor.getSenses().size() == 1 || anchor.getSenses().first().getProbability() >= (1-minSenseProbability)) 
-							unambigAnchors.add(anchor) ;
+					if (label.getLinkProbability() > minLinkProbability) {
+						
+						Label.Sense[] senses = label.getSenses() ;
+					
+						if (senses.length == 1 || senses[0].getPriorProbability() >= (1-minSenseProbability)) 
+							unambigLabels.add(label) ;
+					}
 				}	
 			}
 		}
 
-		return new Context(unambigAnchors, rc, maxContextSize) ;
+		return new Context(unambigLabels, rc, maxContextSize) ;
 	}
 
 	/**
-	 * @return the maximum length (in words) for ngrams that will be checked against wikipedia's anchor vocabulary.
+	 * @return the maximum length (in words) for ngrams that will be checked against wikipedia's Label vocabulary.
 	 */
-	public int getMaxAnchorLength() {
-		return maxAnchorLength;
+	public int getMaxLabelLength() {
+		return maxLabelLength;
 	}
 
 	
@@ -572,7 +604,7 @@ public class Disambiguator {
 	}	 
 
 	/**
-	 * @return the lowest probability (as a destination for the ambiguous anchor term) for which senses will be considered.
+	 * @return the lowest probability (as a destination for the ambiguous Label term) for which senses will be considered.
 	 */
 	public double getMinSenseProbability() {
 		return minSenseProbability;
@@ -586,7 +618,7 @@ public class Disambiguator {
 	}
 
 	/**
-	 * @return the text processor used to modify terms and phrases before they are compared to Wikipedia's anchor vocabulary.
+	 * @return the text processor used to modify terms and phrases before they are compared to Wikipedia's Label vocabulary.
 	 */
 	public TextProcessor getTextProcessor() {
 		return tp ;
@@ -600,26 +632,28 @@ public class Disambiguator {
 	 * is not allowed) a username and password for the database.
 	 * 
 	 * @throws Exception
-	 */
+	 *//*
 	public static void main(String[] args) throws Exception{
 
 		//set up an instance of wikipedia
-		Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
+		//Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
+		Wikipedia wikipedia = new Wikipedia("localhost", "inexwiki_2008", "dnk2", null) ;
 		
 		//use a text processor, so that terms and items in wikipedia will both be case-folded before being compared.
-		TextProcessor tp = new CaseFolder() ;
+		TextProcessor tp = null ; //new CaseFolder() ;
 
 		//cache tables that will be used extensively
-		File dataDirectory = new File("/research/wikipediaminer/data/en/20080727") ;
-		ProgressNotifier pn = new ProgressNotifier(4) ;
+		File dataDirectory = new File("/research/wikipediaminer/data/inex/2008") ;
+		ProgressTracker pn = new ProgressTracker(3) ;
 		
-		TIntHashSet ids = wikipedia.getDatabase().getValidPageIds(dataDirectory, 2, pn) ;
-		wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;
-		wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 2, pn) ;
-		wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
+		//TIntHashSet ids = wikipedia.getEnvironment().getValidPageIds(dataDirectory, 2, pn) ;
+		TIntHashSet ids = null ;
+		wikipedia.getEnvironment().cachePages(dataDirectory, ids, pn) ;
+		wikipedia.getEnvironment().cacheLabels(dataDirectory, tp, ids, 0, pn) ;
+		wikipedia.getEnvironment().cacheInLinks(dataDirectory, ids, pn) ;
 		
 		//gather article sets for training and testing		
-		ArticleSet trainSet = new ArticleSet(new File("data/articleSets/trainingIds.csv")) ;
+		ArticleSet trainSet = new ArticleSet(new File("/Desktop/data/articleSets/trainingIds.csv")) ;
 		ArticleSet testSet = new ArticleSet(new File("data/articleSets/testIds_disambig.csv")) ;
 
 		//use relatedness cache, so we won't repeat these calculations unnecessarily
@@ -636,8 +670,8 @@ public class Disambiguator {
 		disambiguator.saveClassifier(new File("data/models/disambig.model")) ;
 		
 		//test
-		Result<Integer> r = disambiguator.test(testSet, ArticleCleaner.ALL, rc) ;
+		Result<Integer> r = disambiguator.test(testSet, null, ArticleCleaner.ALL, rc) ;
 		System.out.println(r) ; 
-	}
+	}*/
 
 }

@@ -47,6 +47,7 @@ public class HtmlTagger extends DocumentTagger{
 		this.wikipediaHome = wikipediaHome ;		
 	}
 	
+	@Override
 	public String getTag(String anchor, Topic topic) {
 		return "<a href=\"" + wikipediaHome + "/wiki/" + topic.getTitle() + "\">" + anchor + "</a>" ;
 	}

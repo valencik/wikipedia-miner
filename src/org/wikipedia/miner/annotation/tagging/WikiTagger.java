@@ -30,6 +30,7 @@ import org.wikipedia.miner.annotation.Topic;
  */
 public class WikiTagger extends DocumentTagger{
 		
+	@Override
 	public String getTag(String anchor, Topic topic) {
 		if (topic.getTitle().compareToIgnoreCase(anchor) == 0)
 			return "[[" + anchor + "]]" ;

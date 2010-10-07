@@ -19,96 +19,152 @@
     </context-param>
 
     <context-param>
-      <param-name>server_path</param-name>
+      <param-name>hubConfigFile</param-name>
       <param-value></param-value>
-    </context-param>
+      <description>
+        An XML file describing the wikipedia dumps that are available via these web services,
+	and how they should be configured.
+    </context-param>  
 
-    <context-param>
-      <param-name>service_name</param-name>
-      <param-value>service</param-value>
-    </context-param>
 
-    <context-param>
-      <param-name>mysql_server</param-name>
-      <param-value></param-value>
-    </context-param>
 
-    <context-param>
-      <param-name>mysql_database</param-name>
-      <param-value></param-value>
-    </context-param>
 
-    <context-param>
-      <param-name>mysql_user</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>mysql_password</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>proxy_host</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>proxy_port</param-name>
-      <param-value></param-value>
-    </context-param>
-    
-    <context-param>
-      <param-name>proxy_user</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>proxy_password</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>wikifier_disambigModel</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>wikifier_linkModel</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>stopword_file</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>data_directory</param-name>
-      <param-value></param-value>
-    </context-param>
-
-    <context-param>
-      <param-name>xslt_directory</param-name>
-      <param-value></param-value>
-    </context-param>
 
     <servlet>
-      <servlet-name>WikipediaMinerServlet</servlet-name>
+      <servlet-name>ProgressService</servlet-name>
       <description>
 
       </description>
       <servlet-class>
-        org.wikipedia.miner.service.WikipediaMinerServlet
+        org.wikipedia.miner.service.ProgressService
       </servlet-class>
     </servlet>
     
-
     <servlet-mapping>
-      <servlet-name>WikipediaMinerServlet</servlet-name>
-      <url-pattern>/service</url-pattern>
+      <servlet-name>ProgressService</servlet-name>
+      <url-pattern>/getProgress</url-pattern>
     </servlet-mapping>
+
+
+
+    <servlet>
+      <servlet-name>DefineService</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.DefineService
+      </servlet-class>
+    </servlet>
     
+    <servlet-mapping>
+      <servlet-name>DefineService</servlet-name>
+      <url-pattern>/define</url-pattern>
+    </servlet-mapping>
+
+
+
+    <servlet>
+      <servlet-name>SearchService</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.SearchService
+      </servlet-class>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>SearchService</servlet-name>
+      <url-pattern>/search</url-pattern>
+    </servlet-mapping>
+
+
+
+    <servlet>
+      <servlet-name>BrowseService</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.BrowseService
+      </servlet-class>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>BrowseService</servlet-name>
+      <url-pattern>/browse</url-pattern>
+    </servlet-mapping>
+
+
+
+    <servlet>
+      <servlet-name>CompareService</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.CompareService
+      </servlet-class>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>CompareService</servlet-name>
+      <url-pattern>/compare</url-pattern>
+    </servlet-mapping>
+
+
+
+    <servlet>
+      <servlet-name>WikifyService</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.WikifyService
+      </servlet-class>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>WikifyService</servlet-name>
+      <url-pattern>/wikify</url-pattern>
+    </servlet-mapping>
+
+
+
+    <servlet>
+      <servlet-name>CorrectionService</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.CorrectionService
+      </servlet-class>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>CorrectionService</servlet-name>
+      <url-pattern>/correct</url-pattern>
+    </servlet-mapping>
+
+    
+    <servlet>
+      <servlet-name>StatisticsService</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.StatsService
+      </servlet-class>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>StatisticsService</servlet-name>
+      <url-pattern>/getStats</url-pattern>
+    </servlet-mapping>
+
+    
+
 
     <session-config>
       <session-timeout>30</session-timeout>    <!-- 30 minutes -->

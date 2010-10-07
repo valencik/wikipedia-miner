@@ -20,7 +20,6 @@
 package org.wikipedia.miner.annotation;
 
 import org.wikipedia.miner.util.MarkupStripper;
-import org.wikipedia.miner.util.SentenceSplitter;
 import org.wikipedia.miner.model.Article;
 
 /**
@@ -29,27 +28,16 @@ import org.wikipedia.miner.model.Article;
  * @author David Milne
  */
 public class ArticleCleaner {
-
-	/**
-	 * all of the article will be extracted and cleaned
-	 */
-	public static final int ALL = 0 ;
-	/**
-	 * only the first sentence of the article will be extracted and cleaned
-	 */
-	public static final int FIRST_SENTENCE = 1;
-	/**
-	 * only the first paragraph of the article will be extracted and cleaned
-	 */
-	public static final int FIRST_PARAGRAPH = 2 ;
 	
-	private SentenceSplitter sentenceSplitter ;
+	public enum SnippetLength { full, firstSentence, firstParagraph } ;	
+	
+	private MarkupStripper stripper ;
 	
 	/**
 	 * Initializes a new ArticleCleaner
 	 */
 	public ArticleCleaner() {
-		this.sentenceSplitter = new SentenceSplitter() ;
+		stripper = new MarkupStripper() ;
 	}
 	
 	
@@ -59,41 +47,30 @@ public class ArticleCleaner {
 	 * @return the content (or snippet) of the given article, with all markup removed except links to other articles.  
 	 * @throws Exception
 	 */
-	public String getMarkupLinksOnly(Article article, int snippetLength) throws Exception {
+	public String getMarkupLinksOnly(Article article, SnippetLength length) throws Exception {
 		
-		if (snippetLength == FIRST_SENTENCE || snippetLength == FIRST_PARAGRAPH) {
-			
-			String content ;
-			
-			if (snippetLength == FIRST_SENTENCE) 
-				content = article.getFirstSentence(null, sentenceSplitter) ;
-			else
-				content = article.getFirstParagraph() ;
-			
-			content = MarkupStripper.stripFormatting(content) ;
-			return content ;
-			
-		} else {
-			String content = article.getContent() ;
-			
-			content = MarkupStripper.stripTemplates(content) ;
-			content = MarkupStripper.stripSection(content, "see also") ;
-			content = MarkupStripper.stripSection(content, "references") ;
-			content = MarkupStripper.stripSection(content, "external links") ;
-			content = MarkupStripper.stripSection(content, "further reading") ;
-			content = MarkupStripper.stripHeadings(content) ; 
-			content = MarkupStripper.stripNonArticleLinks(content) ;
-			content = MarkupStripper.stripExternalLinks(content) ;
-			content = MarkupStripper.stripIsolatedLinks(content) ;
-			content = MarkupStripper.stripTables(content) ;
-			content = MarkupStripper.stripHTML(content) ;
-			content = MarkupStripper.stripMagicWords(content) ;
-			content = MarkupStripper.stripFormatting(content) ;
-			content = MarkupStripper.stripExternalLinks(content) ;		
-			content = MarkupStripper.stripExcessNewlines(content) ;
-			
-			return content ;
+		String markup ;
+		
+		switch (length) {
+		
+		case firstSentence :
+			markup = article.getSentenceMarkup(0) ;
+			break ;
+		case firstParagraph :
+			//TODO: retrieve first paragraph
+			markup = article.getMarkup() ;
+			break ;
+		default : 
+			markup = article.getMarkup() ;
+			break ;
 		}
+				
+		markup = stripper.stripAllButInternalLinksAndEmphasis(markup, null) ;
+		markup = stripper.stripNonArticleInternalLinks(markup, null) ;
+		
+				
+		return markup ;
+		
 		
 		
 	}
@@ -104,41 +81,27 @@ public class ArticleCleaner {
 	 * @return the content of the given article, with all markup removed.  
 	 * @throws Exception
 	 */
-	public String getCleanedContent(Article article,  int snippetLength) throws Exception{
+	public String getCleanedContent(Article article, SnippetLength length) throws Exception{
 		
-		if (snippetLength == FIRST_SENTENCE || snippetLength == FIRST_PARAGRAPH) {
-			
-			String content ;
-			
-			if (snippetLength == FIRST_SENTENCE) 
-				content = article.getFirstSentence(null, sentenceSplitter) ;
-			else
-				content = article.getFirstParagraph() ;
-			
-			content = MarkupStripper.stripFormatting(content) ;
-			content = MarkupStripper.stripLinks(content) ;
-			return content ;
-	
-		} else {
 		
-			String content = article.getContent() ;
-			content = MarkupStripper.stripTemplates(content) ;
-			content = MarkupStripper.stripSection(content, "see also") ;
-			content = MarkupStripper.stripSection(content, "references") ;
-			content = MarkupStripper.stripSection(content, "external links") ;
-			content = MarkupStripper.stripSection(content, "further reading") ;
-			content = MarkupStripper.stripHeadings(content) ; 
-			content = MarkupStripper.stripExternalLinks(content) ;
-			content = MarkupStripper.stripIsolatedLinks(content) ;
-			content = MarkupStripper.stripLinks(content) ;
-			content = MarkupStripper.stripTables(content) ;
-			content = MarkupStripper.stripHTML(content) ;
-			content = MarkupStripper.stripMagicWords(content) ;
-			content = MarkupStripper.stripFormatting(content) ;
-			content = MarkupStripper.stripExternalLinks(content) ;		
-			content = MarkupStripper.stripExcessNewlines(content) ;
+		String markup ;
 		
-			return content ;
+		switch (length) {
+		
+		case firstSentence :
+			markup = article.getSentenceMarkup(0) ;
+			break ;
+		case firstParagraph :
+			//TODO: retrieve first paragraph
+			markup = article.getMarkup() ;
+			break ;
+		default : 
+			markup = article.getMarkup() ;
+			break ;
 		}
+		
+		markup = stripper.stripToPlainText(markup, null) ;
+				
+		return markup ;
 	}
 }

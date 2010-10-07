@@ -20,19 +20,18 @@
 
 package org.wikipedia.miner.annotation.weighting;
 
-import gnu.trove.TIntHashSet;
-
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
+import org.apache.log4j.Logger;
 import org.wikipedia.miner.annotation.*;
+import org.wikipedia.miner.annotation.ArticleCleaner.SnippetLength;
+import org.wikipedia.miner.annotation.preprocessing.DocumentPreprocessor;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
-import org.wikipedia.miner.util.text.*;
 
 import weka.classifiers.Classifier;
-import weka.classifiers.meta.Bagging;
 import weka.core.*;
 
 /**
@@ -43,7 +42,7 @@ import weka.core.*;
  * See the following paper for a more detailed explanation:
  * Milne, D. and Witten, I.H. (2008) Learning to link with Wikipedia. In Proceedings of the ACM Conference on Information and Knowledge Management (CIKM'2008), Napa Valley, California.
  * <p>
- * This will run hideously slowly unless pages, anchors, inLinks, and generality have all been cached.
+ * This will run hideously slowly unless anchors and inLinks have been cached.
  * 
  * @author David Milne
  */
@@ -58,9 +57,13 @@ public class LinkDetector extends TopicWeighter{
 	private Classifier classifier ;
 	
 	/**
-	 * @param wikipedia
+	 * Initialises a new LinkDetector. If the given wikipedia has been configured with a link detection model ({@link WikipediaConfiguration#getDetectionModel()}), then the
+	 * link detector will be ready for use. Otherwise a model must be loaded, or a new one extracted from training data.
+	 * 
+	 * @param wikipedia an active wikipedia, ideally with label and pageLinkIn databases cached to memory
+	 * @throws Exception if there is a problem with the wikipedia database, or the detection model (if specified). 
 	 */
-	public LinkDetector(Wikipedia wikipedia) {
+	public LinkDetector(Wikipedia wikipedia) throws Exception {
 		this.wikipedia = wikipedia ;
 		this.cleaner = new ArticleCleaner() ;
 		
@@ -86,23 +89,25 @@ public class LinkDetector extends TopicWeighter{
 		this.header = new Instances("wikification_headerOnly", attributes, 0) ;
 		header.setClassIndex(header.numAttributes() -1) ;
 		
-
+		if (wikipedia.getConfig().getDetectionModel() != null) {
+			loadClassifier(wikipedia.getConfig().getDetectionModel()) ;
+		}
 	}
 	
 	/**
-	 * Weights the given list of topics according to how likely they are to be Wikipedia links if the 
+	 * Weights and sorts the the given list of topics according to how likely they are to be Wikipedia links if the 
 	 * document they were extracted from was a Wikipedia article. 
 	 * 
-	 * @param topics
-	 * @return a sorted vector of the same topics, where the weight of each topic is the probability that it is a link
-	 * @throws Exception
+	 * @param topics a collection of topics to be weighted
+	 * @return an ArrayList of the same topics, where the weight of each topic is the probability that it is a link. 
+	 * @throws Exception if the link detector has not yet been trained
 	 */
-	public SortedVector<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception {
+	public ArrayList<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception  {
 
 		if (classifier == null)
 			throw new Exception("You must train the link detector first.") ;
 
-		SortedVector<Topic> weightedTopics = new SortedVector<Topic>() ;
+		ArrayList<Topic> weightedTopics = new ArrayList<Topic>() ;
 
 		for (Topic topic: topics) {
 
@@ -115,10 +120,10 @@ public class LinkDetector extends TopicWeighter{
 			values[4] = topic.getMaxLinkProbability() ;
 			values[5] = topic.getAverageLinkProbability() ;
 
-			if (topic.getGenerality() >= 0)
+			if (topic.getGenerality() != null)
 				values[6] = topic.getGenerality() ;
 			else
-				values[7] = Instance.missingValue();
+				values[6] = Instance.missingValue();
 
 			values[7] = topic.getFirstOccurance() ;
 			values[8] = topic.getLastOccurance() ;
@@ -132,10 +137,12 @@ public class LinkDetector extends TopicWeighter{
 			instance.setDataset(header) ;
 			
 			double prob = classifier.distributionForInstance(instance)[0] ;
-			topic.setWeight(prob) ;
-			weightedTopics.add(topic, false) ;
+			topic.setWeight((float)prob) ;
+			weightedTopics.add(topic) ;
 		}
 
+		Collections.sort(weightedTopics) ;
+		
 		return weightedTopics ;
 	}
 	
@@ -151,17 +158,17 @@ public class LinkDetector extends TopicWeighter{
 	 * @param rc a cache in which relatedness measures will be saved so they aren't repeatedly calculated. Make this null if using extremely large training sets, so that caches will be reset from document to document, and won't grow too large.   
 	 * @throws Exception 
 	 */
-	public void train(ArticleSet articles, int snippetLength, String datasetName, TopicDetector td, RelatednessCache rc) throws Exception{
+	public void train(ArticleSet articles, SnippetLength snippetLength, String datasetName, TopicDetector td, RelatednessCache rc) throws Exception{
 
 		trainingData = new Instances(datasetName, attributes, 0) ;
 		trainingData.setClassIndex(trainingData.numAttributes() -1) ;
 
-		ProgressNotifier pn = new ProgressNotifier(articles.getArticleIds().size(), "LinkDetector: training") ;
+		ProgressTracker tracker = new ProgressTracker(articles.getArticleIds().size(), "training", LinkDetector.class) ;
 		for (int id: articles.getArticleIds()) {
 			
 			Article art = null;
 			try {
-				art = new Article(wikipedia.getDatabase(), id) ;
+				art = new Article(wikipedia.getEnvironment(), id) ;
 			} catch (Exception e) {
 				System.err.println("Warning: " + id + " is not a valid article") ;
 			} 
@@ -169,7 +176,7 @@ public class LinkDetector extends TopicWeighter{
 			if (art != null) 
 				train(art, snippetLength, td, rc) ;
 			
-			pn.update() ;
+			tracker.update() ;
 		}
 	}
 
@@ -182,7 +189,8 @@ public class LinkDetector extends TopicWeighter{
 	 */
 	@SuppressWarnings("unchecked")
 	public void saveTrainingData(File file) throws IOException {
-		System.out.println("LinkDetector: saving training data...") ;
+		
+		Logger.getLogger(LinkDetector.class).info("saving training data") ;
 		
 		BufferedWriter writer = new BufferedWriter(new FileWriter(file)) ;
 		writer.write(header.toString()) ;
@@ -204,7 +212,7 @@ public class LinkDetector extends TopicWeighter{
 	 * @throws Exception if the file does not contain valid training data.
 	 */
 	public void loadTrainingData(File file) throws Exception{
-		System.out.println("LinkDetector: loading training data...") ;
+		Logger.getLogger(LinkDetector.class).info("loading training data") ;
 		
 		trainingData = new Instances(new FileReader(file)) ;
 		trainingData.setClassIndex(trainingData.numAttributes()-1) ;
@@ -217,7 +225,7 @@ public class LinkDetector extends TopicWeighter{
 	 * @throws IOException if the file cannot be read
 	 */
 	public void saveClassifier(File file) throws IOException {
-		System.out.println("LinkDetector: saving classifier...") ;
+		Logger.getLogger(LinkDetector.class).info("saving classifier") ;
 		
 		ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file));
 		oos.writeObject(classifier);
@@ -232,7 +240,7 @@ public class LinkDetector extends TopicWeighter{
 	 * @throws Exception 
 	 */
 	public void loadClassifier(File file) throws Exception {
-		System.out.println("LinkDetector: loading classifier...") ;
+		Logger.getLogger(LinkDetector.class).info("loading classifier") ;
 		
 		ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file));
 		classifier = (Classifier) ois.readObject();
@@ -251,7 +259,7 @@ public class LinkDetector extends TopicWeighter{
 		weightTrainingInstances() ;
 		
 		if (trainingData == null) {
-			throw new WekaException("You must load training data or train on a set of articles before builing classifier.") ;
+			throw new Exception("You must load training data or train on a set of articles before builing classifier.") ;
 		} else {
 			this.classifier = classifier ;
 			classifier.buildClassifier(trainingData) ;
@@ -271,34 +279,58 @@ public class LinkDetector extends TopicWeighter{
 	 * @return Result a result (including recall, precision, f-measure) of how well the classifier did.   
 	 * @throws Exception if there is a problem with the classifier
 	 */
-	public Result<Integer> test(ArticleSet testSet, int snippetLength, TopicDetector td, RelatednessCache rc) throws Exception{
+	public Result<Integer> test(ArticleSet testSet, SnippetLength snippetLength, TopicDetector td, RelatednessCache rc) throws Exception{
 
 		if (classifier == null) 
-			throw new WekaException("You must build (or load) classifier first.") ;
+			throw new Exception("You must build (or load) classifier first.") ;
+		
+		double worstRecall = 1 ;
+		double worstPrecision = 1 ;
+		
+		int articlesTested = 0 ;
+		int perfectRecall = 0 ;
+		int perfectPrecision = 0 ;
 
 		Result<Integer> r = new Result<Integer>() ;
 
-		ProgressNotifier pn = new ProgressNotifier(testSet.getArticleIds().size(), "Testing") ;
+		ProgressTracker tracker = new ProgressTracker(testSet.getArticleIds().size(), "Testing", LinkDetector.class) ;
 		for (int id: testSet.getArticleIds()) {
 			
 			Article art = null ;
 			
 			try {
-				art = new Article(wikipedia.getDatabase(), id) ;
+				art = new Article(wikipedia.getEnvironment(), id) ;
 			} catch (Exception e) {
 				System.err.println("Warning: " + id + " is not a valid article") ;
 			} 
 			
-			if (art != null)
-				r.addIntermediateResult(test(art, snippetLength, td, rc)) ;
 			
-			pn.update() ;
+			if (art != null) {
+				
+				articlesTested ++ ;
+				
+				Result<Integer> ir = test(art, snippetLength, td, rc) ;
+				
+				if (ir.getRecall() ==1) perfectRecall++ ;
+				if (ir.getPrecision() == 1) perfectPrecision++ ;
+				
+				worstRecall = Math.min(worstRecall, ir.getRecall()) ;
+				worstPrecision = Math.min(worstPrecision, ir.getPrecision()) ;
+				
+				r.addIntermediateResult(ir) ;
+				
+			}
+			
+			tracker.update() ;
 		}
+
+		System.out.println("worstR:" + worstRecall + ", worstP:" + worstPrecision) ;
+		System.out.println("tested:" + articlesTested + ", perfectR:" + perfectRecall + ", perfectP:" + perfectPrecision) ;
 
 		return r ;
 	}
 
-	private void train(Article article, int snippetLength, TopicDetector td, RelatednessCache rc) throws Exception{
+	private void train(Article article, SnippetLength snippetLength, TopicDetector td, RelatednessCache rc) throws Exception{
 		
 		String text = cleaner.getCleanedContent(article, snippetLength) ;
 		
@@ -335,7 +367,7 @@ public class LinkDetector extends TopicWeighter{
 		}
 	}
 
-	private Result<Integer> test(Article article, int snippetLength, TopicDetector td, RelatednessCache rc) throws Exception{
+	private Result<Integer> test(Article article, SnippetLength snippetLength, TopicDetector td, RelatednessCache rc) throws Exception{
 		System.out.println(" - testing " + article) ;
 		
 		if (rc == null)
@@ -345,7 +377,7 @@ public class LinkDetector extends TopicWeighter{
 		
 		Collection<Topic> topics = td.getTopics(text, rc) ;
 		
-		SortedVector<Topic> weightedTopics = this.getWeightedTopics(topics) ;
+		ArrayList<Topic> weightedTopics = this.getWeightedTopics(topics) ;
 		
 		HashSet<Integer> linkedTopicIds = new HashSet<Integer>() ;
 		for (Topic topic: weightedTopics) {
@@ -360,7 +392,7 @@ public class LinkDetector extends TopicWeighter{
 		return result ;
 	}
 	
-	private HashSet<Integer> getGroundTruth(Article article, int snippetLength) throws Exception {
+	private HashSet<Integer> getGroundTruth(Article article, SnippetLength snippetLength) throws Exception {
 		
 		HashSet<Integer> links = new HashSet<Integer>() ;
 		
@@ -436,53 +468,83 @@ public class LinkDetector extends TopicWeighter{
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
+		
 				
-		//set up an instance of Wikipedia
-		Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
+		
 		
 		//use a text processor, so that terms and items in wikipedia will both be case-folded before being compared.
-		TextProcessor tp = new CaseFolder() ;
+		//TextProcessor tp = new CaseFolder() ;
 		
-		File stopwordFile = new File("/research/wikipediaminer/data/stopwords.txt") ;
+		//File stopwordFile = null ; //new File("/research/wikipediaminer/data/stopwords.txt") ;
 		
-		// cache tables that will be used extensively
-		File dataDirectory = new File("/research/wikipediaminer/data/en/20080727") ;
-		ProgressNotifier pn = new ProgressNotifier(5) ;
+		File confFile = new File("/home/dmilne/workspaces/Eclipse/wikipediaMiner_hadoopAndBerkeleyDB/configs/en.xml") ; 		
+		WikipediaConfiguration conf = new WikipediaConfiguration(confFile) ;
 		
-		TIntHashSet ids = wikipedia.getDatabase().getValidPageIds(dataDirectory, 2, pn) ;
-		wikipedia.getDatabase().cachePages(dataDirectory, ids, pn) ;
-		wikipedia.getDatabase().cacheAnchors(dataDirectory, tp, ids, 2, pn) ;
-		wikipedia.getDatabase().cacheInLinks(dataDirectory, ids, pn) ;
-		wikipedia.getDatabase().cacheGenerality(dataDirectory, ids, pn) ;	
+		//set up an instance of Wikipedia
+		Wikipedia wikipedia = new Wikipedia(conf, false) ;
+		
 		
 		//gather article sets for training and testing
-		ArticleSet trainSet = new ArticleSet(new File("data/articleSets/trainingIds.csv")) ;
-		ArticleSet testSet = new ArticleSet(new File("data/articleSets/testIds_wikify.csv")) ;
+		//ArticleSet trainSet = new ArticleSet(new File("/home/dnk2/workspace/wikipediaminer/data/articleSets/trainingIds.csv")) ;
+		//ArticleSet testSet = new ArticleSet(new File("/home/dnk2/workspace/wikipediaminer/data/articleSets/testIds_wikify.csv")) ;
 		
 		// use relatedness cache, so we won't repeat these calculations unnecessarily
 		RelatednessCache rc = null ; //new RelatednessCache() ;
 		
 		// use a pre-trained disambiguator
-		Disambiguator disambiguator = new Disambiguator(wikipedia, tp, 0.01, 0.01, 25) ;
-		disambiguator.loadClassifier(new File("data/models/disambig.model")) ;
+		Disambiguator disambiguator = new Disambiguator(wikipedia) ;
+		//disambiguator.loadClassifier(new File("/home/dmilne/workspaces/Eclipse/wikipedia-miner_server/models/disambig.model")) ;
 		
 		// connect disambiguator to a new topic detector
-		TopicDetector topicDetector = new TopicDetector(wikipedia, disambiguator, stopwordFile, true, false) ;
+		TopicDetector topicDetector = new TopicDetector(wikipedia, disambiguator, true, false) ;
 		
 		// train a new link detector		
 		LinkDetector linkDetector = new LinkDetector(wikipedia) ;
-		linkDetector.train(trainSet, ArticleCleaner.ALL, "LinkDetection_Training", topicDetector, rc) ;
+		
+		
+		/*
+		linkDetector.train(trainSet, SnippetLength.full, "LinkDetection_Training", topicDetector, null) ;
 
 		// build link detection classifier
 		Classifier classifier = new Bagging() ;
 		classifier.setOptions(Utils.splitOptions("-P 10 -S 1 -I 10 -W weka.classifiers.trees.J48 -- -U -M 2")) ;
 		linkDetector.buildClassifier(classifier) ;
 		
-		linkDetector.saveClassifier(new File("data/models/linkDetect.model")) ;
+		linkDetector.saveClassifier(new File("/home/dnk2/workspace/data/models/linkDetect_06032009.model")) ;
+		*/
+		//linkDetector.loadClassifier(new File("/home/dmilne/workspaces/Eclipse/wikipedia-miner_server/models/linkDetect.model")) ;
 		
+		File testFile = new File("/home/dmilne/Desktop/Schuchert_ATexof_1929_260.txt") ;
+		
+		
+		String testText = DocumentPreprocessor.getContent(testFile) ;
+		ArrayList<Topic> weightedTopics = linkDetector.getWeightedTopics(topicDetector.getTopics(testText, null)) ;
+		for (Topic t: weightedTopics) 
+				System.out.println(t + "[" + t.getWeight() + "]") ;
+			
+		
+		
+		
+		/*
+		BufferedReader input = new BufferedReader(new InputStreamReader(System.in));
+		
+		while (true) {
+			System.out.println("Please enter a line of text to wikify (or ENTER to quit)") ;
+			
+			String text = input.readLine() ;
+			
+			if (text == null || text.length()==0) 
+				break ;
+			
+			ArrayList<Topic> weightedTopics = linkDetector.getWeightedTopics(topicDetector.getTopics(text, null)) ;
+			for (Topic t: weightedTopics) {
+				System.out.println(t + "[" + t.getWeight() + "]") ;
+			}
+		}
+		*/
 		// test		
-		Result<Integer> r = linkDetector.test(testSet, ArticleCleaner.ALL, topicDetector, rc) ;
-		System.out.println(r) ; 
+		//Result<Integer> r = linkDetector.test(testSet, null, ArticleCleaner.ALL, topicDetector, null) ;
+		//System.out.println(r) ; 
 	}
 	
 

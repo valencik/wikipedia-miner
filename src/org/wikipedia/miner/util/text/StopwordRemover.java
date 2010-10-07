@@ -31,20 +31,16 @@ public class StopwordRemover extends TextProcessor {
 	
 	HashSet<String> stopwords ;
 	Cleaner cleaner = new Cleaner() ;
-    File stopwordFile;
 	
 	/**
 	 * Initializes a newly created StopwordRemover with a list of stopwords contained within the given file. 
-	 * The file must be in a format where each word is found on its own line.
-     * Comments are also supported using the Snowball project syntax: every character between a '|' symbol
-     * and the end of the line is ignored. Spaces between the last non-space character and the '|' symbol
-     * are also ignored.
+	 * The file must be in a format where each word is found on its own line.  
 	 * 
 	 * @param	stopwordFile	the file of stopwords
 	 * @throws	IOException		if there is a problem reading from the file of stopwords
 	 */	
 	public StopwordRemover(File stopwordFile) throws IOException {
-		this.stopwordFile = stopwordFile;
+		
 		stopwords = new HashSet<String>() ;
 		
 		BufferedReader input = new BufferedReader(new FileReader(stopwordFile)) ;
@@ -52,7 +48,6 @@ public class StopwordRemover extends TextProcessor {
 		String line ;
 		while ((line = input.readLine()) != null) {
 			String word = line.trim().toLowerCase() ;
-            word = word.replaceAll("\\s*[|].*", "");
 			stopwords.add(word) ;
 		}
 	}
@@ -74,29 +69,16 @@ public class StopwordRemover extends TextProcessor {
 	 * @return the processed string
 	 */	
 	public String processText(String text) {
-		StringBuffer processedText = new StringBuffer() ;
+		String t = text ;
+		String t2 = "" ;
 		
-		String[] terms = text.split(" ") ;
-		for(int i=0;i<terms.length; i++) {
-			if (!stopwords.contains(terms[i])) {
-				processedText.append(cleaner.processText(terms[i])) ;
-				processedText.append(" ") ;
-			}
-		}
-
-		return processedText.toString().trim() ;	
+		String[] terms = t.split(" ") ;
+		for(int i=0;i<terms.length; i++)
+			if (!stopwords.contains(terms[i]))
+				t2 = t2 + cleaner.processText(terms[i]) + " " ;
+		
+		return t2.trim() ;	
 	}
-
-	/**
-	 * Returns a string that provides complete information to setup the current configuration of the
-     * text processor.
-	 *
-	 * @return	a textual description of the TextProcessor.
-	 */
-    @Override
-    public String toString(){
-        return super.toString() + "<file<" + TextProcessor.encodeParam(this.stopwordFile.toString());
-    }
 }
 
 

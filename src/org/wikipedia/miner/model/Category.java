@@ -1,5 +1,5 @@
 /*
- *    Category.java
+ *    Article.java
  *    Copyright (C) 2007 David Milne, d.n.milne@gmail.com
  *
  *    This program is free software; you can redistribute it and/or modify
@@ -19,333 +19,114 @@
 
 package org.wikipedia.miner.model;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.sql.*;
-import java.util.* ;
-import org.wikipedia.miner.util.*; 
+import java.util.Collections;
+import org.wikipedia.miner.db.WEnvironment;
+import org.wikipedia.miner.db.struct.DbIdList;
+import org.wikipedia.miner.db.struct.DbPage;
 
 /**
- * This class represents categories in Wikipedia; the pages that exist to organize articles that discuss related topics. 
- * It is intended to contain all properties and methods that are relevant for a category, such as its pertinent statistics,
- * the categories and articles it contains, and the categories it belongs to.  
+ * 
+ * 
  * 
  * @author David Milne
+ *
  */
 public class Category extends Page {
 
 	/**
-	 * Initialises a newly created Category so that it represents the page given by <em>id</em> and <em>title</em>.
+	 * Initializes a newly created Category so that it represents the category given by <em>id</em>.
 	 * 
-	 * This is the most efficient constructor as no database lookup is required.
-	 * 
-	 * @param database	an active WikipediaDatabase 
-	 * @param id	the unique identifier of the category
-	 * @param title	the (case dependent) title of the category
+	 * @param env	an active WikipediaEnvironment
+	 * @param id	the unique identifier of the article
 	 */
-	public Category(WikipediaDatabase database, int id, String title) {
-		super(database, id, title, CATEGORY) ;
+	public Category(WEnvironment env, int id) {
+		super(env, id) ;
 	}
-
-	/**
-	 * Initialises a newly created Category so that it represents the category given by <em>id</em>.
-	 * 
-	 * @param database	an active WikipediaDatabase
-	 * @param id	the unique identifier of the category
-	 * @throws SQLException	if no page is defined for the id, or if it is not an article.
-	 */
-	public Category(WikipediaDatabase database, int id) throws SQLException{
-		super(database, id) ;
-
-		if (type != CATEGORY)
-			throw new SQLException("The page given by id: " + id + " is not a category") ;
-	}
-
-	/**
-	 * Initialises a newly created Category so that it represents the category given by <em>title</em>.
-	 * 
-	 * @param database	an active WikipediaDatabase
-	 * @param title	the (case dependent) title of the article
-	 * @throws SQLException	if no article is defined for the title.
-	 */
-	public Category(WikipediaDatabase database, String title) throws SQLException {
-		super(database, title, CATEGORY) ;
-	}
-
-	/**
-	 * Returns the Article that relates to the same concept as this category. Note that many categories 
-	 * do not have equivalent articles; they to not relate to a single concept, and exist only to organize the 
-	 * articles and categories it contains. 
-	 * i.e <em>Rugby Teams</em> may have an equivalent article, but <em>Rugby Teams by region</em> is unlikely to.
-	 * In this case <em>null</em> will be returned.
-	 * 
-	 * @return	the equivalent Article, or null
-	 * @throws	SQLException if there is a problem with the database
-	 */ 
-	public Article getEquivalentArticle() throws SQLException {
-		Article equivalentArticle = null ;
-
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT page_id, page_title FROM equivalence, page WHERE page_id=eq_art AND eq_cat=" + id) ;
-
-		if (rs.first()) {
-			try {
-				equivalentArticle = new Article(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")) ;
-			} catch (Exception e) {} ;
-		}
-
-		rs.close() ;
-		stmt.close() ;	
-
-		return equivalentArticle ;
-	}
-
-	/**
-	 * Returns a SortedVector of Categories that this category belongs to. These are the categories 
-	 * that are linked to at the bottom of any Wikipedia category. 
-	 * 
-	 * @return	a SortedVector of Categories
-	 * @throws SQLException if there is a problem with the Wikipedia database
-	 */
-	public SortedVector<Category> getParentCategories() throws SQLException {
-		SortedVector<Category> parentCategories = new SortedVector<Category>() ;
-
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id, page_title, page_type FROM categorylink, page WHERE cl_parent=page_id AND cl_child=" + id + " ORDER BY page_id") ;
-
-		while(rs.next()) {
-			try {
-				Category wc = new Category(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")) ;
-				parentCategories.add(wc, true) ;
-			} catch (Exception e) {} ;
-		}
-
-		rs.close() ;
-		stmt.close() ;
-		return parentCategories ;
+	
+	protected Category(WEnvironment env, int id, DbPage pd) {
+		super(env, id, pd) ;
 	}
 	
 	/**
-	 * @return a sorted array of category ids that this category belongs to. 
-	 * @throws SQLException if there is a problem with the Wikipedia database.
+	 * Returns an array of Categories that this category belongs to. These are the categories 
+	 * that are linked to at the bottom of any Wikipedia category. 
+	 * 
+	 * @return	an array of Categories (sorted by id)
 	 */
-	public int[] getParentCategoryIds() throws SQLException {
-		
-		if (database.areParentIdsCached())
-			return database.cachedParentIds.get(id) ;
-		
-		
-		Vector<Integer> parentCategories = new Vector<Integer>() ;
+	public Category[] getParentCategories() {
+		DbIdList tmpParents = env.getDbCategoryParents().retrieve(id) ; 
+		if (tmpParents == null || tmpParents.getIds() == null) 
+			return new Category[0] ;
 
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id FROM categorylink, page WHERE cl_parent=page_id AND cl_child=" + id + " ORDER BY page_id") ;
+		Category[] parentCategories = new Category[tmpParents.getIds().size()] ;
 
-		while(rs.next()) 
-			parentCategories.add(rs.getInt(1)) ; 
-
-		rs.close() ;
-		stmt.close() ;
-		
-		int[] ids = new int[parentCategories.size()] ;
-		
-		int c=0 ;
-		for (Integer catId:parentCategories) {
-			ids[c] = catId ;
-			c++ ;
+		int index = 0 ;
+		for (int id:tmpParents.getIds()) {
+			parentCategories[index] = new Category(env, id) ;
+			index++ ;
 		}
-		
-		return ids ;
-	}
 
+		return parentCategories ;	
+	}
+	
 	/**
-	 * Returns a SortedVector of Categories that this category contains. These are the categories 
+	 * Returns an array of Categories that this category contains. These are the categories 
 	 * that are presented in alphabetical lists in any Wikipedia category. 
 	 * 
-	 * @return	a SortedVector of Categories
-	 * @throws SQLException if there is a problem with the Wikipedia database
+	 * @return	an array of Categories, sorted by id
 	 */
-	public SortedVector<Category> getChildCategories() throws SQLException{
-		SortedVector<Category> childCategories = new SortedVector<Category>() ;
+	public Category[] getChildCategories() {
+		DbIdList tmpChildCats = env.getDbChildCategories().retrieve(id) ; 
+		if (tmpChildCats == null || tmpChildCats.getIds() == null) 
+			return new Category[0] ;
 
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id, page_title, page_type FROM categorylink, page WHERE cl_child=page_id AND page_type=" + CATEGORY + " AND cl_parent=" + id) ;
+		Category[] childCategories = new Category[tmpChildCats.getIds().size()] ;
 
-		while(rs.next()) {
-			try {
-				Category wc = new Category(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")) ;
-				childCategories.add(wc, true) ;
-			} catch (Exception e) {} ;
+		int index = 0 ;
+		for (int id:tmpChildCats.getIds()) {
+			childCategories[index] = new Category(env, id) ;
+			index++ ;
 		}
-
-		rs.close() ;
-		stmt.close() ;
 
 		return childCategories ;	
 	}
 	
-	
 	/**
-	 * @return a sorted array of category ids that this category belongs to. 
-	 * @throws SQLException if there is a problem with the Wikipedia database.
-	 */
-	public int[] getChildCategoryIds() throws SQLException {
-		Vector<Integer> childCategories = new Vector<Integer>() ;
-
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id FROM categorylink, page WHERE cl_child=page_id AND page_type=" + CATEGORY + " AND cl_parent=" + id + " ORDER BY cl_child") ;
-
-		while(rs.next()) 
-			childCategories.add(rs.getInt(1)) ; 
-
-		rs.close() ;
-		stmt.close() ;
-		
-		int[] ids = new int[childCategories.size()] ;
-		
-		int c=0 ;
-		for (Integer catId:childCategories) {
-			ids[c] = catId ;
-			c++ ;
-		}
-		
-		return ids ;
-	}
-
-	/**
-	 * Returns true if the argument article is a child of this category, otherwise false
+	 * Returns true if the argument {@link Article} is a child of this category, otherwise false
 	 * 
 	 * @param article the article of interest
 	 * @return	true if the argument article is a child of this category, otherwise false
-	 * @throws SQLException if there is a problem with the Wikipedia database
 	 */
-	public boolean contains(Article article) throws SQLException {
-		boolean isChild = false ;
+	public boolean contains(Article article) {
 
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT * FROM categorylink WHERE cl_parent=" + id + " AND cl_child=" + article.getId()) ;
-
-		if (rs.first()) 
-			isChild = true ;
-
-		rs.close() ;
-		stmt.close() ;
-		return isChild ;
-	}
-
-	/**
-	 * Returns an ordered Vector of Articles that belong to this category.  
-	 * 
-	 * @return	a Vector of Articles
-	 * @throws SQLException if there is a problem with the wikipedia database
-	 */
-	public SortedVector<Article> getChildArticles() throws SQLException {
-
-		SortedVector<Article> childArticles = new SortedVector<Article>() ;
-		Vector<Redirect> redirects = new Vector<Redirect>() ;
-
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT page_id, page_title, page_type FROM categorylink, page WHERE cl_child=page_id AND page_type=" + ARTICLE + " AND cl_parent=" + id + " ORDER BY page_id") ;
-
-		while(rs.next()) {
-			try {
-				childArticles.add(new Article(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")), true) ;
-			} catch (Exception e) {} ;
-		}
-
-		rs.close() ;
-		stmt.close() ;
-
-		for(Redirect r: redirects) {
-			Page target = r.getTarget() ;
-			if (target != null && target.getType() == ARTICLE)
-				childArticles.add((Article)target, false) ;
-		}
-
-		return childArticles ;		
+		DbIdList tmpChildCats = env.getDbChildArticles().retrieve(id) ;
+		if (tmpChildCats == null || tmpChildCats.getIds() == null) 
+			return false ;
+		
+		return Collections.binarySearch(tmpChildCats.getIds(), article.getId()) >= 0 ;
 	}
 	
 	/**
-	 * @return a sorted array of article ids that belong to this category. 
-	 * @throws SQLException if there is a problem with the Wikipedia database.
+	 * Returns an array of {@link Article Articles} that belong to this category.  
+	 * 
+	 * @return	an array of Articles, sorted by id
 	 */
-	public int[] getChildArticleIds() throws SQLException {
-		Vector<Integer> childArticles = new Vector<Integer>() ;
+	public Article[] getChildArticles() {
 
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT page_id FROM categorylink, page WHERE cl_child=page_id AND page_type=" + ARTICLE + " AND cl_parent=" + id + " ORDER BY page_id") ;
+		DbIdList tmpChildArts = env.getDbChildArticles().retrieve(id) ;
+		if (tmpChildArts == null || tmpChildArts.getIds() == null) 
+			return new Article[0] ;
 
-		while(rs.next()) 
-			childArticles.add(rs.getInt(1)) ; 
+		Article[] childArticles = new Article[tmpChildArts.getIds().size()] ;
 
-		rs.close() ;
-		stmt.close() ;	
-		
-		int[] ids = new int[childArticles.size()] ;
-		
-		int c=0 ;
-		for (Integer catId:childArticles) {
-			ids[c] = catId ;
-			c++ ;
+		int index = 0 ;
+		for (int id:tmpChildArts.getIds()) {
+			childArticles[index] = new Article(env, id) ;
+			index++ ;
 		}
-		
-		return ids ;
+
+		return childArticles ;	
 	}
 	
-	/**
-	 * Provides a demo of functionality available to Categories
-	 * 
-	 * @param args an array of arguments for connecting to a wikipedia database: server and database names at a minimum, and optionally a username and password
-	 * @throws Exception if there is a problem with the wikipedia database.
-	 */
-	public static void main(String[] args) throws Exception{
-
-		Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
-
-		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));	
-
-		while (true) {
-			System.out.println("Enter category title (or press ENTER to quit): ") ;
-			String title = in.readLine() ;
-
-			if (title == null || title.equals(""))
-				break ;
-
-			Category category = wikipedia.getCategoryByTitle(title) ; 
-
-			if (category == null) {
-				System.out.println("Could not find category. Try again") ; 
-			}else {
-
-				System.out.println("Category: " + category) ; 
-				
-				if (wikipedia.getDatabase().isContentImported()) {
-					
-					System.out.println(" - first sentence:") ;
-					System.out.println("    - " + category.getFirstSentence(null, null)) ;
-					
-					System.out.println(" - first paragraph:") ;
-					System.out.println("    - " + category.getFirstParagraph()) ;
-				}
-
-				Article eqArticle = category.getEquivalentArticle() ;
-				if (eqArticle != null) {
-					System.out.println("\n - equivalent article") ;
-					System.out.println("    - " + eqArticle) ;
-				}
-				
-				System.out.println("\n - parent categories (broader topics): ") ;
-				for (Category c: category.getParentCategories()) 
-					System.out.println("    - " + c) ; 
-				
-				System.out.println("\n - child categories (narrower topics): ") ;
-				for (Category c: category.getChildCategories()) 
-					System.out.println("    - " + c) ; 
-
-				System.out.println("\n - child articles (narrower topics): ") ;
-				for (Article a: category.getChildArticles()) 
-					System.out.println("    - " + a) ; 
-			}
-			System.out.println("") ;
-		}
-	}
+	
 }

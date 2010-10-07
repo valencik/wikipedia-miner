@@ -20,14 +20,15 @@
 package org.wikipedia.miner.annotation.preprocessing;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.regex.*;
 import org.wikipedia.miner.annotation.preprocessing.PreprocessedDocument.RegionTag;
-import org.wikipedia.miner.util.* ;
 
 /**
- * This abstract class specifies the methods required to pre-process documents so that they can be tagged by a document tagger.
+ * This abstract class specifies the methods required to preprocess documents so that they can be tagged by a document tagger.
  * 
- * A document preprocessor must be able to recognize and strip out any syntax that should not be considered when matching terms to potential articles in Wikipedia.
+ * A document preprocessor must be able to recognise and strip out any syntax that should not be considered when matching terms to potential articles in Wikipedia.
  * 
  * Often, when tagging documents, you want to tag only the first mention of each topic within each significant region (chapter, paragraph, html div, etc). To facilitate this, the document preprocessor must also be able to recognize regions which should be tagged independently of each other
  * 
@@ -40,11 +41,11 @@ public abstract class DocumentPreprocessor {
 	protected Pattern splitPattern ;
 	
 	/**
-	 * Initializes a DocumentPreprocessor, so that will recognize regions specified with the given tags. 
+	 * Initialises a DocumentPreprocessor, so that will recognise regions specified with the given tags. 
 	 * 
-	 * @param openPattern a regular expression that will match tags which indicate the start of a region (e.g. a div in a web page)
-	 * @param closePattern a regular expression that will match tags which indicate the end of a region (e.g. a div in a web page)
-	 * @param splitPattern a regular expression that will match tags which indicate where a region should be split in two (e.g. a br in a web page)
+	 * @param openPattern a regular expression that will match tags which indicate the start of a region (e.g. a DIV start tag in a web page)
+	 * @param closePattern a regular expression that will match tags which indicate the end of a region (e.g. a DIV end tag in a web page)
+	 * @param splitPattern a regular expression that will match tags which indicate where a region should be split in two (e.g. a BR tag in a web page)
 	 */
 	public DocumentPreprocessor(Pattern openPattern, Pattern closePattern, Pattern splitPattern) {
 		
@@ -67,10 +68,10 @@ public abstract class DocumentPreprocessor {
 	
 	
 	/**
-	 * A convenience method that reads and pre-processes the content of a file
+	 * A convenience method that reads and preprocesses the content of a file
 	 * 
-	 * @param file a file to read and pre-process
-	 * @return the pre-processed content of the file.
+	 * @param file a file to read and preprocess
+	 * @return the preprocessed content of the file.
 	 * @throws IOException if the file cannot be read.
 	 */
 	public PreprocessedDocument preprocess(File file) throws IOException {
@@ -123,26 +124,28 @@ public abstract class DocumentPreprocessor {
 		return sb.toString() ;
 	}
 	
-	protected SortedVector<RegionTag> getRegionTags(String markup) {
-		SortedVector<RegionTag> regionTags = new SortedVector<RegionTag>() ;
+	protected ArrayList<RegionTag> getRegionTags(String markup) {
+		ArrayList<RegionTag> regionTags = new ArrayList<RegionTag>() ;
 		
 		if (openPattern != null) {
 			Matcher m = openPattern.matcher(markup) ;
 			while (m.find()) 
-				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_OPEN), false) ;
+				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_OPEN)) ;
 		}
 		
 		if (closePattern != null) {
 			Matcher m = closePattern.matcher(markup) ;
 			while (m.find()) 
-				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_CLOSE), false) ;
+				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_CLOSE)) ;
 		}
 				
 		if (splitPattern != null) {
 			Matcher m = splitPattern.matcher(markup) ;
 			while (m.find()) 
-				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_SPLIT), false) ;
+				regionTags.add(new RegionTag(m.start(), RegionTag.REGION_SPLIT)) ;
 		}
+		
+		Collections.sort(regionTags) ;
 		
 		return regionTags ;
 	}

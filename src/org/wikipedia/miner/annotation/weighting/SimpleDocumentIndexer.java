@@ -20,9 +20,11 @@
 
 package org.wikipedia.miner.annotation.weighting;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+
 import org.wikipedia.miner.annotation.Topic;
-import org.wikipedia.miner.util.SortedVector;
 
 /**
  * This class very simply weights topics according to how important they are within the document. 
@@ -35,7 +37,8 @@ import org.wikipedia.miner.util.SortedVector;
  */
 public class SimpleDocumentIndexer extends TopicWeighter{
 
-	public SortedVector<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception {
+	@Override
+	public ArrayList<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception {
 		
 		int maxOccurances = 0 ;
 		for (Topic topic:topics) {
@@ -43,18 +46,19 @@ public class SimpleDocumentIndexer extends TopicWeighter{
 				maxOccurances = topic.getOccurances() ;
 		}
 		
-		SortedVector<Topic> weightedTopics = new SortedVector<Topic>() ;
+		ArrayList<Topic> weightedTopics = new ArrayList<Topic>() ;
 		for (Topic topic:topics) {
 			
-			double weight = topic.getRelatednessToOtherTopics() * 2 ; 
-			weight = weight + (double)topic.getOccurances()/maxOccurances ;
+			float weight = topic.getRelatednessToOtherTopics() * 2 ; 
+			weight = weight + (float)topic.getOccurances()/maxOccurances ;
 			weight = weight + topic.getSpread() ;
-			weight = weight/5 ;
+			weight = weight/3 ;
 			
 			topic.setWeight(weight) ;
-			weightedTopics.add(topic, false) ;
+			weightedTopics.add(topic) ;
 		}
 		
+		Collections.sort(weightedTopics) ;
 		return weightedTopics ;
 	}
 }

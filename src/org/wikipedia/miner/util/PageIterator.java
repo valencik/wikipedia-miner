@@ -20,8 +20,15 @@
 package org.wikipedia.miner.util;
 
 import java.util.* ;
-import java.sql.* ;
+
+
+import org.wikipedia.miner.db.WEntry;
+import org.wikipedia.miner.db.WIterator;
+import org.wikipedia.miner.db.WEnvironment;
+import org.wikipedia.miner.db.struct.DbPage;
 import org.wikipedia.miner.model.* ;
+import org.wikipedia.miner.model.Page.PageType;
+
 
 /**
  * @author David Milne
@@ -30,25 +37,23 @@ import org.wikipedia.miner.model.* ;
  */
 public class PageIterator implements Iterator<Page> {
 
-	WikipediaDatabase database ;
+	WEnvironment env ;
+	WIterator<Integer,DbPage> iter ;
 
-	Vector<Page> pageBuffer ;
-	int pageType = -1 ;
-
-	int lastId = 0 ;
-	int bufferSize = 100000 ;
+	Page nextPage = null ;
+	PageType type = null ;
 
 	/**
 	 * Creates an iterator that will loop through all pages in Wikipedia.
 	 * 
 	 * @param database an active (connected) Wikipedia database.
-	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
-	public PageIterator(WikipediaDatabase database) throws SQLException {
-		this.database = database ;
-		pageBuffer = new Vector<Page>() ;
+	public PageIterator(WEnvironment env) {
 
-		fillBuffer() ;
+		this.env = env ;
+		iter = env.getDbPage().getIterator() ; 
+		
+		queueNext() ;
 	}
 
 	/**
@@ -58,74 +63,93 @@ public class PageIterator implements Iterator<Page> {
 	 * @param pageType the type of page to restrict the iterator to (ARTICLE, CATEGORY, REDIRECT or DISAMBIGUATION_PAGE)
 	 * @throws SQLException if there is a problem with the Wikipedia database.
 	 */
-	public PageIterator(WikipediaDatabase database, int pageType) throws SQLException {
-		this.database = database ;
-		this.pageType = pageType ;
-		pageBuffer = new Vector<Page>() ;
+	public PageIterator(WEnvironment env, PageType type)  {
 
-		fillBuffer() ;
+		this.env = env ;
+		iter = env.getDbPage().getIterator() ; 
+		this.type = type ;
+		
+		queueNext() ;
 	}
 
+	@Override
 	public boolean hasNext() {
-		return !pageBuffer.isEmpty() ;
+		return (nextPage != null) ;
 	}
 
+	@Override
 	public void remove() {
 		throw new UnsupportedOperationException() ;
 	}
 
+	@Override
 	public Page next() {
-
-		if (pageBuffer.isEmpty())
+		
+		if (nextPage == null) 
 			throw new NoSuchElementException() ;
-
-		Page p = pageBuffer.firstElement() ;
-		pageBuffer.remove(0) ;
-
-		try {
-			while (pageBuffer.isEmpty()) 
-				fillBuffer() ;
-		} catch (SQLException e) {} ;
-
+		
+		Page p = nextPage ;
+		queueNext() ;
+		
 		return p ;
 	}
 
-	private void fillBuffer() throws SQLException{
+	private void queueNext() {
 
-		Statement stmt = database.createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT page_id, page_title, page_type FROM page WHERE page_id>" + lastId + " ORDER BY page_id LIMIT " + bufferSize) ;
+		try {
+			nextPage=toPage(iter.next()) ;
 
-		if (!rs.first()) {
-			// there is nothing left to retrieve
-			rs.close() ;
-			stmt.close() ;
-			
-			throw new SQLException("No pages left to retrieve") ;
+			if (type != null) {
+				while (nextPage.getType() != type)
+					nextPage = toPage(iter.next());
+			}
+		} catch (NoSuchElementException e) {
+			nextPage = null ;
+		}
+	}
+
+	private Page toPage(WEntry<Integer,DbPage> e) {
+		if (e== null)
+			return null ;
+		else
+			return Page.createPage(env, e.getKey(), e.getValue()) ;
+	}
+
+	/*
+	public static void main(String[] args) throws Exception {
+		
+		DecimalFormat df = new DecimalFormat("0.000") ;
+
+		if (args.length != 1) {		
+			System.out.println("Please specify a directory containing a fully prepared Wikipedia database") ;
+			return ;
 		}
 
-		while (rs.next()) {
+		File envDir = new File(args[0]) ;
 
-			try {
-				int id = rs.getInt(1) ;
-				String title = new String(rs.getBytes(2), "UTF-8") ;
-				int type = rs.getInt(3) ;
+		Wikipedia wikipedia = new Wikipedia(envDir) ;
+		
+		ProgressTracker tracker = new ProgressTracker(wikipedia.getEnvironment().getDbPage().getCount(), "Iterating pages", PageIterator.class) ;
 
-				Page p = Page.createPage(database, id, title, type) ; ;
+		Iterator<Page> iter = wikipedia.getPageIterator(PageType.article) ;
+		
+		
+		
+		int count = 0 ;
+		
+		while (iter.hasNext()) {
+			tracker.update() ;
+			Page p = iter.next() ;
+			
+			if (count%1000 == 0) {
+				System.out.println(p + " [" + p.getType() + "] - " + df.format(tracker.getTaskProgress())) ;
 				
-				//oddly, it is faster to cut out unwanted page types here, rather than with the database call
-				if (p != null && (pageType<0 || type == pageType)) {
-					pageBuffer.add(p) ;
-				}
-
-				lastId = id ;
-
-			} catch (Exception e) {
-				e.printStackTrace() ;
-			} ;	
+			}
+			
+			count++ ;
 		}
 		
-		rs.close() ;
-		stmt.close() ;
-	}
+		System.out.println(count) ;
+	}*/
 }
 

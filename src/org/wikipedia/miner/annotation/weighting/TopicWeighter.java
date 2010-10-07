@@ -19,9 +19,9 @@
 
 package org.wikipedia.miner.annotation.weighting;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import org.wikipedia.miner.annotation.*;
-import org.wikipedia.miner.util.SortedVector;
 
 /**
  * This abstract class specifies the methods that should be implemented by something that will weight topics identified by the topicDetector.
@@ -38,7 +38,7 @@ public abstract class TopicWeighter {
 	 * @return the weighted topics.
 	 * @throws Exception depends on the implementing class
 	 */
-	public abstract SortedVector<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception ;
+	public abstract ArrayList<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception ;
 	
 	/**
 	 * A convenience method that weights the given topics using getWeightedTopics(), and discards those below a certian weight. 
@@ -46,18 +46,18 @@ public abstract class TopicWeighter {
 	 * @param topics the topics to be weighted and sorted.
 	 * @param minimumWeight the weight below which topics are discarded
 	 * @return the weighted topics.
-	 * @throws Exception
+	 * @throws Exception depends on the implementing class
 	 */
-	public SortedVector<Topic> getBestTopics(Collection<Topic> topics, double minimumWeight) throws Exception {
+	public ArrayList<Topic> getBestTopics(Collection<Topic> topics, double minimumWeight) throws Exception {
 		
-		SortedVector<Topic> allTopics = getWeightedTopics(topics) ;
-		SortedVector<Topic> bestTopics = new SortedVector<Topic>() ;
+		ArrayList<Topic> allTopics = getWeightedTopics(topics) ;
+		ArrayList<Topic> bestTopics = new ArrayList<Topic>() ;
 		
 		for (Topic topic: allTopics) {
 			if (topic.getWeight() >= minimumWeight) 
-				bestTopics.add(topic, true) ;
+				bestTopics.add(topic) ;
 			else
-				break ;		
+				break ;
 		}
 		
 		return bestTopics ;		

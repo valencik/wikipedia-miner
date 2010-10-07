@@ -26,6 +26,7 @@ import java.util.*;
 import java.util.regex.*;
 
 import org.wikipedia.miner.model.*;
+import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.util.*;
 import org.wikipedia.miner.annotation.preprocessing.*;
 
@@ -44,11 +45,16 @@ public class TopicDetector {
 	private Wikipedia wikipedia ;
 	//private SentenceSplitter ss; 
 	private Disambiguator disambiguator ;
-	private HashSet<String> stopwords ;
+	//private HashSet<String> stopwords ;
 	
 	
 	private boolean strictDisambiguation ;
 	private boolean allowDisambiguations ;
+	
+	
+	
+	
+	
 	
 	/**
 	 * Initializes a new topic detector.
@@ -60,23 +66,28 @@ public class TopicDetector {
 	 * @param allowDisambiguations 
 	 * @throws IOException 
 	 */
-	public TopicDetector(Wikipedia wikipedia, Disambiguator disambiguator, File stopwordFile, boolean strictDisambiguation, boolean allowDisambiguations) throws IOException {
+	public TopicDetector(Wikipedia wikipedia, Disambiguator disambiguator, boolean strictDisambiguation, boolean allowDisambiguations) throws IOException {
 		this.wikipedia = wikipedia ;
 		this.disambiguator = disambiguator ;
 		
 		this.strictDisambiguation = strictDisambiguation ;
 		this.allowDisambiguations = allowDisambiguations ;
 		
+		/*
 		this.stopwords = new HashSet<String>() ;
 		if (stopwordFile != null) {
 			BufferedReader input = new BufferedReader(new FileReader(stopwordFile)) ;
 			String line ;
 			while ((line=input.readLine()) != null) 
 				stopwords.add(line.trim()) ;			
-		}
+		}*/
 		
-		if (!wikipedia.getDatabase().isGeneralityCached()) 
+		//TODO:Check caching 
+		/*
+		if (!wikipedia.getEnvironment().isGeneralityCached()) 
 			System.err.println("TopicDetector | Warning: generality has not been cached, so this will run significantly slower than it needs to.") ;
+		*/	
+			
 	}
 	
 	/**
@@ -134,7 +145,7 @@ public class TopicDetector {
 	private void calculateRelatedness(Collection<Topic> topics, RelatednessCache cache) throws SQLException{
 		
 		for (Topic topicA: topics) {
-			double avgRelatedness = 0 ;
+			float avgRelatedness = 0 ;
 			
 			for (Topic topicB: topics) {
 				if (!topicA.equals(topicB)) {
@@ -175,16 +186,18 @@ public class TopicDetector {
 				if (Character.isWhitespace(s.charAt(startIndex))) 
 					continue ;
 
-				for (int j=Math.min(i + disambiguator.getMaxAnchorLength(), matchIndexes.size()-1) ; j > i ; j--) {
+				for (int j=Math.min(i + disambiguator.getMaxLabelLength(), matchIndexes.size()-1) ; j > i ; j--) {
 					int currIndex = matchIndexes.elementAt(j) ;	
 					String ngram = s.substring(startIndex, currIndex) ;
 
-					if (! (ngram.length()==1 && s.substring(startIndex-1, startIndex).equals("'"))&& !ngram.trim().equals("") && !stopwords.contains(ngram.toLowerCase())) {
-						Anchor anchor = new Anchor(wikipedia.getDatabase().addEscapes(ngram), disambiguator.getTextProcessor(), wikipedia.getDatabase()) ;
+					if (! (ngram.length()==1 && s.substring(startIndex-1, startIndex).equals("'"))&& !ngram.trim().equals("") && !wikipedia.getConfig().isStopword(ngram)) {
+						
+						//TODO: test if we need escapes here
+						Label label = new Label(wikipedia.getEnvironment(), ngram, disambiguator.getTextProcessor()) ;
 
-						if (anchor.getLinkProbability() >= disambiguator.getMinLinkProbability()) {
+						if (label.exists() && label.getLinkProbability() >= disambiguator.getMinLinkProbability()) {
 							Position pos = new Position(startIndex-2, currIndex-2) ;
-							TopicReference ref = new TopicReference(anchor, pos) ;
+							TopicReference ref = new TopicReference(label, pos) ;
 							references.add(ref) ;
 							
 							//System.out.println(" - ref: " + ngram) ;
@@ -200,32 +213,32 @@ public class TopicDetector {
 	private HashMap<Integer,Topic> getTopics(Vector<TopicReference> references, String contextText, int docLength, RelatednessCache cache) throws Exception{
 		HashMap<Integer,Topic> chosenTopics = new HashMap<Integer,Topic>() ;
 	
-		// get context articles from unambiguous anchors
-		Vector<Anchor> unambigAnchors = new Vector<Anchor>() ;
+		// get context articles from unambiguous Labels
+		Vector<Label> unambigLabels = new Vector<Label>() ;
 		for (TopicReference ref:references) {
-			Anchor anchor = ref.getAnchor() ;
+			Label label = ref.getLabel() ;
 			
-			SortedVector<Anchor.Sense> senses = anchor.getSenses() ;
-			if (senses.size() > 0) {				
-				if (senses.size() == 1 || senses.first().getProbability() > 1-disambiguator.getMinSenseProbability())
-					unambigAnchors.add(anchor) ;	
+			Label.Sense[] senses = label.getSenses() ;
+			if (senses.length > 0) {				
+				if (senses.length == 1 || senses[0].getPriorProbability() > 1-disambiguator.getMinSenseProbability())
+					unambigLabels.add(label) ;	
 			}		
 		}
 		
 		//get context articles from additional context text
 		//Vector<String> contextSentences = ss.getSentences(, SentenceSplitter.MULTIPLE_NEWLINES) ; 
 		for (TopicReference ref:getReferences(contextText)){
-			Anchor anchor = ref.getAnchor() ;
-			SortedVector<Anchor.Sense> senses = anchor.getSenses() ;
-			if (senses.size() > 0) {
-				if (senses.size() == 1 || senses.first().getProbability() > 1-disambiguator.getMinSenseProbability()) {
-					unambigAnchors.add(anchor) ;	
+			Label label = ref.getLabel() ;
+			Label.Sense[] senses = label.getSenses() ;
+			if (senses.length > 0) {
+				if (senses.length == 1 || senses[0].getPriorProbability() > 1-disambiguator.getMinSenseProbability()) {
+					unambigLabels.add(label) ;	
 				}
 			}
 		}
 		
-		Context context = new Context(unambigAnchors, cache, disambiguator.getMaxContextSize()) ;	
-		unambigAnchors = null ;
+		Context context = new Context(unambigLabels, cache, disambiguator.getMaxContextSize()) ;	
+		unambigLabels = null ;
 
 		//now disambiguate all references
 		//unambig references are still processed here, because we need to calculate relatedness to context anyway.
@@ -234,25 +247,25 @@ public class TopicDetector {
 		HashMap<String, TreeSet<CachedSense>> disambigCache = new HashMap<String, TreeSet<CachedSense>>() ;
 
 		for (TopicReference ref:references) {
-			//System.out.println("disambiguating ref: " + ref.getAnchor().getText()) ;
+			//System.out.println("disambiguating ref: " + ref.getLabel().getText()) ;
 
-			TreeSet<CachedSense> validSenses = disambigCache.get(ref.getAnchor().getText()) ;
+			TreeSet<CachedSense> validSenses = disambigCache.get(ref.getLabel().getText()) ;
 
 			if (validSenses == null) {
-				// we havent seen this anchor in this document before
+				// we havent seen this label in this document before
 				validSenses = new TreeSet<CachedSense>() ;
 
-				for (Anchor.Sense sense: ref.getAnchor().getSenses()) {
+				for (Label.Sense sense: ref.getLabel().getSenses()) {
 					
-					if (sense.getProbability() < disambiguator.getMinSenseProbability()) break ;
+					if (sense.getPriorProbability() < disambiguator.getMinSenseProbability()) break ;
 					
-					if (!allowDisambiguations && sense.getType() == Page.DISAMBIGUATION)
+					if (!allowDisambiguations && sense.getType() == PageType.disambiguation)
 						continue ;
 
-					double relatedness = context.getRelatednessTo(sense) ;
-					double commonness = sense.getProbability() ;
+					float relatedness = context.getRelatednessTo(sense) ;
+					float commonness = sense.getPriorProbability() ;
 
-					double disambigProb = disambiguator.getProbabilityOfSense(commonness, relatedness, context) ;
+					float disambigProb = disambiguator.getProbabilityOfSense(commonness, relatedness, context) ;
 
 					//System.out.println(" - sense " + sense + ", " + disambigProb) ;
 					
@@ -263,7 +276,7 @@ public class TopicDetector {
 						validSenses.add(vs) ;
 					}
 				}
-				disambigCache.put(ref.getAnchor().getText(), validSenses) ;
+				disambigCache.put(ref.getLabel().getText(), validSenses) ;
 			}
 
 			if (strictDisambiguation) {
@@ -305,19 +318,19 @@ public class TopicDetector {
 	private class CachedSense implements Comparable<CachedSense>{
 		
 		int id ;
-		double commonness ;
-		double relatedness ;
-		double disambigConfidence ;
+		float commonness ;
+		float relatedness ;
+		float disambigConfidence ;
 
 		/**
 		 * Initializes a new CachedSense
 		 * 
 		 * @param id the id of the article that represents this sense
-		 * @param commonness the prior probability of this sense given a source ngram (anchor)
+		 * @param commonness the prior probability of this sense given a source ngram (label)
 		 * @param relatedness the relatedness of this sense to the surrounding unambiguous topics
 		 * @param disambigConfidence the probability that this sense is valid, as defined by the disambiguator.
 		 */
-		public CachedSense(int id, double commonness, double relatedness, double disambigConfidence) {
+		public CachedSense(int id, float commonness, float relatedness, float disambigConfidence) {
 			this.id = id ;
 			this.commonness = commonness ;
 			this.relatedness = relatedness ;

@@ -19,150 +19,106 @@
 
 package org.wikipedia.miner.model;
 
-import java.io.*;
-import java.sql.ResultSet ;
-import java.sql.Statement ;
-import java.sql.SQLException ;
-import java.text.DecimalFormat;
 import java.util.* ; 
 
-import org.wikipedia.miner.util.* ;
+import org.wikipedia.miner.db.WEnvironment;
+import org.wikipedia.miner.db.WDatabase.DatabaseType ;
+import org.wikipedia.miner.db.WEnvironment.StatisticName;
+import org.wikipedia.miner.db.struct.DbIdList;
+import org.wikipedia.miner.db.struct.DbLabelForPage;
+import org.wikipedia.miner.db.struct.DbLabelForPageList;
+import org.wikipedia.miner.db.struct.DbLinkLocation;
+import org.wikipedia.miner.db.struct.DbLinkLocationList;
+import org.wikipedia.miner.db.struct.DbPage;
 
 /**
- * This class represents articles in Wikipedia; the pages that contain descriptive text regarding a particular topic. 
- * It is intended to contain all properties and methods that are relevant for an article, such as its pertinent statistics,
- * the categories it belongs to, and the articles that link to it.  
- * 
- * @author David Milne
+ * Represents articles in Wikipedia; the pages that contain descriptive text regarding a particular topic. 
  */
 public class Article extends Page {
 
 	/**
-	 * ids of incoming links - needed every time we calculate sr, so lets cache it
-	 */
-	private int inLinkIds[] ;
-
-	/**
-	 * ids and counts of outgoing links - needed every time we calculate sr, so lets cache it
-	 */
-	private int outLinkIdsAndCounts[][] ;
-
-
-	/**
-	 * Initialises a newly created Article so that it represents the page given by <em>id</em> and <em>title</em>.
+	 * Modes available for measuring relatedness between articles. 
 	 * 
-	 * This is the most efficient constructor as no database lookup is required.
-	 * 
-	 * @param database	an active WikipediaDatabase 
-	 * @param id	the unique identifier of the article
-	 * @param title	the (case dependent) title of the article
+	 * @see Article#getRelatednessTo(Article)
 	 */
-	public Article(WikipediaDatabase database, int id, String title) {
-		super(database, id, title, ARTICLE) ;
-	}
-
+	public enum RelatednessMode{
+		
 	/**
-	 * Initializes a newly created Article so that it represents the article given by <em>id</em>.
-	 * 
-	 * @param database	an active WikipediaDatabase
-	 * @param id	the unique identifier of the article
-	 * @throws SQLException	if no page is defined for the id, or if it is not an article.
+	 * Use links made to articles to measure relatedness. You should cache {@link DatabaseType#pageLinksIn} if using this mode extensively.  
 	 */
-	public Article(WikipediaDatabase database, int id) throws SQLException{
-		super(database, id) ;
-
-		if (type != ARTICLE && type != DISAMBIGUATION)
-			throw new SQLException("The page given by id: " + id + " is not an article") ;
-	}
-
-	/**
-	 * Initialises a newly created Article so that it represents the article given by <em>title</em>.
-	 * 
-	 * @param database	an active WikipediaDatabase
-	 * @param title	the (case dependent) title of the article
-	 * @throws SQLException	if no article is defined for the title.
-	 */
-	public Article(WikipediaDatabase database, String title) throws SQLException {
-		super(database, title, ARTICLE) ;
-	}
-
-	protected Article(WikipediaDatabase database, String title, int type) throws SQLException{
-		super(database, title, type) ;
-	}
+	inLinks, 
 	
 	/**
-	 * Returns a SortedVector of Redirects that point to this article.
-	 * 
-	 * @return	a SortedVector of Redirects
-	 * @throws SQLException if there is a problem with the Wikipedia database
+	 * Use {@link RelatednessMode#inLinks}, but ignore relations (return {@value 0}) that don't have sentence that explain them.
 	 */
-	public SortedVector<Redirect> getRedirects() throws SQLException{
-		SortedVector<Redirect> redirects = new SortedVector<Redirect>() ;
+	sentences, 
+	
+	/**
+	 * Use links made from articles to measure relatedness. You should cache {@link DatabaseType#pageLinksOut} if using this mode extensively. 
+	 */
+	outLinks
+	} ;
+	
+	
+	/**
+	 * Initialises a newly created Article so that it represents the article given by <em>id</em>.
+	 * 
+	 * @param env	an active WEnvironment
+	 * @param id	the unique identifier of the article
+	 */
+	public Article(WEnvironment env, int id) {
+		super(env, id) ;
+	}
 
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id, page_title, page_type FROM redirect, page WHERE page_id=rd_from AND rd_to=" + id) ;
+	protected Article(WEnvironment env, int id, DbPage pd) {
+		super(env, id, pd) ;
+	}
 
-		while(rs.next()) {
-			try {
-				Redirect wr = new Redirect(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")) ;
-				redirects.add(wr, true) ;
-			} catch (Exception e) {} ;	
-		}
+	/**
+	 * Returns a array of {@link Redirect Redirects}, sorted by id, that point to this article.
+	 * 
+	 * @return	an array of Redirects, sorted by id
+	 */
+	public Redirect[] getRedirects()  {
 
-		rs.close() ;
-		stmt.close() ;
+		DbIdList tmpRedirects = env.getDbRedirectSourcesByTarget().retrieve(id) ;
+		if (tmpRedirects == null || tmpRedirects.getIds() == null) 
+			return new Redirect[0] ;
+
+		Redirect[] redirects = new Redirect[tmpRedirects.getIds().size()] ;
+		for (int i=0 ; i<tmpRedirects.getIds().size() ; i++)
+			redirects[i] = new Redirect(env, tmpRedirects.getIds().get(i)) ;	
 
 		return redirects ;	
 	}
-	
-	/**
-	 * @return an array of category ids that this article belongs to. 
-	 */
-	public int[] getParentCategoryIds() {
-		
-		int[] parentIds = null;
-		
-		if (database.areParentIdsCached())
-			parentIds = database.cachedParentIds.get(id) ;
-		
-		if (parentIds == null)
-			parentIds = new int[0] ;
-		
-		return parentIds ;
-	}
 
 	/**
-	 * Returns a SortedVector of Categories that this article belongs to. These are the categories 
+	 * Returns an array of {@link Category Categories} that this article belongs to. These are the categories 
 	 * that are linked to at the bottom of any Wikipedia article. Note that one of these will be the article's
 	 * equivalent category, if one exists.
 	 * 
-	 * @return	a Vector of WikipediaCategories
-	 * @throws SQLException if there is a problem with the Wikipedia database
+	 * @return	an array of Categories, sorted by id
 	 */
-	public SortedVector<Category> getParentCategories() throws SQLException {
-		//TODO: use cached parent ids
-		
-		SortedVector<Category> parentCategories = new SortedVector<Category>() ;
+	public Category[] getParentCategories() {
 
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id, page_title, page_type FROM categorylink, page WHERE cl_parent=page_id AND cl_child=" + id + " ORDER BY page_id") ;
+		DbIdList tmpParents = env.getDbArticleParents().retrieve(id) ;
+		if (tmpParents == null || tmpParents.getIds() == null) 
+			return new Category[0] ;
 
-		while(rs.next()) {
+		Category[] parentCategories = new Category[tmpParents.getIds().size()] ;
 
-			try {
-				Category wc = new Category(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")) ;
-				parentCategories.add(wc, true) ;
-			} catch (Exception e) {} ;	
+		int index = 0 ;
+		for (int id:tmpParents.getIds()) {
+			parentCategories[index] = new Category(env, id) ;
+			index++ ;
 		}
 
-		rs.close() ;
-		stmt.close() ;
-
-		return parentCategories ;
+		return parentCategories ;	
 	}
 
+	//TODO:
 	/**
-	 * Returns the Category that relates to the same concept as this article. For instance, calling 
+	 * Returns the {@link Category} that relates to the same concept as this article. For instance, calling 
 	 * this for "6678: Cat" returns the category "799717: Cats"
 	 * 
 	 * Note that many articles do not have equivalent categories; they are only used when the article 
@@ -170,12 +126,13 @@ public class Article extends Page {
 	 * this method will often return null. 
 	 * 
 	 * @return	the equivalent Category, or null
-	 * @throws SQLException if there is a problem with the wikipedia database
-	 */
-	public Category getEquivalentCategory() throws SQLException{
+	 *//*
+	public Category getEquivalentCategory() {
 
 		Category equivalentCategory = null ;
 
+		//TODO ;
+		/*
 		Statement stmt = getWikipediaDatabase().createStatement() ;
 		ResultSet rs = stmt.executeQuery("SELECT page_id, page_title FROM equivalence, page WHERE page_id=eq_cat AND eq_art=" + id) ;
 
@@ -189,109 +146,54 @@ public class Article extends Page {
 		stmt.close() ;	
 
 		return equivalentCategory ;
-	}
+	}*/
 
 	/**
-	 * Returns a SortedVector of Articles that link to this article. These 
+	 * Returns an array of {@link Article Articles} that link to this article. These 
 	 * are defined by the internal hyperlinks within article text. If these hyperlinks came via 
 	 * redirects, then they are resolved.
 	 * 
-	 * @return	the SortedVector of Articles that this article links to
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @return	the array of Articles that link to this article, sorted by id.
 	 */
-	public SortedVector<Article> getLinksIn() throws SQLException{
+	public Article[] getLinksIn() {
 
-		SortedVector<Article> articles = new SortedVector<Article>() ;	
+		DbLinkLocationList tmpLinks = env.getDbPageLinkIn().retrieve(id) ;
+		if (tmpLinks == null || tmpLinks.getLinkLocations() == null) 
+			return new Article[0] ;
 
-		String query = "" ;
+		Article[] links = new Article[tmpLinks.getLinkLocations().size()] ;
 
-		for (int linkIn: getLinksInIds()) {
-			query = query + linkIn + "," ;
+		int index = 0 ;
+		for (DbLinkLocation ll:tmpLinks.getLinkLocations()) {
+			links[index] = new Article(env, ll.getLinkId()) ;
+			index++ ;
 		}
 
-		if (query.length() > 0) {
-			query = query.substring(0, query.length()-1) ;
-
-			Statement stmt = getWikipediaDatabase().createStatement() ;
-			ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id, page_title, page_type FROM page WHERE page_id IN (" + query + ") ORDER BY page_id") ;
-
-			while(rs.next()) {
-				int type = rs.getInt(3) ;
-				try {
-					if (type == Page.ARTICLE) 
-						articles.add(new Article(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")), true) ;
-
-					if (type == Page.DISAMBIGUATION) 
-						articles.add(new Disambiguation(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")), true) ;
-				} catch (Exception e) {} ;	
-			}
-			rs.close() ;
-			stmt.close() ;
-		}
-
-		return articles ;
+		return links ;		
 	}
 
 	/**
-	 * Returns a Vector of Articles that this article links to. These 
-	 * are defined by the internal hyperlinks within article text. If these hyperlinks point
-	 * to redirects, then these are resolved. 
+	 * Returns an array of {@link Article}s, sorted by article id, that this article 
+	 * links to. These are defined by the internal hyperlinks within article text. 
+	 * If these hyperlinks point to redirects, then these are resolved. 
 	 * 
-	 * @return	the Vector of Articles that this article links to
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @return	an array of Articles that this article links to, sorted by id
 	 */
-	public SortedVector<Article> getLinksOut() throws SQLException{
+	public Article[] getLinksOut()  {
 
-		SortedVector<Article> articles = new SortedVector<Article>() ;	
+		DbLinkLocationList tmpLinks = env.getDbPageLinkOut().retrieve(id) ;
+		if (tmpLinks == null || tmpLinks.getLinkLocations() == null) 
+			return new Article[0] ;
 
-		String query = "" ;
+		Article[] links = new Article[tmpLinks.getLinkLocations().size()] ;
 
-		for (int linksOut[]: getLinksOutIdsAndCounts()) {
-			query = query + linksOut[0] + "," ;
+		int index = 0 ;
+		for (DbLinkLocation ll:tmpLinks.getLinkLocations()) {
+			links[index] = new Article(env, ll.getLinkId()) ;
+			index++ ;
 		}
 
-		if (query.length() > 0) {
-			query = query.substring(0, query.length()-1) ;
-
-			Statement stmt = getWikipediaDatabase().createStatement() ;
-			ResultSet rs = stmt.executeQuery("SELECT DISTINCT page_id, page_title, page_type FROM page WHERE page_id IN (" + query + ") ORDER BY page_id") ;
-
-			while(rs.next()) {
-				int type = rs.getInt(3) ;
-				try {
-					if (type == Page.ARTICLE) 
-						articles.add(new Article(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")), true) ;
-
-					if (type == Page.DISAMBIGUATION) 
-						articles.add(new Disambiguation(database, rs.getInt(1), new String(rs.getBytes(2), "UTF-8")), true) ;
-				} catch (Exception e) {} ;	
-			}
-			rs.close() ;
-			stmt.close() ;
-		}
-
-		return articles ;
-	}
-
-	/**
-	 * Returns a Vector of language codes for which translations are available (i.e. fn, jp, de, etc). 
-	 * 
-	 * @return true if there exists a link from this article to the argument one; otherwise false.
-	 * @throws SQLException if there is a problem with the Wikipedia database
-	 */	
-	public Vector<String> getAvaliableLanguages() throws SQLException {
-		Vector<String> languages = new Vector<String>() ; 
-
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT tl_lang FROM translation WHERE tl_id=" + id) ; 
-
-		while(rs.next())
-			languages.add(rs.getString(1)) ;
-
-		rs.close() ;
-		stmt.close() ;
-
-		return languages ;
+		return links ;	
 	}
 
 	/**
@@ -300,49 +202,20 @@ public class Article extends Page {
 	 * 
 	 * @param languageCode	the (generally 2 character) language code.
 	 * @return the translated title if it is available; otherwise null.
-	 * @throws SQLException if there is a problem with the Wikipedia database
 	 */	
-	public String getTranslation(String languageCode) throws SQLException {
-		String translation = null ;
-
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT tl_text FROM translation WHERE tl_id=" + id + " AND tl_lang=\"" + languageCode + "\"") ; 
-
-		try {
-			if(rs.first())
-				translation = new String(rs.getBytes(1), "UTF-8") ;
-		} catch (Exception e) {} ;			
-
-		rs.close() ;
-		stmt.close() ;
-
-		return translation ;
-	}
+	//public String getTranslation(String languageCode) throws DatabaseException {		
+	//	return environment.getTranslations(id).get(languageCode) ;
+	//}
 
 	/**
 	 * Returns a HashMap associating language code with translated title for all available translations 
 	 * 
 	 * @return a HashMap associating language code with translated title.
-	 * @throws SQLException if there is a problem with the Wikipedia database
+	 * @ if there is a problem with the Wikipedia database
 	 */	
-	public HashMap<String,String> getTranslations() throws SQLException{
-		HashMap<String,String> translations = new HashMap<String,String>() ;
-
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT tl_lang, tl_text FROM translation WHERE tl_id=" + id) ; 
-
-		try {
-			while(rs.next())
-				translations.put(rs.getString(1), new String(rs.getBytes(2), "UTF-8")) ;
-		} catch (Exception e) {
-			e.printStackTrace() ;			
-		}
-
-		rs.close() ;
-		stmt.close() ;
-
-		return translations ;
-	}
+	//public HashMap<String,String> getTranslations() throws DatabaseException {
+	//	return environment.getTranslations(id) ;
+	//}
 
 	/**
 	 * <p>
@@ -370,165 +243,82 @@ public class Article extends Page {
 	 * 
 	 * @param article the other article of interest
 	 * @return the weight of the semantic relation between this article and the argument one.
-	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public double getRelatednessTo(Article article) throws SQLException{
-		
+	public float getRelatednessTo(Article article) {
+
+		return getRelatednessFromInLinks(article) ;
+
+		//TODO:use in and out links to calculate relatedness, unless caching says otherwise.
+		/*
 		if (database.areOutLinksCached() && database.areInLinksCached()) 
 			return (getRelatednessFromInLinks(article) + getRelatednessFromOutLinks(article))/2 ;
-			
+
 		if (database.areOutLinksCached()) 
 			return getRelatednessFromOutLinks(article) ;
-		
+
 		if (database.areInLinksCached()) 
 			return getRelatednessFromInLinks(article) ;
-		
+
 		return (getRelatednessFromInLinks(article) + getRelatednessFromOutLinks(article))/2 ;
+		 */
 	}
 
 	/**
-	 * @return an ordered array of article ids that link to this page (with redirects resolved) 
-	 * @throws SQLException if there is a problem with the Wikipedia database.
-	 */
-	public int[] getLinksInIds() throws SQLException{
+	 * @return the total number of links that are made to this article 
+	 * @
+	 *//*
+	public int getTotalLinksInCount() throws DatabaseException {
 
-		if (inLinkIds != null)
-			return inLinkIds ;
+		int[] linkCounts = environment.getLinkCounts(id) ;
 
-		if (database.areInLinksCached()){
-			//if this stuff is cached then we just want to grab it. Dont save it to this.inLinkIds, otherwise we would have duplicate copies in memory
+		if (linkCounts == null) 
+			return 0 ;
+		else
+			return linkCounts[2] ;
+	}*/
 
-			if (database.cachedInLinks.containsKey(id))
-				return database.cachedInLinks.get(id) ;
-			else
-				return new int[0] ; 
-		}
+	/**
+	 * @return the number of distinct articles which contain a link to this article 
+	 *//*
+	public int getDistinctLinksInCount() throws DatabaseException {
 
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT li_data FROM pagelink_in WHERE li_id=" + id) ;
+		int[] linkCounts = environment.getLinkCounts(id) ;
 
-		inLinkIds = new int[0] ;
-		
-		
+		if (linkCounts == null) 
+			return 0 ;
+		else
+			return linkCounts[3] ;
+	}*/
 
-		if (rs.first()) {
-			String data = rs.getString(1) ;
-			if (!data.equals("")) {
-				String[] l = data.split(":") ;
-				inLinkIds = new int[l.length] ;
-				for (int i=0 ; i<l.length ; i++) 
-					inLinkIds[i] = new Integer(l[i]).intValue() ;
-			}
-		}
-		
-		
+	/**
+	 * @return the total number links that this article makes to other articles 
+	 *//*
+	public int getTotalLinksOutCount() throws DatabaseException {
 
-		rs.close() ;
-		stmt.close() ;
+		int[] linkCounts = environment.getLinkCounts(id) ;
 
-		return inLinkIds ;
-	}
+		if (linkCounts == null) 
+			return 0 ;
+		else
+			return linkCounts[0] ;
+	}*/
+
+	/**
+	 * @return the number of distinct articles that this article links to 
+	 *//*
+	public int getDistinctLinksOutCount() throws DatabaseException {
+
+		int[] linkCounts = environment.getLinkCounts(id) ;
+		if (linkCounts == null) 
+			return 0 ;
+		else
+			return linkCounts[1] ;
+	}*/
+
 	
-	/**
-	 * @return the number of articles that link to this one 
-	 * @throws SQLException
-	 */
-	public int getLinksInCount() throws SQLException {
-		
-		int linkCount = 0 ;
-		
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT lc_in FROM linkcount WHERE lc_id=" + id) ;
-		
-		if (rs.first())
-			linkCount = rs.getInt(1) ;
-		
-		rs.close() ;
-		stmt.close() ;
-		
-		return linkCount ;
-	}
-	
-	/**
-	 * @return the number of articles that this one links to 
-	 * @throws SQLException
-	 */
-	public int getLinksOutCount() throws SQLException {
-		
-		int linkCount = 0 ;
-		
-		Statement stmt = getWikipediaDatabase().createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT lc_out FROM linkcount WHERE lc_id=" + id) ;
-		
-		if (rs.first())
-			linkCount = rs.getInt(1) ;
-		
-		rs.close() ;
-		stmt.close() ;
-		
-		return linkCount ;
-	}
-	
-	/**
-	 * @return an ordered array of article ids that this page links to (with redirects resolved) 
-	 * @throws SQLException
-	 */
-	public int[] getLinksOutIds() throws SQLException {
-		
-		int[][] idsAndCounts = getLinksOutIdsAndCounts() ;
-		
-		int[] idsOnly = new int[idsAndCounts.length] ;
-		
-		for (int i=0 ; i<idsAndCounts.length ; i++)
-			idsOnly[i] = idsAndCounts[i][0] ;
+	/*
+	private double getRelatednessFromOutLinks(Article article) {
 
-		return idsOnly ;		
-	}
-
-	private int[][] getLinksOutIdsAndCounts() throws SQLException {
-
-		if (outLinkIdsAndCounts != null)
-			return outLinkIdsAndCounts ;
-
-		if (database.areOutLinksCached()) {
-			//if this stuff is cached then we just want to grab it. Dont save it to this.inLinkIds, otherwise we would have duplicate copies in memory
-			if (database.cachedOutLinks.containsKey(id))
-				return database.cachedOutLinks.get(id) ;
-			else
-				return new int[0][2] ; 
-		}
-
-		String data = "" ;
-
-		Statement stmt = database.createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT lo_data FROM pagelink_out WHERE lo_id = " + id) ;
-
-		if (rs.first()) 
-			data = rs.getString(1) ;
-
-		stmt.close() ;
-		rs.close();
-
-		String[] values = data.split(";") ;
-
-		outLinkIdsAndCounts = new int[values.length][2] ;
-
-		int index = 0 ;
-		for (String value:values) {
-			String values2[] = value.split(":") ;
-			
-			if (values2.length == 2) {
-				outLinkIdsAndCounts[index][0] = Integer.parseInt(values2[0]) ;
-				outLinkIdsAndCounts[index][1] = Integer.parseInt(values2[1]) ;
-			}
-			index ++ ;
-		}
-
-		return outLinkIdsAndCounts ;
-	}
-
-	private double getRelatednessFromOutLinks(Article article) throws SQLException{
-		
 		if (getId() == article.getId()) 
 			return 1 ;
 
@@ -566,17 +356,17 @@ public class Article extends Page {
 			} else {
 
 				if ((idA < idB && idA > 0)|| idB < 0) {
-					
+
 					double probability = Math.log((double)totalArticles/dataA[indexA][1]) ;
 					vectA.add(probability) ;
 					if (idA == article.getId())
 						vectB.add(probability) ;
 					else
 						vectB.add(0.0) ;
-				
+
 					indexA ++ ;
 				} else {
-					
+
 					double probability = Math.log((double)totalArticles/dataB[indexB][1]) ;
 					vectB.add(new Double(probability)) ;
 					if (idB == id)
@@ -611,168 +401,325 @@ public class Article extends Page {
 		sr = sr / (Math.PI/2) ; // normalize, so measure is between 0 and 1 ;				
 
 		return sr ;
-	}
+	}*/
 
-	
-	private double getRelatednessFromInLinks(Article article) throws SQLException{
-		
+
+	private float getRelatednessFromInLinks(Article article) {
+
 		if (getId() == article.getId()) 
 			return 1 ;
-		
-		int[] linksA = this.getLinksInIds() ; 
-		int[] linksB = article.getLinksInIds() ; 
+
+		DbLinkLocationList idListA = env.getDbPageLinkIn().retrieve(id) ; 
+		DbLinkLocationList idListB = env.getDbPageLinkIn().retrieve(article.id) ; 
+
+		if (idListA==null || idListB==null) 
+			return 0 ;
+
+		ArrayList<DbLinkLocation> linksA = idListA.getLinkLocations() ;
+		ArrayList<DbLinkLocation> linksB = idListB.getLinkLocations() ;
+
+		if (linksA==null || linksB==null) 
+			return 0 ;
 
 		int linksBoth = 0 ;
 
 		int indexA = 0 ;
 		int indexB = 0 ;
 
-		while (indexA < linksA.length && indexB < linksB.length) {
+		while (indexA < linksA.size() && indexB < linksB.size()) {
 
-			long idA = linksA[indexA] ;
-			long idB = linksB[indexB] ;
+			int linkA = linksA.get(indexA).getLinkId() ;
+			int linkB = linksB.get(indexB).getLinkId() ;
 
-			if (idA == idB) {
+			if (linkA == linkB) {
 				linksBoth ++ ;
 				indexA ++ ;
 				indexB ++ ;
 			} else {
-				
-				if ((idA < idB && idA > 0)|| idB < 0) {
-					
-					if (idA == article.getId()) 
+
+				if (linkA < linkB) {
+					if (linkA == article.getId()) 
 						linksBoth ++ ;
-					
+
 					indexA ++ ;
 				} else {
-					
-					if (idB == id) 
+
+					if (linkB == id) 
 						linksBoth ++ ;
-					
+
 					indexB ++ ;
 				}
 			}
 		}
 
-		double a = Math.log(linksA.length) ;
-		double b = Math.log(linksB.length) ;
-		double ab = Math.log(linksBoth) ;
-		double m = Math.log(database.getArticleCount()) ;
+		float a = (float)Math.log(linksA.size()) ;
+		float b = (float)Math.log(linksB.size()) ;
+		float ab = (float)Math.log(linksBoth) ;
+		float m = (float)Math.log(env.retrieveStatistic(StatisticName.articleCount)) ;
 
-		double sr = (Math.max(a, b) -ab) / (m - Math.min(a, b)) ;
+		float sr = (Math.max(a, b) -ab) / (m - Math.min(a, b)) ;
 
-		if (Double.isNaN(sr) || Double.isInfinite(sr) || sr > 1)
+		if (Float.isNaN(sr) || Float.isInfinite(sr) || sr > 1)
 			sr = 1 ;
 
 		sr = 1-sr ;
-
 		return sr ;
 	}
 
 	
+	//TODO: how are these sorted?
 	/**
-	 * Returns a SortedVector of AnchorTexts used to link to this page, in 
-	 * descending order of use
-	 * 
-	 * @return see above.
-	 * @throws SQLException if there is a problem with the sql database
+	 * @return an array of {@link Label Labels}, sorted by ???, that have been used to refer to this article. 
 	 */
-	public SortedVector<AnchorText> getAnchorTexts() throws SQLException {
+	public Label[] getLabels() {
 
-		SortedVector<AnchorText> anchors = new SortedVector<AnchorText>() ;
+		DbLabelForPageList tmpLabels = env.getDbLabelsForPage().retrieve(id) ; 
+		if (tmpLabels == null || tmpLabels.getLabels() == null) 
+			return new Label[0] ;
 
-		Statement stmt = database.createStatement() ;
-		ResultSet rs = stmt.executeQuery("SELECT an_text, an_count FROM anchor WHERE an_to = " + id + " ORDER BY an_count DESC") ;
+		Label[] labels = new Label[tmpLabels.getLabels().size()] ;
 
-		while (rs.next()) {
-			try {
-				AnchorText at = new AnchorText(new String(rs.getBytes(1), "UTF-8"), this, rs.getInt(2)) ;
-				anchors.add(at, true) ;
-			} catch (Exception e) {} ;	
+		int index = 0 ;
+		for (DbLabelForPage ll:tmpLabels.getLabels()) {
+			labels[index] = new Label(ll) ;
+			index++ ;
 		}
 
-		return anchors ;
+		return labels ;	
+	}
+
+
+
+
+	/**
+	 * This efficiently identifies sentences within this article that contain links to the given target article. 
+	 * The actual text of these sentences can be obtained using {@link Page#getSentenceMarkup(int)}
+	 * 
+	 * @param art the article of interest. 
+	 * @return an array of sentence indexes that contain links to the given article.
+	 */
+	public Integer[] getSentenceIndexesMentioning(Article art) {
+
+		DbLinkLocationList tmpLinks = env.getDbPageLinkIn().retrieve(art.getId()) ;
+		if (tmpLinks == null || tmpLinks.getLinkLocations() == null) 
+			return new Integer[0] ;
+
+		DbLinkLocation key = new DbLinkLocation(id, null) ;
+		int index = Collections.binarySearch(tmpLinks.getLinkLocations(), key, new Comparator<DbLinkLocation>(){
+			public int compare(DbLinkLocation a, DbLinkLocation b) {
+				return new Integer(a.getLinkId()).compareTo(b.getLinkId()) ;
+			}
+		}) ;
+
+		if (index < 0)
+			return new Integer[0] ;
+
+		ArrayList<Integer> sentenceIndexes = tmpLinks.getLinkLocations().get(index).getSentenceIndexes() ;
+
+		return sentenceIndexes.toArray(new Integer[sentenceIndexes.size()]) ;
 	}
 
 	/**
-	 * Represents a term or phrase that is used to link to a particular page.
+	 * This efficiently identifies sentences within this article that contain links to all of the given target articles. 
+	 * The actual text of these sentences can be obtained using {@link Page#getSentenceMarkup(int)}
+	 * 
+	 * @param arts the articles of interest. 
+	 * @return an array of sentence indexes that contain links to the given article.
 	 */
-	public class AnchorText implements Comparable<AnchorText>{
+	public Integer[] getSentenceIndexesMentioning(ArrayList<Article> arts) {
 
-		private String text ;
-		private Page destination ;
-		private int count ;
 
-		/**
-		 * Initializes the AnchorText
-		 * 
-		 * @param text the text used within the anchor
-		 * @param destination the id of the article that this anchor links to
-		 * @param count the number of times the given text is used to link to the given destination.
-		 */
-		public AnchorText(String text, Page destination, int count) {
-			this.text = text;
-			this.destination = destination ;
-			this.count = count ;
+		TreeMap<Integer, Integer> sentenceCounts = new TreeMap<Integer, Integer>() ;
+
+		//associate sentence indexes with number of arts mentioned.
+		for (Article art:arts) {
+
+			System.out.println(" - Checking art " + art) ;
+
+			for (Integer sentenceIndex: getSentenceIndexesMentioning(art)) {
+
+				System.out.println(" - - Adding sentence " + sentenceIndex) ;
+
+				Integer count = sentenceCounts.get(sentenceIndex) ;
+				if (count == null)
+					sentenceCounts.put(sentenceIndex, 1) ;
+				else
+					sentenceCounts.put(sentenceIndex, count + 1) ;	
+			}
 		}
 
+		//gather all sentences that mention all arts
+		ArrayList<Integer> validSentences = new ArrayList<Integer>() ;
+		Iterator<Map.Entry<Integer, Integer>> iter = sentenceCounts.entrySet().iterator() ;
+
+		while (iter.hasNext()) {
+			Map.Entry<Integer, Integer> e = iter.next();
+
+			System.out.println(" - " + e.getKey() + ", " + e.getValue()) ;
+
+			if (e.getValue() == arts.size())
+				validSentences.add(e.getKey()) ;
+		}
+
+		return validSentences.toArray(new Integer[validSentences.size()]) ;
+	}
+
+
+	/**
+	 * A label that has been used to refer to the enclosing {@link Article}. These are mined from the title of the article, the 
+	 * titles of {@link Redirect redirects} that point to the article, and the anchors of links that point to the article.   
+	 * 
+	 * @author David Milne
+	 */
+	public class Label {
+
+		private String text ;
+
+		private long linkDocCount ;
+		private long linkOccCount ;
+
+		private boolean fromTitle ;
+		private boolean fromRedirect ;
+		private boolean isPrimary ;
+
+		protected Label(DbLabelForPage l) {
+
+			this.text = l.getText() ;
+			this.linkDocCount = l.getLinkDocCount() ;
+			this.linkOccCount = l.getLinkOccCount() ;
+			this.fromTitle = l.getFromTitle() ;
+			this.fromRedirect = l.getFromRedirect() ;
+			this.isPrimary = l.getIsPrimary() ;
+		}
+
+		
 		/**
-		 * Returns the text used to make the link
-		 * 
-		 * @return see above.
+		 * @return the text of this label (the title of the article or redirect, or the anchor of the link
 		 */
 		public String getText() {
 			return text ;
 		}
 
 		/**
-		 * Returns the destination page of the link
-		 * 
-		 * @return see above.
+		 * @return the number of pages that contain links that associate this label with the enclosing {@link Article}.
 		 */
-		public Page getDestination() {
-			return destination ;
+		public long getLinkDocCount() {
+			return linkDocCount;
 		}
 
 		/**
-		 * Returns the number of times the link is made
-		 * 
-		 * @return see above.
+		 * @return the number of times this label occurs as the anchor text in links that refer to the enclosing {@link Article}.
 		 */
-		public int getCount() {
-			return count ;
-		}
-
-		public String toString() {
-			return text ;
+		public long getLinkOccCount() {
+			return linkOccCount;
 		}
 
 		/**
-		 * Compares this AnchorText to another, so that the AnchorText with the greatest count will be 
-		 * considered smaller, and therefore occur earlier in lists.  
-		 * 
-		 * @param	at	the AnchorText to be compared
-		 * @return	see above.
+		 * @return {@value true} if this label matches the title of the enclosing {@link Article}, otherwise {@value false}.
 		 */
-		public int compareTo(AnchorText at) {
-			
-			int cmp = -1 * (new Integer(count)).compareTo(new Integer(at.getCount())) ;
-			
-			if (cmp == 0) 
-				cmp = text.compareTo(at.getText()) ;
-			
-			return cmp ;
+		public boolean isFromTitle() {
+			return fromTitle;
 		}
-	}	
+
+		/**
+		 * @return {@value true} if there is a {@link Redirect} that associates this label with the enclosing {@link Article}, otherwise {@value false}.
+		 */
+		public boolean isFromRedirect() {
+			return fromRedirect;
+		}
+
+		/**
+		 * @return {@value true} if the enclosing {@link Article} is the primary, most common sense for the given label, otherwise {@value false}.
+		 */
+		public boolean isPrimary() {
+			return isPrimary;
+		}
+	}
+	
+	
+
+	//public static ============================================================
+
+/*
+	public static void main(String[] args) throws Exception {
+
+
+		File databaseDirectory = new File("/research/dmilne/wikipedia/db/en/20100130");
+
+
+
+		Wikipedia w = new Wikipedia(databaseDirectory) ;
+
+		
+
+
+		Article nzBirds = w.getMostLikelyArticle("Birds of New Zealand", null) ;
+		//Article kiwi = w.getMostLikelyArticle("Kiwi", null) ;
+		
+		/*
+		DbLinkLocationList ll = w.getEnvironment().getDbPageLinkOut().retrieve(kiwi.getId()) ;
+		
+		for (DbLinkLocation l:ll.getLinkLocations()) {
+			System.out.print(" - " + l.getLinkId() +  ":") ;
+			for (Integer s:l.getSentenceIndexes()) 
+				System.out.print(" " + s) ;
+			System.out.println() ;
+		}
+		*/
+		
+		//System.out.println(kiwi) ;
+
+		/*
+		Article nz = w.getMostLikelyArticle("New Zealand", null) ;
+
+		for (Article art:kiwi.getLinksOut()){
+
+			if (art.equals(nz))
+				System.out.println(" - link: " + art) ;
+		}
+
+		for (Article art:nz.getLinksIn()) {
+			if (art.equals(kiwi))
+				System.out.println(" - link in: " + art) ;
+		}
+	
+
+		ArrayList<Article> arts = new ArrayList<Article>() ;
+		arts.add(w.getMostLikelyArticle("Kiwi", null)) ;
+		arts.add(w.getMostLikelyArticle("Takahe", null)) ;
+
+
+		System.out.println(nzBirds.getMarkup()) ;
+
+
+		for (Article art:arts) {
+			System.out.println("retrieving sentences mentioning " + art) ;
+			
+			for (int si: nzBirds.getSentenceIndexesMentioning(art)){
+				System.out.println(nzBirds.getSentenceMarkup(si)) ;
+			}
+			
+		}
+		
+		System.out.println("retrieving sentences mentioning all") ;
+		
+		for (int si: nzBirds.getSentenceIndexesMentioning(arts)){
+			System.out.println(nzBirds.getSentenceMarkup(si)) ;
+		}
+		
+		
+		
+	}*/
+
 
 	/**
 	 * Provides a demo of functionality available to Articles
 	 * 
 	 * @param args an array of arguments for connecting to a wikipedia database: server and database names at a minimum, and optionally a username and password
 	 * @throws Exception if there is a problem with the wikipedia database.
-	 */
+	 *//*
 	public static void main(String[] args) throws Exception {
-		
+
 		Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
 
 		BufferedReader in = new BufferedReader( new InputStreamReader( System.in ) );	
@@ -786,56 +733,56 @@ public class Article extends Page {
 				break ;
 
 			Article article = wikipedia.getArticleByTitle(title) ;
-			
+
 			if (article == null) {
 				System.out.println("Could not find exact match. Searching through anchors instead") ;
 				article = wikipedia.getMostLikelyArticle(title, null) ; 
 			}
-			
+
 			if (article == null) {
 				System.out.println("Could not find exact article. Try again") ;
 			} else {
 				System.out.println("\n" + article + "\n") ;
 
 				if (wikipedia.getDatabase().isContentImported()) {
-					
+
 					System.out.println(" - first sentence:") ;
 					System.out.println("    - " + article.getFirstSentence(null, null)) ;
-					
+
 					System.out.println(" - first paragraph:") ;
 					System.out.println("    - " + article.getFirstParagraph()) ;
 				}
-				
-				Category eqCategory = article.getEquivalentCategory() ;
-				if (eqCategory != null) {
-					System.out.println("\n - equivalent category") ;
-					System.out.println("    - " + eqCategory) ;
-				}
-				
+
+				//Category eqCategory = article.getEquivalentCategory() ;
+				//if (eqCategory != null) {
+				//	System.out.println("\n - equivalent category") ;
+				//	System.out.println("    - " + eqCategory) ;
+				//}
+
 				System.out.println("\n - redirects (synonyms or very small related topics that didn't deserve a seperate article):") ;
 				for (Redirect r: article.getRedirects())
 					System.out.println("    - " + r);
-	
-				System.out.println("\n - anchors (synonyms and hypernyms):") ;
-				for (AnchorText at:article.getAnchorTexts()) 
-					System.out.println("    - \"" + at.getText() + "\" (used " + at.getCount() + " times)") ;
-	
+
+				//System.out.println("\n - anchors (synonyms and hypernyms):") ;
+				//for (AnchorText at:article.getAnchorTexts()) 
+				//	System.out.println("    - \"" + at.getText() + "\" (used " + at.getCount() + " times)") ;
+
 				System.out.println("\n - parent categories (hypernyms):") ;
 				for (Category c: article.getParentCategories()) 
 					System.out.println("    - " + c); 
-				
+
 				System.out.println("\n - language links (translations):") ;
 				HashMap<String,String> translations = article.getTranslations() ;
 				for (String lang:translations.keySet())
 					System.out.println("    - \"" + translations.get(lang) + "\" (" + lang + ")") ;
-				
-				System.out.println("\n - pages that this links to (related concepts):") ;
-				for (Article a: article.getLinksOut()) {
-					System.out.println("    - " + a + " (" + df.format(article.getRelatednessTo(a)*100) + "% related)"); 
-				}
+
+				//System.out.println("\n - pages that this links to (related concepts):") ;
+				//for (Article a: article.getLinksOut()) {
+				//	System.out.println("    - " + a + " (" + df.format(article.getRelatednessTo(a)*100) + "% related)"); 
+				//}
 			}
 			System.out.println("") ;
 		}
-	
-	}
+
+	}*/
 }

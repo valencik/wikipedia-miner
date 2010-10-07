@@ -19,10 +19,10 @@
 
 package org.wikipedia.miner.annotation.preprocessing;
 
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.wikipedia.miner.annotation.preprocessing.PreprocessedDocument.RegionTag;
-import org.wikipedia.miner.util.*;
 
 /**
  * This class prepares html documents so that they can be tagged by a document tagger.
@@ -69,7 +69,7 @@ public class HtmlPreprocessor extends DocumentPreprocessor{
 		
 		String temp = content.toLowerCase() ;
 		
-		SortedVector<RegionTag> regionTags = getRegionTags(temp) ;
+		ArrayList<RegionTag> regionTags = getRegionTags(temp) ;
 		
 		
 		

@@ -48,7 +48,7 @@ public class PorterStemmer extends TextProcessor {
 		String[] terms = text.split(" ") ;
 
 		for (String term: terms) {
-			if (!term.equals("")) {
+			if (term != "") {
 				stemmer.add(term.toCharArray(), term.length()) ;
 				stemmer.stem();
 				processedText = processedText + " " + cleaner.processText(stemmer.toString()) ;			

@@ -34,7 +34,7 @@ import org.wikipedia.miner.util.*;
 public class Context {
 		
 	private Vector<Article> contextArticles ;
-	private double totalWeight ;
+	private float totalWeight ;
 	private RelatednessCache relatednessCache ;
 	
 	/**
@@ -45,7 +45,7 @@ public class Context {
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public Context(Collection<Anchor> unambigAnchors, RelatednessCache relatednessCache, double maxSize) throws SQLException {
+	public Context(Collection<Label> unambigLabels, RelatednessCache relatednessCache, double maxSize) throws SQLException {
 		
 		if (relatednessCache == null)
 			this.relatednessCache = new RelatednessCache() ;
@@ -53,29 +53,29 @@ public class Context {
 			this.relatednessCache = relatednessCache ;
 		
 		HashSet<Integer> doneIds = new HashSet<Integer>() ;		
-		Vector<Anchor.Sense> senses = new Vector<Anchor.Sense>() ;
-		for (Anchor anch: unambigAnchors) {
+		Vector<Label.Sense> senses = new Vector<Label.Sense>() ;
+		for (Label label: unambigLabels) {
 			
-			Anchor.Sense sense = anch.getSenses().first() ;	
-			if (!isDate(anch.getSenses().first()) && !doneIds.contains(sense.getId())) {
-				sense.setWeight(anch.getLinkProbability()) ;
+			Label.Sense sense = label.getSenses()[0] ;	
+			if (!isDate(sense) && !doneIds.contains(sense.getId())) {
+				sense.setWeight(label.getLinkProbability()) ;
 				senses.add(sense) ;
 				doneIds.add(sense.getId()) ;
 			}
 		}
 		
 		TreeSet<Article> sortedContextArticles = new TreeSet<Article>() ;
-		for (Anchor.Sense s:senses) {
-			double linkProb = s.getWeight() ;
+		for (Label.Sense s:senses) {
+			float linkProb = s.getWeight() ;
 			
-			double avgRelatedness = 0 ;
+			float avgRelatedness = 0 ;
 			
-			for (Anchor.Sense s2: senses) 
+			for (Label.Sense s2: senses) 
 				avgRelatedness += this.relatednessCache.getRelatedness(s, s2) ; 
 				
 			avgRelatedness = avgRelatedness / (senses.size()) ;
 			
-			double weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
+			float weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
 			
 			s.setWeight(weight) ;
 			sortedContextArticles.add(s) ;
@@ -96,7 +96,7 @@ public class Context {
 	
 	
 	/**
-	 * Initializes a collection of context articles from the given set of ambuguous anchors,  
+	 * Initializes a collection of context articles from the given set of ambiguous anchors,  
 	 * 
 	 * @param ambigAnchors a set of ambiguous anchors, the most useful of which will be used to disambiguate other terms
 	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated. This may be null. 
@@ -104,7 +104,7 @@ public class Context {
 	 * @param minSenseLimit the minimum prior probability of an anchors sense that will be used as context.  
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
-	public Context(Collection<Anchor> ambigAnchors, RelatednessCache relatednessCache, double maxSize, double minSenseLimit) throws SQLException {
+	public Context(Collection<Label> ambigAnchors, RelatednessCache relatednessCache, double maxSize, double minSenseLimit) throws SQLException {
 		
 		if (relatednessCache == null)
 			this.relatednessCache = new RelatednessCache() ;
@@ -112,14 +112,17 @@ public class Context {
 			this.relatednessCache = relatednessCache ;
 		
 		HashSet<Integer> doneIds = new HashSet<Integer>() ;		
-		Vector<Anchor.Sense> senses = new Vector<Anchor.Sense>() ;
-		for (Anchor anch: ambigAnchors) {
+		Vector<Label.Sense> senses = new Vector<Label.Sense>() ;
+		for (Label label: ambigAnchors) {
 			
-			for (Anchor.Sense sense:anch.getSenses()) {
-				if (sense.getProbability() < minSenseLimit) break ;
+			for (Label.Sense sense:label.getSenses()) {
+				
+				float pp = sense.getPriorProbability() ;
+				
+				if (pp < minSenseLimit) break ;
 				
 				if (!isDate(sense) && !doneIds.contains(sense.getId())) {
-					sense.setWeight(anch.getLinkProbability() * sense.getProbability()) ;
+					sense.setWeight(label.getLinkProbability() * pp) ;
 					senses.add(sense) ;
 					doneIds.add(sense.getId()) ;
 				}
@@ -127,17 +130,17 @@ public class Context {
 		}
 		
 		TreeSet<Article> sortedContextArticles = new TreeSet<Article>() ;
-		for (Anchor.Sense s:senses) {
-			double linkProb = s.getWeight() ;
+		for (Label.Sense s:senses) {
+			float linkProb = s.getWeight() ;
 			
-			double avgRelatedness = 0 ;
+			float avgRelatedness = 0 ;
 			
-			for (Anchor.Sense s2: senses) 
+			for (Label.Sense s2: senses) 
 				avgRelatedness += this.relatednessCache.getRelatedness(s, s2) ; 
 				
 			avgRelatedness = avgRelatedness / (senses.size()) ;
 			
-			double weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
+			float weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
 			
 			s.setWeight(weight) ;
 			sortedContextArticles.add(s) ;
@@ -157,7 +160,7 @@ public class Context {
 	/**
 	 * @return the quality (size and homogeneity) of the available context. 
 	 */
-	public double getQuality() {
+	public float getQuality() {
 		return totalWeight ;		
 	}	
 
@@ -168,16 +171,16 @@ public class Context {
 	 * @return the average relatedness between the article and context anchors
 	 * @throws SQLException
 	 */
-	public double getRelatednessTo(Article art) throws SQLException {
+	public float getRelatednessTo(Article art) throws SQLException {
 		
 		if (contextArticles.size() == 0 || totalWeight == 0)
 			return 0 ;
 
-		double relatedness = 0 ;
+		float relatedness = 0 ;
 		
 		for (Article contextArt: contextArticles) { 
 			
-			double r = relatednessCache.getRelatedness(art, contextArt) ;
+			float r = relatednessCache.getRelatedness(art, contextArt) ;
 			r = r * contextArt.getWeight() ;
 			relatedness = relatedness + r ;
 		}
