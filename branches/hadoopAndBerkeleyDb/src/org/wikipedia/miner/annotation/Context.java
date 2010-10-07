@@ -29,7 +29,7 @@ import org.wikipedia.miner.util.*;
 /**
  * A selection of unambiguous terms and their corresponding articles, which are used to resolve ambiguous terms.
  * 
- * @author David Milne
+ * @author David Milne 
  */
 public class Context {
 		
