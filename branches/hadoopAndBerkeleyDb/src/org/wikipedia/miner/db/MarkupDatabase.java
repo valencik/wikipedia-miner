@@ -1,0 +1,146 @@
+package org.wikipedia.miner.db;
+
+import gnu.trove.TIntHash;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+
+import org.apache.commons.io.input.CountingInputStream;
+import org.apache.hadoop.record.CsvRecordInput;
+import org.wikipedia.miner.util.ProgressTracker;
+import org.wikipedia.miner.util.WikipediaConfiguration;
+
+import com.sleepycat.bind.tuple.IntegerBinding;
+import com.sleepycat.bind.tuple.StringBinding;
+import com.sleepycat.je.Database;
+import com.sleepycat.je.DatabaseEntry;
+
+/**
+ * A {@link WDatabase} for associating page ids with page markup. 
+ * 
+ * This will throw {@link UnsupportedOperationException}s if any attempt is made to cache this database to memory.
+ */
+public class MarkupDatabase extends WDatabase<Integer, String> {
+
+	private enum DumpTag {page, id, text, ignorable} ;
+
+	/**
+	 * Creates or connects to a database, whose name and type will be {@link WDatabase.DatabaseType#markup}.
+	 * 
+	 * @param env the WEnvironment surrounding this database
+	 */
+	public MarkupDatabase(WEnvironment env) {
+
+		super (env, DatabaseType.markup, new IntegerBinding(), new StringBinding()) ;
+	}
+
+	@Override
+	public String filterCacheEntry(WEntry<Integer, String> e,
+			WikipediaConfiguration conf, TIntHash validIds) {
+		throw new UnsupportedOperationException() ;
+	}
+
+
+	@Override
+	public WEntry<Integer,String> deserialiseCsvRecord(CsvRecordInput record) throws IOException {
+		throw new UnsupportedOperationException() ;
+	}
+
+	/**
+	 * This differs from the loadFromFile functions of other WDatabases, in that it expects an XML dump of Wikipedia, rather than a 
+	 * Summarised CSV file. 
+	 */
+	@Override 
+	public void loadFromFile(File dataFile, boolean overwrite, ProgressTracker tracker) throws IOException, XMLStreamException  {
+
+		if (exists() && !overwrite)
+			return ;
+		
+		if (tracker == null) tracker = new ProgressTracker(1, MarkupDatabase.class) ;
+		tracker.startTask(dataFile.length(), "Loading " + getName() + " database") ;
+
+		Database db = getDatabase(false) ;
+
+		Integer currId = null ;
+		String currMarkup = null ;
+		StringBuffer characters = new StringBuffer() ;
+
+		XMLInputFactory xmlStreamFactory = XMLInputFactory.newInstance() ;
+		CountingInputStream countingReader = new CountingInputStream(new FileInputStream(dataFile)) ;
+		XMLStreamReader xmlStreamReader = xmlStreamFactory.createXMLStreamReader(countingReader, "UTF-8") ;
+
+		int pageTotal = 0 ;
+		long charTotal = 0 ;
+		long maxChar = 0 ;
+
+		while (xmlStreamReader.hasNext()) {
+
+			int eventCode = xmlStreamReader.next();
+
+			switch (eventCode) {
+			case XMLStreamReader.START_ELEMENT :
+				switch(resolveDumpTag(xmlStreamReader.getLocalName())) {
+				case page:
+					//System.out.println(" - " + countingReader.getByteCount()) ;
+				}
+
+				break;
+			case XMLStreamReader.END_ELEMENT :
+
+				switch(resolveDumpTag(xmlStreamReader.getLocalName())) {
+
+				case id:
+					//only take the first id (there is a 2nd one for the revision) 
+					if (currId == null) 
+						currId = Integer.parseInt(characters.toString().trim()) ;
+					break ;
+				case text:
+					currMarkup = characters.toString().trim() ;
+					break ;
+				case page:
+
+					DatabaseEntry key = new DatabaseEntry() ;
+					keyBinding.objectToEntry(currId, key) ;
+
+					DatabaseEntry value = new DatabaseEntry() ;
+					valueBinding.objectToEntry(currMarkup, value) ;
+
+					pageTotal++ ;
+					charTotal = charTotal + currMarkup.length();
+
+					maxChar = Math.max(maxChar, currMarkup.length()) ;
+					db.put(null, key, value) ;
+
+					currId = null ;
+					currMarkup = null ;
+
+					tracker.update(countingReader.getByteCount()) ;
+				}
+
+				characters = new StringBuffer() ;
+
+				break;
+			case XMLStreamReader.CHARACTERS :
+				characters.append(xmlStreamReader.getText()) ;
+			}
+		}
+		xmlStreamReader.close();
+
+		env.cleanAndCheckpoint() ;
+		getDatabase(true) ;
+	}
+
+	private DumpTag resolveDumpTag(String tagName) {
+
+		try {
+			return DumpTag.valueOf(tagName) ;
+		} catch (IllegalArgumentException e) {
+			return DumpTag.ignorable ;
+		}
+	}
+}
