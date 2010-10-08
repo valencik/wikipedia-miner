@@ -37,6 +37,8 @@ public class WDatabaseFactory {
 	}
 
 	/**
+	 * Returns a database associating page ids with the title, type and generality of the page. 
+	 * 
 	 * @return a database associating page ids with the title, type and generality of the page. 
 	 */
 	public WDatabase<Integer, DbPage> buildPageDatabase() {
@@ -80,6 +82,8 @@ public class WDatabaseFactory {
 	}
 	
 	/**
+	 * Returns a database associating either article or category titles with their ids.
+	 * 
 	 * @param type either {@link DatabaseType#articlesByTitle} or {@link DatabaseType#categoriesByTitle}.
 	 * @return a database associating either article or category titles with their ids.
 	 */
@@ -132,13 +136,17 @@ public class WDatabaseFactory {
 	}
 
 	/**
-	 * @return a database associating String labels with the statistics about the articles (senses) these labels could refer to 
+	 * Returns a database associating String labels with the statistics about the articles (senses) these labels could refer to.
+	 * 
+	 * @return a database associating String labels with the statistics about the articles (senses) these labels could refer to. 
 	 */
 	public LabelDatabase buildLabelDatabase() {
 		return new LabelDatabase(env) ;
 	}
 
 	/**
+	 * Returns a database associating String labels with the statistics about the articles (senses) these labels could refer to.
+	 * 
 	 * @param tp a text processor that should be applied to string labels before indexing and searching
 	 * @return a database associating String labels with the statistics about the articles (senses) these labels could refer to 
 	 */
@@ -151,6 +159,8 @@ public class WDatabaseFactory {
 	}
 
 	/**
+	 * Returns a database associating Integer page ids with the labels used to refer to that page
+	 * 
 	 * @return a database associating Integer page ids with the labels used to refer to that page
 	 */
 	public WDatabase<Integer,DbLabelForPageList> buildPageLabelDatabase() {
@@ -190,6 +200,8 @@ public class WDatabaseFactory {
 	}
 
 	/**
+	 * Returns a database associating Integer ids with the ids of articles it links to or that link to it, and the sentence indexes where these links are found.
+	 * 
 	 * @param type either {@link DatabaseType#pageLinksIn} or {@link DatabaseType#pageLinksOut}.
 	 * @return a database associating Integer ids with the ids of articles it links to or that link to it, and the sentence indexes where these links are found
 	 */
@@ -254,6 +266,8 @@ public class WDatabaseFactory {
 
 	
 	/**
+	 * Returns a database appropriate for the given {@link DatabaseType}
+	 * 
 	 * @param type {@link DatabaseType#categoryParents}, {@link DatabaseType#articleParents}, {@link DatabaseType#childCategories},{@link DatabaseType#childArticles}, {@link DatabaseType#redirectSourcesByTarget}, {@link DatabaseType#sentenceSplits}
 	 * @return see the description of the appropriate DatabaseType
 	 */
@@ -330,6 +344,8 @@ public class WDatabaseFactory {
 	}
 	
 	/**
+	 * Returns a database associating integer id of redirect with the id of its target
+	 * 
 	 * @return a database associating integer id of redirect with the id of its target
 	 */
 	public WDatabase<Integer,Integer> buildRedirectTargetBySourceDatabase() {
@@ -364,6 +380,8 @@ public class WDatabaseFactory {
 	}
 	
 	/**
+	 * Returns a database associating integer {@link WEnvironment.StatisticName#ordinal()} with the value relevant to this statistic.
+	 * 
 	 * @return a database associating integer {@link WEnvironment.StatisticName#ordinal()} with the value relevant to this statistic.
 	 */
 	public IntObjectDatabase<Long> buildStatisticsDatabase() {
@@ -403,6 +421,8 @@ public class WDatabaseFactory {
 
 	
 	/**
+	 * Returns a database associating integer id of page with its content, in mediawiki markup format
+	 * 
 	 * @return a database associating integer id of page with its content, in mediawiki markup format
 	 */
 	public WDatabase<Integer,String> buildMarkupDatabase() {

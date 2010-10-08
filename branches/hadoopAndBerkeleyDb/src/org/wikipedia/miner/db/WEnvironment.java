@@ -105,6 +105,8 @@ public class WEnvironment  {
 	
 	
 	/**
+	 * Returns the configuration of this environment
+	 * 
 	 * @return the configuration of this environment
 	 */
 	public WikipediaConfiguration getConfiguration() {
@@ -112,6 +114,8 @@ public class WEnvironment  {
 	}
 	
 	/**
+	 * Returns the {@link DatabaseType#page} database
+	 * 
 	 * @return see {@link DatabaseType#page} 
 	 */
 	public WDatabase<Integer, DbPage> getDbPage() {
@@ -119,7 +123,9 @@ public class WEnvironment  {
 	}
 
 	/**
-	 * @param textProcessor the text processor that should be applied to labels before indexing or searching (or {@value null} if the original label database is required)
+	 * Returns the {@link DatabaseType#label} database for the given text processor
+	 * 
+	 * @param textProcessor the text processor that should be applied to labels before indexing or searching (or null if the original label database is required)
 	 * @return see {@link DatabaseType#label} 
 	 */
 	public LabelDatabase getDbLabel(TextProcessor textProcessor) {
@@ -139,6 +145,8 @@ public class WEnvironment  {
 	}
 	
 	/**
+	 * Returns the {@link DatabaseType#pageLabel} database
+	 * 
 	 * @return see {@link DatabaseType#pageLabel} 
 	 */
 	public WDatabase<Integer, DbLabelForPageList> getDbLabelsForPage() {
@@ -146,6 +154,8 @@ public class WEnvironment  {
 	}
 	
 	/**
+	 * Returns the {@link DatabaseType#articlesByTitle} database
+	 * 
 	 * @return see {@link DatabaseType#articlesByTitle} 
 	 */
 	public WDatabase<String, Integer> getDbArticlesByTitle() {
@@ -153,6 +163,8 @@ public class WEnvironment  {
 	}
 	
 	/**
+	 * Returns the {@link DatabaseType#categoriesByTitle} database
+	 * 
 	 * @return see {@link DatabaseType#categoriesByTitle} 
 	 */
 	public WDatabase<String, Integer> getDbCategoriesByTitle() {
@@ -160,6 +172,8 @@ public class WEnvironment  {
 	}
 	
 	/**
+	 * Returns the {@link DatabaseType#redirectTargetBySource} database
+	 * 
 	 * @return see {@link DatabaseType#redirectTargetBySource} 
 	 */
 	public WDatabase<Integer, Integer> getDbRedirectTargetBySource() {
@@ -167,6 +181,8 @@ public class WEnvironment  {
 	}
 	
 	/**
+	 * Returns the {@link DatabaseType#redirectSourcesByTarget} database
+	 * 
 	 * @return see {@link DatabaseType#redirectSourcesByTarget} 
 	 */
 	public WDatabase<Integer, DbIdList> getDbRedirectSourcesByTarget() {
@@ -174,6 +190,8 @@ public class WEnvironment  {
 	}
 
 	/**
+	 * Returns the {@link DatabaseType#pageLinksIn} database
+	 * 
 	 * @return see {@link DatabaseType#pageLinksIn} 
 	 */
 	public WDatabase<Integer, DbLinkLocationList> getDbPageLinkIn() {
@@ -181,6 +199,8 @@ public class WEnvironment  {
 	}
 
 	/**
+	 * Returns the {@link DatabaseType#pageLinksOut} database
+	 * 
 	 * @return see {@link DatabaseType#pageLinksOut} 
 	 */
 	public WDatabase<Integer, DbLinkLocationList> getDbPageLinkOut() {
@@ -188,6 +208,8 @@ public class WEnvironment  {
 	}
 
 	/**
+	 * Returns the {@link DatabaseType#categoryParents} database
+	 * 
 	 * @return see {@link DatabaseType#categoryParents} 
 	 */
 	public WDatabase<Integer, DbIdList> getDbCategoryParents() {
@@ -195,6 +217,8 @@ public class WEnvironment  {
 	}
 
 	/**
+	 * Returns the {@link DatabaseType#articleParents} database
+	 * 
 	 * @return see {@link DatabaseType#articleParents} 
 	 */
 	public WDatabase<Integer, DbIdList> getDbArticleParents() {
@@ -202,6 +226,8 @@ public class WEnvironment  {
 	}
 
 	/**
+	 * Returns the {@link DatabaseType#childCategories} database
+	 * 
 	 * @return see {@link DatabaseType#childCategories} 
 	 */
 	public WDatabase<Integer, DbIdList> getDbChildCategories() {
@@ -209,6 +235,8 @@ public class WEnvironment  {
 	}
 
 	/**
+	 * Returns the {@link DatabaseType#childArticles} database
+	 * 
 	 * @return see {@link DatabaseType#childArticles} 
 	 */
 	public WDatabase<Integer, DbIdList> getDbChildArticles() {
@@ -216,6 +244,8 @@ public class WEnvironment  {
 	}
 
 	/**
+	 * Returns the {@link DatabaseType#markup} database
+	 * 
 	 * @return see {@link DatabaseType#markup} 
 	 */
 	public MarkupDatabase getDbMarkup() {
@@ -223,6 +253,8 @@ public class WEnvironment  {
 	}
 	
 	/**
+	 * Returns the {@link DatabaseType#sentenceSplits} database
+	 * 
 	 * @return see {@link DatabaseType#sentenceSplits} 
 	 */
 	public WDatabase<Integer, DbIdList> getDbSentenceSplits() {
@@ -237,7 +269,7 @@ public class WEnvironment  {
 	 * This preparation can be done in a separate thread if required, in which case progress can be tracked using {@link #getProgress()}, {@link #getPreparationTracker()} and {@link #isReady()}.
 	 * 
 	 * @param conf configuration options
-	 * @param threaded {@value true} if this should be prepared (e.g. cached to memory) in a separate thread, otherwise {@value false}
+	 * @param threaded true if this should be prepared (e.g. cached to memory) in a separate thread, otherwise false
 	 * @throws EnvironmentLockedException if the underlying {@link Environment} is unavailable
 	 */
 	public WEnvironment(WikipediaConfiguration conf, boolean threaded) throws EnvironmentLockedException {
@@ -321,7 +353,7 @@ public class WEnvironment  {
 	
 	
 	/**
-	 * @return {@value true} if the preparation work has been completed, otherwise {@value false}
+	 * @return true if the preparation work has been completed, otherwise false
 	 */
 	public boolean isReady() {
 		return prepThread.isCompleted() ;
@@ -329,7 +361,7 @@ public class WEnvironment  {
 	}
 	
 	/**
-	 * @return a number between {@value 0} (just started) and {@value 1} (completed) indicating progress of the preparation work. 
+	 * @return a number between 0 (just started) and 1 (completed) indicating progress of the preparation work. 
 	 */
 	public double getProgress() {
 		return prepThread.getProgress() ;
@@ -353,7 +385,7 @@ public class WEnvironment  {
 	
 	/**
 	 * @param tp a text processor
-	 * @return {@value true} if the environment is ready to be searched for labels using the given text processor, otherwise {@value false} 
+	 * @return true if the environment is ready to be searched for labels using the given text processor, otherwise false 
 	 */
 	public boolean isPreparedFor(TextProcessor tp) {
 		
@@ -370,7 +402,7 @@ public class WEnvironment  {
 	 * @see LabelDatabase#prepare(File, int)
 	 * 
 	 * @param tp a text processor
-	 * @param overwrite {@value true} if the preparation should occur even if the environment has been prepared for this processor already
+	 * @param overwrite true if the preparation should occur even if the environment has been prepared for this processor already
 	 * @param tempDirectory a directory for writing temporary files
 	 * @param passes the number of the number of passes to break the task into (more = slower, but less memory required)
 	 * @throws IOException if the temporary directory is not writable
@@ -579,7 +611,7 @@ public class WEnvironment  {
 	 * 
 	 * @param conf a configuration specifying where the databases are to be stored, etc.
 	 * @param dataDirectory a directory containing the a single XML dump of wikipedia, and all of the CSV files produced by {@link DumpExtractor}
-	 * @param overwrite {@value true} if existing databases should be overwritten, otherwise {@value false}
+	 * @param overwrite true if existing databases should be overwritten, otherwise false
 	 * @throws IOException if any of the required files cannot be read
 	 * @throws XMLStreamException if the XML dump of wikipedia cannot be parsed
 	 */
