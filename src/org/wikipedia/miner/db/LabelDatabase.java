@@ -88,6 +88,7 @@ public class LabelDatabase extends WDatabase<String, DbLabel> {
 	}
 
 	/**
+	 * Returns the text processor used to modify texts before they are used to index documents (may be null).
 	 * @return the text processor used to modify texts before they are used to index documents (may be null).
 	 */
 	public TextProcessor getTextProcessor() {
@@ -96,9 +97,9 @@ public class LabelDatabase extends WDatabase<String, DbLabel> {
 
 	/**
 	 * If this database uses a text processor, you must prepare it (by calling {@link #prepare(File,int)} before use. 
-	 * This returns {@value true} if that call has been made.
+	 * This returns true if that call has been made.
 	 * 
-	 * @return {@value true} if the database has been prepared for use, otherwise {@false}
+	 * @return true if the database has been prepared for use, otherwise false
 	 */
 	public boolean isPrepared() {
 		return getDatabase(true) != null ;
@@ -109,7 +110,7 @@ public class LabelDatabase extends WDatabase<String, DbLabel> {
 	 * 
 	 * <p>Note:<b> you should NOT apply text processors to the key; that will be done internally within this method.
 	 * 
-	 * @return {@value true} if the database has been prepared for use, otherwise {@false}
+	 * @return true if the database has been prepared for use, otherwise false
 	 */
 	@Override
 	public DbLabel retrieve(String key) {

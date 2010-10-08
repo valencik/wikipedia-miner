@@ -197,6 +197,8 @@ public abstract class WDatabase<K,V> {
 	}
 	
 	/**
+	 * Returns the type of this database
+	 * 
 	 * @return the type of this database
 	 */
 	public DatabaseType getType() {
@@ -204,6 +206,8 @@ public abstract class WDatabase<K,V> {
 	}
 	
 	/**
+	 * Returns the name of this database
+	 * 
 	 * @return the name of this database
 	 */
 	public String getName() {
@@ -211,6 +215,8 @@ public abstract class WDatabase<K,V> {
 	}
 	
 	/**
+	 * Returns the number of entries in the database
+	 * 
 	 * @return the number of entries in the database
 	 */
 	public long getDatabaseSize() {
@@ -218,6 +224,8 @@ public abstract class WDatabase<K,V> {
 	}
 	
 	/**
+	 * Returns the number of entries that have been cached to memory
+	 * 
 	 * @return the number of entries that have been cached to memory
 	 */
 	public long getCacheSize() {
@@ -231,13 +239,17 @@ public abstract class WDatabase<K,V> {
 	}
 	
 	/**
-	 * @return {@value true} if this has been cached to memory, otherwise {@value false}
+	 * Returns true if this has been cached to memory, otherwise false
+	 * 
+	 * @return true if this has been cached to memory, otherwise false
 	 */
 	public boolean isCached() {
 		return isCached ;
 	}
 
 	/**
+	 * Returns whether this has been cached for speed or memory efficiency
+	 * 
 	 * @return whether this has been cached for speed or memory efficiency
 	 */
 	public CachePriority getCachePriority() {
@@ -245,7 +257,9 @@ public abstract class WDatabase<K,V> {
 	}
 	
 	/**
-	 * @return {@value true} if there is a persistent database underlying this, otherwise {@value false}
+	 * true if there is a persistent database underlying this, otherwise false
+	 * 
+	 * @return true if there is a persistent database underlying this, otherwise false
 	 */
 	public boolean exists() {
 		try {
@@ -257,7 +271,7 @@ public abstract class WDatabase<K,V> {
 	}
 	
 	/**
-	 * Retrieves the value associated with the given key, either from the persistant database, or from memory if
+	 * Retrieves the value associated with the given key, either from the persistent database, or from memory if
 	 * the database has been cached. This will return null if the key is not found, or has been excluded from the cache.
 	 * 
 	 * @param key the key to search for
@@ -308,8 +322,8 @@ public abstract class WDatabase<K,V> {
 	/**
 	 * Builds the persistent database from a file.
 	 * 
-	 * @param dataFile the file (typically a csv file) containing data to be loaded
-	 * @param overwrite {@value true} if the existing database should be overwritten, otherwise {@value false}
+	 * @param dataFile the file (typically a CSV file) containing data to be loaded
+	 * @param overwrite true if the existing database should be overwritten, otherwise false
 	 * @param tracker an optional progress tracker (may be null)
 	 * @throws IOException if there is a problem reading or deserialising the given data file.
 	 * @throws XMLStreamException if the data file is in XML format and cannot be deserialised.

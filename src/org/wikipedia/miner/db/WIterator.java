@@ -17,7 +17,9 @@ import com.sleepycat.je.*;
  */
 
 /**
- * @author dmilne
+ * An iterator that will cycle through all entries in a WDatabase.
+ * 
+ * 
  *
  * @param <K>
  * @param <V>
@@ -33,11 +35,11 @@ public class WIterator<K,V> implements Iterator<WEntry<K,V>> {
 	DatabaseEntry value = new DatabaseEntry() ;
 
 	/**
-	 * Creates an iterator that will loop through all entries in a WikipediaDatabase.
+	 * Creates an iterator that will cycle through all entries the given WDatabase.
 	 * 
-	 * @param database an active (connected) Wikipedia database.
+	 * @param database an active (connected) WDatabase.
 	 */
-	public WIterator(WDatabase<K,V> database) throws DatabaseException{
+	public WIterator(WDatabase<K,V> database) {
 		
 		this.db = database ;
 		cursor = db.getDatabase(true).openCursor(null, null) ;
@@ -56,6 +58,10 @@ public class WIterator<K,V> implements Iterator<WEntry<K,V>> {
 		throw new UnsupportedOperationException() ;
 	}
 	
+	/**
+	 * Tidily closes the {@link Cursor} underlying this iterator. This should be called before 
+	 * destroying the object.
+	 */
 	public void close() {
 		cursor.close();
 		this.cursor = null ;

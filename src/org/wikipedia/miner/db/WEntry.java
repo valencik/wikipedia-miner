@@ -23,6 +23,8 @@ public class WEntry<K,V> {
 	}
 	
 	/**
+	 * Returns the key
+	 * 
 	 * @return the key
 	 */
 	public K getKey() {
@@ -30,6 +32,8 @@ public class WEntry<K,V> {
 	}
 
 	/**
+	 * Returns the value
+	 * 
 	 * @return the value
 	 */
 	public V getValue() {
