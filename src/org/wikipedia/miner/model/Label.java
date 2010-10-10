@@ -73,6 +73,11 @@ public class Label {
 
 	//public ==================================================================
 
+	@Override
+	public String toString() {
+		return "\"" + text + "\"" ; 
+	}
+	
 	/**
 	 * @return the text used to refer to concepts. 
 	 */
@@ -81,7 +86,7 @@ public class Label {
 	}
 	
 	/**
-	 * @return {@value true} if this label has ever been used to refer to an article, otherwise {@value false}
+	 * @return true if this label has ever been used to refer to an article, otherwise false
 	 */
 	public boolean exists() {
 		if (!detailsSet) setDetails() ;
@@ -221,8 +226,7 @@ public class Label {
 	
 	
 	/**
-	 * 
-	 *
+	 * A possible sense for a label
 	 */
 	public class Sense extends Article {
 
@@ -235,12 +239,6 @@ public class Label {
 
 		//constructor =============================================================
 		
-		/**
-		 * Initialises a sense
-		 * 
-		 * @param env 
-		 * @param s	a database representation of the sense.
-		 */
 		protected Sense(WEnvironment env,  DbSenseForLabel s) {
 			
 			super(env, s.getId()) ;
@@ -254,28 +252,49 @@ public class Label {
 		
 		//public ==================================================================
 
+		/**
+		 * Returns the number of documents that contain links that use the surrounding label as anchor text, and point to this sense as the destination.
+		 * 
+		 * @return the number of documents that contain links that use the surrounding label as anchor text, and point to this sense as the destination.  
+		 */
 		public long getLinkDocCount() {
 			return sLinkDocCount;
 		}
 
 
+		/**
+		 * Returns the number of links that use the surrounding label as anchor text, and point to this sense as the destination.
+		 * 
+		 * @return the number of links that use the surrounding label as anchor text, and point to this sense as the destination.
+		 */
 		public long getLinkOccCount() {
 			return sLinkOccCount;
 		}
 
 
+		/**
+		 * Returns true if the surrounding label is used as a title for this sense article, otherwise false
+		 * 
+		 * @return true if the surrounding label is used as a title for this sense article, otherwise false
+		 */
 		public boolean isFromTitle() {
 			return fromTitle;
 		}
 
-
+		/**
+		 * Returns true if the surrounding label is used as a redirect for this sense article, otherwise false
+		 * 
+		 * @return true if the surrounding label is used as a redirect for this sense article, otherwise false
+		 */
 		public boolean isFromRedirect() {
 			return fromRedirect;
 		}
 		
 		
 		/**
-		 * @return the probability that this anchor goes to this destination
+		 * Returns the probability that the surrounding label goes to this destination 
+		 * 
+		 * @return the probability that the surrounding label goes to this destination 
 		 */
 		public float getPriorProbability() {
 
@@ -288,12 +307,21 @@ public class Label {
 				return ((float)sLinkOccCount) / linkOccCount ;
 		}
 		
+		/**
+		 * Returns true if this is the most likely sense for the surrounding label, otherwise false
+		 * 
+		 * @return true if this is the most likely sense for the surrounding label, otherwise false
+		 */
 		public boolean isPrimary() {
 			return (this == senses[0]) ;
 		}
 		
 	}
 	
+	/**
+	 * The result of measuring the relatedness of two labels: the disambiguated sense chosen to 
+	 * represent each label, and their relatedness.
+	 */
 	public class DisambiguatedSensePair implements Comparable<DisambiguatedSensePair> {
 		
 		private Sense senseA ;
@@ -303,15 +331,7 @@ public class Label {
 		
 		//constructor =============================================================
 		
-		/**
-		 * initializes a new pair of candidate senses when disambiguating two anchors against each other
-		 * 
-		 * @param senseA the candidate sense of the first anchor
-		 * @param senseB the candidate sense of the seccond anchor
-		 * @param relatedness the amount that these senses relate to each other
-		 * @param obviousness the average prior probability of the two senses
-		 */
-		public DisambiguatedSensePair(Sense senseA, Sense senseB, float relatedness, float obviousness) {
+		protected DisambiguatedSensePair(Sense senseA, Sense senseB, float relatedness, float obviousness) {
 			this.senseA = senseA ;
 			this.senseB = senseB ;
 			this.relatedness = relatedness ;
@@ -320,27 +340,50 @@ public class Label {
 		
 		//public ==================================================================
 		
+		@Override
 		public int compareTo(DisambiguatedSensePair cp) {
 			return new Float(cp.obviousness).compareTo(obviousness) ;
 		}
 		
+		@Override
 		public String toString() {
 			return senseA + "," + senseB + ",r=" + relatedness + ",o=" + obviousness ;
 		}
 		
+		
+		/**
+		 * Returns the sense chosen to represent the first label
+		 * 
+		 * @return the sense chosen to represent the first label
+		 */
 		public Sense getSenseA() {
 			return senseA ;
 		}
 		
+		/**
+		 * Returns the sense chosen to represent the second label
+		 * 
+		 * @return the sense chosen to represent the second label
+		 */
 		public Sense getSenseB() {
 			return senseB ;
 		}
 		
+		/**
+		 * Returns the semantic relatedness of the two labels
+		 * 
+		 * @return the semantic relatedness of the two labels
+		 */
 		public float getRelatedness() {
 			return relatedness ;
 		}
 		
-		public float getObviousness() {
+		/**
+		 * Returns the average prior probability of the two senses 
+		 * 
+		 * @return the average prior probability of the two senses 
+		 */
+		public float getAvgPriorProbability() {
 			return obviousness ;
 		}
 	}

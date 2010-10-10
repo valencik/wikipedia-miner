@@ -131,7 +131,7 @@ public class Article extends Page {
 
 		Category equivalentCategory = null ;
 
-		//TODO ;
+		//TODO:
 		/*
 		Statement stmt = getWikipediaDatabase().createStatement() ;
 		ResultSet rs = stmt.executeQuery("SELECT page_id, page_title FROM equivalence, page WHERE page_id=eq_cat AND eq_art=" + id) ;
@@ -467,9 +467,11 @@ public class Article extends Page {
 	}
 
 	
-	//TODO: how are these sorted?
 	/**
-	 * @return an array of {@link Label Labels}, sorted by ???, that have been used to refer to this article. 
+	 * Returns an array of {@link Label Labels} that have been used to refer to this article.
+	 * They are sorted by the number of times each label is used.
+	 * 
+	 * @return an array of {@link Label Labels} that have been used to refer to this article. 
 	 */
 	public Label[] getLabels() {
 
@@ -568,8 +570,6 @@ public class Article extends Page {
 	/**
 	 * A label that has been used to refer to the enclosing {@link Article}. These are mined from the title of the article, the 
 	 * titles of {@link Redirect redirects} that point to the article, and the anchors of links that point to the article.   
-	 * 
-	 * @author David Milne
 	 */
 	public class Label {
 
@@ -615,21 +615,21 @@ public class Article extends Page {
 		}
 
 		/**
-		 * @return {@value true} if this label matches the title of the enclosing {@link Article}, otherwise {@value false}.
+		 * @return true if this label matches the title of the enclosing {@link Article}, otherwise false.
 		 */
 		public boolean isFromTitle() {
 			return fromTitle;
 		}
 
 		/**
-		 * @return {@value true} if there is a {@link Redirect} that associates this label with the enclosing {@link Article}, otherwise {@value false}.
+		 * @return true if there is a {@link Redirect} that associates this label with the enclosing {@link Article}, otherwise false.
 		 */
 		public boolean isFromRedirect() {
 			return fromRedirect;
 		}
 
 		/**
-		 * @return {@value true} if the enclosing {@link Article} is the primary, most common sense for the given label, otherwise {@value false}.
+		 * @return true if the enclosing {@link Article} is the primary, most common sense for the given label, otherwise false.
 		 */
 		public boolean isPrimary() {
 			return isPrimary;

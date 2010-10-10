@@ -26,6 +26,7 @@ import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.DbLabel;
 import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.util.PageIterator;
+import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.text.TextProcessor;
 
@@ -42,10 +43,12 @@ public class Wikipedia {
 	/**
 	 * Initialises a newly created Wikipedia according to the given configuration. 
 	 * 
-	 * This can be a time consuming process if .
+	 * This can be a time consuming process if the given configuration specifies databases that need to be cached to memory.
+	 * 
+	 * This preparation can be done in a separate thread if required, in which case progress can be tracked using {@link #getProgress()}, {@link #getPreparationTracker()} and {@link #isReady()}.
 	 *  
 	 * @param conf a configuration that describes where the databases are located, etc. 
-	 * @param threadedPreparation {@value true} if preparation (connecting to databases, caching data to memory) should be done in a separate thread, otherwise {@false}
+	 * @param threadedPreparation true if preparation (connecting to databases, caching data to memory) should be done in a separate thread, otherwise false
 	 * @throws EnvironmentLockedException if the underlying database environment is unavailable.
 	 */
 	public Wikipedia(WikipediaConfiguration conf, boolean threadedPreparation) throws EnvironmentLockedException{
@@ -54,6 +57,8 @@ public class Wikipedia {
 	}
 
 	/**
+	 * Returns the environment that this is connected to
+	 * 
 	 * @return the environment that this is connected to
 	 */
 	public WEnvironment getEnvironment() {
@@ -61,10 +66,40 @@ public class Wikipedia {
 	}
 
 	/**
+	 * Returns the configuration of this wikipedia dump
+	 * 
 	 * @return the configuration of this wikipedia dump
 	 */
 	public WikipediaConfiguration getConfig() {
 		return env.getConfiguration() ;
+	}
+	
+	/**
+	 * Returns true if the preparation work has been completed, otherwise false
+	 * 
+	 * @return true if the preparation work has been completed, otherwise false
+	 */
+	public boolean isReady() {
+		return env.isReady() ;
+		
+	}
+	
+	/**
+	 * Returns a number between 0 (just started) and 1 (completed) indicating progress of the preparation work.
+	 * 
+	 * @return a number between 0 (just started) and 1 (completed) indicating progress of the preparation work. 
+	 */
+	public double getProgress() {
+		return env.getProgress() ;
+	}
+	
+	/**
+	 * Returns a tracker for progress of the preparation work. 
+	 * 
+	 * @return a tracker for progress of the preparation work. 
+	 */
+	public ProgressTracker getPreparationTracker() {
+		return env.getPreparationTracker() ;
 	}
 
 	/**
@@ -146,7 +181,7 @@ public class Wikipedia {
 	 * This is defined by the number of times the term is used as an anchor for links to each of these 
 	 * destinations. 
 	 *  <p>
-	 * An optional text processor (may be null) can be used to alter the way anchor texts are 
+	 * An optional text processor (may be null) can be used to alter the way labels are 
 	 * retrieved (e.g. via stemming or case folding) 
 	 * 
 	 * @param term	the term to obtain articles for
@@ -180,6 +215,8 @@ public class Wikipedia {
 	}
 
 	/**
+	 * Returns an iterator for all pages in the database, in order of ascending ids.
+	 * 
 	 * @return an iterator for all pages in the database, in order of ascending ids.
 	 */
 	public PageIterator getPageIterator() {
@@ -187,6 +224,8 @@ public class Wikipedia {
 	}
 
 	/**
+	 * Returns an iterator for all pages in the database of the given type, in order of ascending ids.
+	 * 
 	 * @param type the type of page of interest
 	 * @return an iterator for all pages in the database of the given type, in order of ascending ids.
 	 */

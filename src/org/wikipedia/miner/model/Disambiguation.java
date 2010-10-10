@@ -4,7 +4,7 @@ import org.wikipedia.miner.db.WEnvironment;
 import org.wikipedia.miner.db.struct.DbPage;
 
 /**
- * Represents a disambiguation page in Wikipedia, which lists possible senses for an ambiguous term
+ * Represents disambiguation pages in Wikipedia, which lists possible senses for an ambiguous term
  */
 public class Disambiguation extends Page {
 

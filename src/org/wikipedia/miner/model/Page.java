@@ -95,7 +95,7 @@ public class Page implements Comparable<Page> {
 
 
 	/**
-	 *  @return {@value true} if a page with this id is defined in Wikipedia, otherwise {@value false}.
+	 *  @return true if a page with this id is defined in Wikipedia, otherwise false.
 	 */
 	public boolean exists() {
 		if (!detailsSet) 
@@ -123,7 +123,7 @@ public class Page implements Comparable<Page> {
 	
 	/**
 	 * @param p the page to compare to
-	 * @return {@value true} if this page has the same id as the given one, otherwise {@value false}
+	 * @return true if this page has the same id as the given one, otherwise false
 	 */
 	public boolean equals(Page p) {
 		return p.id == id ;
