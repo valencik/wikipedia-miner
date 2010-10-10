@@ -58,8 +58,9 @@ module org.wikipedia.miner.db.struct {
   	vector<DbLinkLocation> LinkLocations ;
   }
   
- 
-  
+  class DbTranslations {
+  	map<ustring,ustring> TranslationsByLangCode ;
+  }
 }
 
 

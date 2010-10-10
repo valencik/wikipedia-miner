@@ -74,7 +74,7 @@ public class DumpExtractor {
 
 	public DumpExtractor(String[] args) throws IOException, IllegalArgumentException {
 
-            /*
+
 		GenericOptionsParser gop = new GenericOptionsParser(args) ;
 		conf = gop.getConfiguration() ;
 		dfs = FileSystem.get(conf);
@@ -82,8 +82,6 @@ public class DumpExtractor {
 
 		configure() ;
 		configureLogging() ;
-             * 
-             */
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -285,6 +283,7 @@ public class DumpExtractor {
 			}
 			
 			finalizeFile(currStep, LabelSensesStep.Output.sentenceSplits.name()) ;
+			finalizeFile(currStep, LabelSensesStep.Output.translations.name()) ;
 			
 			//update progress
 			lastCompletedStep = currStep ;
