@@ -43,7 +43,7 @@ public class ArticleCleaner {
 	
 	/**
 	 * @param article the article to clean
-	 * @param snippetLength the portion of the article that is to be extracted and cleaned (ALL, FIRST_SENTENCE, or FIRST_PARAGRAPH)
+	 * @param length the portion of the article that is to be extracted and cleaned (ALL, FIRST_SENTENCE, or FIRST_PARAGRAPH)
 	 * @return the content (or snippet) of the given article, with all markup removed except links to other articles.  
 	 * @throws Exception
 	 */
@@ -57,8 +57,7 @@ public class ArticleCleaner {
 			markup = article.getSentenceMarkup(0) ;
 			break ;
 		case firstParagraph :
-			//TODO: retrieve first paragraph
-			markup = article.getMarkup() ;
+			markup = article.getFirstParagraphMarkup() ;
 			break ;
 		default : 
 			markup = article.getMarkup() ;
@@ -77,7 +76,7 @@ public class ArticleCleaner {
 	
 	/**
 	 * @param article the article to clean
-	 * @param snippetLength the portion of the article that is to be extracted and cleaned (ALL, FIRST_SENTENCE, or FIRST_PARAGRAPH)
+	 * @param length the portion of the article that is to be extracted and cleaned (ALL, FIRST_SENTENCE, or FIRST_PARAGRAPH)
 	 * @return the content of the given article, with all markup removed.  
 	 * @throws Exception
 	 */
@@ -92,8 +91,7 @@ public class ArticleCleaner {
 			markup = article.getSentenceMarkup(0) ;
 			break ;
 		case firstParagraph :
-			//TODO: retrieve first paragraph
-			markup = article.getMarkup() ;
+			markup = article.getFirstParagraphMarkup() ;
 			break ;
 		default : 
 			markup = article.getMarkup() ;
