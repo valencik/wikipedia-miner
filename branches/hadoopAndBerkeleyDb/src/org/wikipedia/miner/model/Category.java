@@ -25,16 +25,12 @@ import org.wikipedia.miner.db.struct.DbIdList;
 import org.wikipedia.miner.db.struct.DbPage;
 
 /**
- * 
- * 
- * 
- * @author David Milne
- *
+ * Represents categories in Wikipedia; the pages that exist to hirachically organise other pages
  */
 public class Category extends Page {
 
 	/**
-	 * Initializes a newly created Category so that it represents the category given by <em>id</em>.
+	 * Initialises a newly created Category so that it represents the category given by <em>id</em>.
 	 * 
 	 * @param env	an active WikipediaEnvironment
 	 * @param id	the unique identifier of the article

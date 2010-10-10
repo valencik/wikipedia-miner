@@ -6,11 +6,8 @@ import org.wikipedia.miner.db.struct.DbPage;
 import org.wikipedia.miner.db.WEnvironment;
 
 /**
- * This class represents redirects in Wikipedia; the links that have been defined to connect synonyms to the correct article
- * (i.e <em>Farming</em> redirects to <em>Agriculture</em>).  
- * It is intended to contain all properties and methods that are relevant for a redirect. 
- * 
- * @author David Milne
+ * Represents redirects in Wikipedia; the links that have been defined to connect synonyms to the correct article
+ * (i.e <em>Farming</em> redirects to <em>Agriculture</em>).   
  */
 public class Redirect extends Page {
 	
