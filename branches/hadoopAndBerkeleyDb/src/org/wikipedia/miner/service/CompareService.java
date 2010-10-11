@@ -196,7 +196,7 @@ public class CompareService extends Service{
 			addMutualLinksOrSnippets(xmlResponse, art1, art2, request, wikipedia) ;
 			break ;
 		case idLists :
-			//TODO:
+			//TODO: semantic relatedness of lists of ids
 			
 			break ;
 		}

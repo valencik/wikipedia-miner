@@ -329,9 +329,7 @@ public class WikifyService extends Service {
 		public String getTag(String anchor, Topic topic) {
 			
 			StringBuffer tag = new StringBuffer("<a") ;
-		
-			//TODO: different wikipedia versions?
-			tag.append(" href=\"http://www.en.wikipedia.org/wiki/" + topic.getTitle() + "\"") ;
+			tag.append(" href=\"http://www." + wikipedia.getConfig().getLangCode() + ".wikipedia.org/wiki/" + topic.getTitle() + "\"") ;
 			
 			tag.append(" class=\"" + linkClassName + "\"") ;
 			

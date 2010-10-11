@@ -81,10 +81,7 @@ public abstract class Service extends HttpServlet {
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
 
-		//TODO: get config file from servletconfig
 		hub = ServiceHub.getInstance(config.getServletContext()) ;
-
-
 
 		String[] descResponseFormat = {"in XML format", "directly, without any additional information such as request parameters. This format will not be valid for some services."} ;
 		prmResponseFormat = new EnumParameter<ResponseFormat>("responseFormat", "the format in which the response should be returned", ResponseFormat.XML, ResponseFormat.values(), descResponseFormat) ;
@@ -92,8 +89,6 @@ public abstract class Service extends HttpServlet {
 
 		prmHelp = new BooleanParameter("help", "If <b>true</b>, this will return a description of the service and the parameters available", false) ;
 		addGlobalParameter(prmHelp) ;
-
-		//TODO: set this up from service hub
 		
 		String[] valsWikipedia = getHub().getWikipediaNames() ;
 		String[] dscsWikipedia = new String[valsWikipedia.length] ;
@@ -111,7 +106,7 @@ public abstract class Service extends HttpServlet {
 
 	public ServiceHub getHub() {
 		return hub ;
-	}
+	}	                                                            
 
 	public Wikipedia getWikipedia(HttpServletRequest request) {
 
