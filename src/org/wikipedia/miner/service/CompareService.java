@@ -114,7 +114,7 @@ public class CompareService extends Service{
 		grpIdLists.addParameter(prmIdList2) ;
 		addParameterGroup(grpIdLists) ;
 		
-		prmConnections = new BooleanParameter("getConnections", "if <b>true</b>, then the service will list articles that refer to both topics being compared. This parameter is ignored if comparing lists of ids.", false) ;
+		prmConnections = new BooleanParameter("connections", "if <b>true</b>, then the service will list articles that refer to both topics being compared. This parameter is ignored if comparing lists of ids.", false) ;
 		addGlobalParameter(prmConnections) ;
 		
 		prmMaxConsConsidered = new IntParameter("maxConnectionsConsidered", "The maximum number of connections that will be gathered and weighted by thier relatedness to the articles being compared. This parameter is ignored if comparing lists of ids.", 1000) ;
@@ -123,7 +123,7 @@ public class CompareService extends Service{
 		prmMaxConsReturned = new IntParameter("maxConnectionsReturned", "The maximum number of connections that will be returned. These will be the highest weighted connections. This parameter is ignored if comparing lists of ids.", 250) ;
 		addGlobalParameter(prmMaxConsReturned) ;
 		
-		prmSnippets = new BooleanParameter("getSnippets", "if <b>true</b>, then the service will list sentences that either mention both of the articles being compared, or come from one of the articles and mention the other. This parameter is ignored if comparing lists of ids.", false) ;
+		prmSnippets = new BooleanParameter("snippets", "if <b>true</b>, then the service will list sentences that either mention both of the articles being compared, or come from one of the articles and mention the other. This parameter is ignored if comparing lists of ids.", false) ;
 		addGlobalParameter(prmSnippets) ;
 		
 		prmMaxConsForSnippets = new IntParameter("maxConnectionsForSnippets", "The maximum number of connections that will be used to gather snippets from. This parameter is ignored if comparing lists of ids.", 100) ;

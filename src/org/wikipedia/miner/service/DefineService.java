@@ -73,13 +73,13 @@ public class DefineService extends Service {
 		prmEscape = new BooleanParameter("escapeDefinition", "Wether the definition markup should be escaped or encoded directly", false) ;
 		addGlobalParameter(prmEscape) ;
 
-		prmLabels = new BooleanParameter("getLabels", "<b>true</b> if labels (synonyms, etc) for this topic are to be returned, otherwise </b>false</b>", false) ;
+		prmLabels = new BooleanParameter("labels", "<b>true</b> if labels (synonyms, etc) for this topic are to be returned, otherwise </b>false</b>", false) ;
 		addGlobalParameter(prmLabels) ;
 
-		prmTranslations = new BooleanParameter("getTranslations", "<b>true</b> if translations (language links) for this topic are to be returned, otherwise </b>false</b>", false) ;
+		prmTranslations = new BooleanParameter("translations", "<b>true</b> if translations (language links) for this topic are to be returned, otherwise </b>false</b>", false) ;
 		addGlobalParameter(prmTranslations) ;
 
-		prmImages = new BooleanParameter("getImages", "Whether or not to retrieve relevant image urls from freebase", false) ;
+		prmImages = new BooleanParameter("images", "Whether or not to retrieve relevant image urls from freebase", false) ;
 		addGlobalParameter(prmImages) ;
 
 		prmImageWidth = new IntParameter("maxImageWidth", "Images can be scaled. This defines their maximum width, in pixels", 150) ;
