@@ -24,6 +24,7 @@
       <description>
         An XML file describing the wikipedia dumps that are available via these web services,
 	and how they should be configured.
+      </description>
     </context-param>  
 
 
