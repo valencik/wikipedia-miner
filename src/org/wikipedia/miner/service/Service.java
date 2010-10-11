@@ -214,7 +214,7 @@ public abstract class Service extends HttpServlet {
 	
 	public Element buildWarningResponse(String message, Element response) {
 
-		response.setAttribute("error", message) ;
+		response.setAttribute("warning", message) ;
 		return response ;
 	}
 	
