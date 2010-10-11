@@ -211,6 +211,14 @@ public abstract class Service extends HttpServlet {
 		response.setAttribute("error", message) ;
 		return response ;
 	}
+	
+	public Element buildWarningResponse(String message, Element response) {
+
+		response.setAttribute("error", message) ;
+		return response ;
+	}
+	
+	
 
 	public String getBasePath(HttpServletRequest request) {
 

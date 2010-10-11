@@ -1,8 +1,11 @@
 package org.wikipedia.miner.service;
 
+import gnu.trove.TLongHashSet;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.TreeSet;
+import java.util.Vector;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -14,6 +17,7 @@ import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.service.param.BooleanParameter;
+import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.IntListParameter;
 import org.wikipedia.miner.service.param.IntParameter;
 import org.wikipedia.miner.service.param.ParameterGroup;
@@ -63,6 +67,8 @@ public class CompareService extends Service{
 	private IntParameter prmMaxSnippets ;
 	
 	private BooleanParameter prmEscape ;
+	
+	private FloatParameter prmMinRelatedness ;
 	
 	
 	
@@ -127,6 +133,8 @@ public class CompareService extends Service{
 		
 		addGlobalParameter(getHub().getFormatter().getEmphasisFormatParam()) ;
 		addGlobalParameter(getHub().getFormatter().getLinkFormatParam()) ;
+		
+		prmMinRelatedness = new FloatParameter("minRelatedness", "The minimum relatedness a term pair must have before it will be returned. This parameter is ignored unless comparing sets of ids.", 0F) ;
 		
 		prmEscape = new BooleanParameter("escapeDefinition", "<true> if sense definitions and sentence snippets should be escaped, <em>false</em> if they are to be encoded directly", false) ;
 		addGlobalParameter(prmEscape) ;
@@ -196,14 +204,85 @@ public class CompareService extends Service{
 			addMutualLinksOrSnippets(xmlResponse, art1, art2, request, wikipedia) ;
 			break ;
 		case idLists :
-			//TODO: semantic relatedness of lists of ids
+			
+			TreeSet<Integer> invalidIds = new TreeSet<Integer>() ;
+			
+			//gather articles from ids1 ;
+			ArrayList<Article> articles1 = new ArrayList<Article>() ;
+			for (Integer id:prmIdList1.getValue(request)) {
+				try {
+					Article art = (Article)wikipedia.getPageById(id) ;
+					articles1.add(art) ;
+				} catch (Exception e) {
+					invalidIds.add(id) ;
+				}
+			}
+			
+			//gather articles from ids2 ;
+			ArrayList<Article> articles2 = new ArrayList<Article>() ;
+			for (Integer id:prmIdList2.getValue(request)) {
+				try {
+					Article art = (Article)wikipedia.getPageById(id) ;
+					articles2.add(art) ;
+				} catch (Exception e) {
+					invalidIds.add(id) ;
+				}
+			}
+			
+			if (!invalidIds.isEmpty()) {
+				StringBuffer sb = new StringBuffer("Invalid ids: ") ;
+				
+				for (int id:invalidIds) {
+					sb.append(id) ;
+					sb.append(", ") ;
+				}
+				
+				xmlResponse = this.buildWarningResponse(sb.substring(sb.length()-2) + ".", xmlResponse) ;
+			}
+			
+			//if ids2 is not specified, then we want to compare each item in ids1 with every other one
+			if (articles2.isEmpty())
+				articles2 = articles1 ;
+			
+			
+			TLongHashSet doneKeys = new TLongHashSet() ;
+			
+			Element xmlMeasures = getHub().createElement("Measures") ;
+			
+			float minRelatedness = prmMinRelatedness.getValue(request) ;
+			
+			for (Article a1:articles1) {
+				for (Article a2:articles2) {
+					
+					//relatedness is symmetric, so create a unique key for this pair of ids were order doesnt matter 
+					long min = Math.min(a1.getId(), a2.getId()) ;
+					long max = Math.max(a1.getId(), a2.getId()) ;
+					long key = min + (max << 30) ;
+					
+					if(doneKeys.contains(key))
+						continue ;
+					
+					float relatedness = a1.getRelatednessTo(a2) ;
+					
+					if (relatedness >= minRelatedness) {
+					
+						Element xmlMeasure = getHub().createElement("Measure") ;
+						xmlMeasure.setAttribute("lowId", String.valueOf(min)) ;
+						xmlMeasure.setAttribute("highId", String.valueOf(max)) ;
+						xmlMeasure.appendChild(getHub().createTextNode(getHub().format(a1.getRelatednessTo(a2)))) ;
+						
+						xmlMeasures.appendChild(xmlMeasure) ;
+					}
+					
+					doneKeys.add(key) ;
+				}
+			}
+			
+			xmlResponse.appendChild(xmlMeasures) ;
 			
 			break ;
 		}
-		
-		
-		
-		
+
 		return xmlResponse ;
 	}
 	
