@@ -5,7 +5,6 @@ import gnu.trove.TLongHashSet;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.TreeSet;
-import java.util.Vector;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -45,6 +44,8 @@ import org.wikipedia.miner.util.text.TextProcessor;
  */
 public class CompareService extends Service{
 
+	private static final long serialVersionUID = 537957588352023198L;
+	
 	private ParameterGroup grpTerms ;
 	private StringParameter prmTerm1 ;
 	private StringParameter prmTerm2 ;
@@ -208,7 +209,7 @@ public class CompareService extends Service{
 			TreeSet<Integer> invalidIds = new TreeSet<Integer>() ;
 			
 			//gather articles from ids1 ;
-			ArrayList<Article> articles1 = new ArrayList<Article>() ;
+			TreeSet<Article> articles1 = new TreeSet<Article>() ;
 			for (Integer id:prmIdList1.getValue(request)) {
 				try {
 					Article art = (Article)wikipedia.getPageById(id) ;
@@ -219,7 +220,7 @@ public class CompareService extends Service{
 			}
 			
 			//gather articles from ids2 ;
-			ArrayList<Article> articles2 = new ArrayList<Article>() ;
+			TreeSet<Article> articles2 = new TreeSet<Article>() ;
 			for (Integer id:prmIdList2.getValue(request)) {
 				try {
 					Article art = (Article)wikipedia.getPageById(id) ;
@@ -237,13 +238,12 @@ public class CompareService extends Service{
 					sb.append(", ") ;
 				}
 				
-				xmlResponse = this.buildWarningResponse(sb.substring(sb.length()-2) + ".", xmlResponse) ;
+				xmlResponse = this.buildWarningResponse(sb.substring(0,sb.length()-2) + ".", xmlResponse) ;
 			}
 			
 			//if ids2 is not specified, then we want to compare each item in ids1 with every other one
 			if (articles2.isEmpty())
 				articles2 = articles1 ;
-			
 			
 			TLongHashSet doneKeys = new TLongHashSet() ;
 			
