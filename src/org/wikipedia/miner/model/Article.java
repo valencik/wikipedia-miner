@@ -30,6 +30,7 @@ import org.wikipedia.miner.db.struct.DbLabelForPageList;
 import org.wikipedia.miner.db.struct.DbLinkLocation;
 import org.wikipedia.miner.db.struct.DbLinkLocationList;
 import org.wikipedia.miner.db.struct.DbPage;
+import org.wikipedia.miner.db.struct.DbTranslations;
 
 /**
  * Represents articles in Wikipedia; the pages that contain descriptive text regarding a particular topic. 
@@ -203,19 +204,32 @@ public class Article extends Page {
 	 * @param languageCode	the (generally 2 character) language code.
 	 * @return the translated title if it is available; otherwise null.
 	 */	
-	//public String getTranslation(String languageCode) throws DatabaseException {		
-	//	return environment.getTranslations(id).get(languageCode) ;
-	//}
+	public String getTranslation(String languageCode)  {		
+		
+		DbTranslations t = env.getDbTranslations().retrieve(id) ;
+		
+		if (t == null)
+			return null ;
+		
+		if (t.getTranslationsByLangCode() == null)
+			return null ;
+		
+		return t.getTranslationsByLangCode().get(languageCode.toLowerCase()) ;
+	}
 
 	/**
-	 * Returns a HashMap associating language code with translated title for all available translations 
+	 * Returns a TreeMap associating language code with translated title for all available translations 
 	 * 
-	 * @return a HashMap associating language code with translated title.
-	 * @ if there is a problem with the Wikipedia database
+	 * @return a TreeMap associating language code with translated title.
 	 */	
-	//public HashMap<String,String> getTranslations() throws DatabaseException {
-	//	return environment.getTranslations(id) ;
-	//}
+	public TreeMap<String,String> getTranslations() {
+		DbTranslations t = env.getDbTranslations().retrieve(id) ;
+		
+		if (t == null)
+			return new TreeMap<String,String>() ;
+		else
+			return t.getTranslationsByLangCode() ;
+	}
 
 	/**
 	 * <p>

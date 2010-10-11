@@ -418,6 +418,50 @@ public class WDatabaseFactory {
 			}
 		} ;
 	}
+	
+	/**
+	 * Returns a database associating integer id of page with DbTranslations (language links)
+	 * 
+	 * @return a database associating integer id of page with DbTranslations (language links)
+	 */
+	public WDatabase<Integer,DbTranslations> buildTranslationsDatabase() {
+		
+		return new IntObjectDatabase<DbTranslations>(
+				env, 
+				DatabaseType.translations, 
+				new RecordBinding<DbTranslations>() {
+					@Override
+					public DbTranslations createRecordInstance() {
+						return new DbTranslations() ;
+					}
+				}
+		) {
+
+			@Override
+			public WEntry<Integer, DbTranslations> deserialiseCsvRecord(
+					CsvRecordInput record) throws IOException {
+				int k = record.readInt(null) ;
+							
+				DbTranslations v = new DbTranslations() ;
+				v.deserialize(record) ;
+				
+				return new WEntry<Integer, DbTranslations>(k,v) ;
+			}
+
+			@Override
+			public DbTranslations filterCacheEntry(
+					WEntry<Integer, DbTranslations> e, WikipediaConfiguration conf,
+					TIntHash validIds) {
+				
+				if (validIds != null && !validIds.contains(e.getKey()))
+					return null ; 
+				
+				return e.getValue();
+				
+			}
+		} ;
+	}
+	
 
 	
 	/**

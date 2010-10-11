@@ -14,6 +14,7 @@ import javax.xml.stream.XMLStreamException;
 
 import org.apache.hadoop.record.CsvRecordInput;
 import org.apache.log4j.Logger;
+import org.wikipedia.miner.db.struct.*;
 import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 
@@ -111,6 +112,11 @@ public abstract class WDatabase<K,V> {
 		 * Associates integer id of page with the character indexes of sentence breaks within it
 		 */
 		sentenceSplits,
+		
+		/**
+		 * Associates integer id of page with a {@link DbTranslations}. 
+		 */
+		translations,
 		
 		/**
 		 * Associates integer id of page with its content, in mediawiki markup format

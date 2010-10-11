@@ -97,6 +97,8 @@ public class WEnvironment  {
 	private MarkupDatabase dbMarkup ;
 	private WDatabase<Integer, DbIdList> dbSentenceSplits ;
 	
+	private WDatabase<Integer, DbTranslations> dbTranslations ;
+	
 	private WDatabase<Integer, Long> dbStatistics ;
 	
 	
@@ -262,6 +264,14 @@ public class WEnvironment  {
 	}
 	
 
+	/**
+	 * Returns the {@link DatabaseType#translations} database
+	 * 
+	 * @return see {@link DatabaseType#translations} 
+	 */
+	public WDatabase<Integer, DbTranslations> getDbTranslations() {
+		return dbTranslations ;
+	}
 
 	/**
 	 * Intitializes the environment defined in the given configuration, and immediately begins connecting to databases and caching them to memory.
@@ -346,6 +356,9 @@ public class WEnvironment  {
 		
 		dbSentenceSplits = dbFactory.buildIntIntListDatabase(DatabaseType.sentenceSplits) ;
 		databasesByType.put(DatabaseType.sentenceSplits, dbSentenceSplits) ;
+		
+		dbTranslations = dbFactory.buildTranslationsDatabase() ;
+		databasesByType.put(DatabaseType.translations, dbTranslations) ;
 		
 		dbStatistics = dbFactory.buildStatisticsDatabase() ;
 		databasesByType.put(DatabaseType.statistics, dbStatistics) ;
@@ -634,8 +647,10 @@ public class WEnvironment  {
 		
 		File redirectTargetBySource = getDataFile(dataDirectory, "redirectTargetsBySource.csv") ;
 		File redirectSourcesByTarget = getDataFile(dataDirectory, "redirectSourcesByTarget.csv") ;
-		
+
 		File sentenceSplits = getDataFile(dataDirectory, "sentenceSplits.csv") ;
+		
+		File translations = getDataFile(dataDirectory, "translations.csv") ;
 		
 		File markup = getMarkupDataFile(dataDirectory) ;
 		
@@ -669,6 +684,8 @@ public class WEnvironment  {
 		env.dbChildArticles.loadFromFile(childArticles, overwrite, null) ;
 		
 		env.dbSentenceSplits.loadFromFile(sentenceSplits, overwrite, null) ;
+		
+		env.dbTranslations.loadFromFile(translations, overwrite, null) ;
 		
 		env.dbMarkup.loadFromFile(markup, overwrite, null) ;
 		
