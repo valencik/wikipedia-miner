@@ -17,7 +17,7 @@ import com.sleepycat.je.DatabaseException;
 public class MarkupFormatter {
 	
 	public enum EmphasisFormat{PLAIN,WIKI,HTML} ;
-	public enum LinkFormat{PLAIN,HTML,HTML_WM,WIKI,WIKI_ID} ;
+	public enum LinkFormat{PLAIN,HTML,WIKI,WIKI_ID} ;
 	
 	private EmphasisResolver emphasisResolver = new EmphasisResolver() ;
 	private MarkupStripper stripper = new MarkupStripper() ;
@@ -34,7 +34,7 @@ public class MarkupFormatter {
 		String[] descEmphasisFormat = {"all emphasis discarded","as mediawiki markup", "as html markup"} ;
 		prmEmphasisFormat = new EnumParameter<EmphasisFormat>("emphasisFormat", "The format of bold and italic markup", EmphasisFormat.HTML, EmphasisFormat.values(), descEmphasisFormat) ;
 
-		String[] descLinkFormat = {"all links discarded", "as html links to wikipedia", "as html links to wikipedia miner", "as mediawiki markup", "as modified mediawiki markup [[id|anchor]]"} ;
+		String[] descLinkFormat = {"all links discarded", "as html links to wikipedia", "as mediawiki markup", "as modified mediawiki markup [[id|anchor]]"} ;
 		prmLinkFormat = new EnumParameter<LinkFormat>("linkFormat", "The format of links", LinkFormat.HTML, LinkFormat.values(), descLinkFormat) ;
 	}
 	
@@ -164,15 +164,7 @@ public class MarkupFormatter {
 				switch(linkFormat) {
 
 				case HTML:
-					//TODO: prefix of wikipedia version?
-					sb.append("<a href=\"http://www.en.wikipedia.org/wiki/" + art.getTitle() + "\">") ;
-					sb.append(anchor) ;
-					sb.append("</a>") ;
-					break ;
-				case HTML_WM:
-					//TODO: wikipedia version?
-					//TODO: update
-					sb.append("<a href=\"search?id=" + art.getId() + "&term=" + art.getTitle() + "\">") ;
+					sb.append("<a href=\"http://www." + wikipedia.getConfig().getLangCode() + ".wikipedia.org/wiki/" + art.getTitle() + "\">") ;
 					sb.append(anchor) ;
 					sb.append("</a>") ;
 					break ;

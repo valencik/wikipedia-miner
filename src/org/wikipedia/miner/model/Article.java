@@ -117,7 +117,7 @@ public class Article extends Page {
 		return parentCategories ;	
 	}
 
-	//TODO:
+	//TODO:equivalent categories
 	/**
 	 * Returns the {@link Category} that relates to the same concept as this article. For instance, calling 
 	 * this for "6678: Cat" returns the category "799717: Cats"
@@ -132,7 +132,6 @@ public class Article extends Page {
 
 		Category equivalentCategory = null ;
 
-		//TODO:
 		/*
 		Statement stmt = getWikipediaDatabase().createStatement() ;
 		ResultSet rs = stmt.executeQuery("SELECT page_id, page_title FROM equivalence, page WHERE page_id=eq_cat AND eq_art=" + id) ;

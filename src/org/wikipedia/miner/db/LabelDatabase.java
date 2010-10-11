@@ -29,8 +29,8 @@ import com.sleepycat.je.DatabaseEntry;
  */
 public class LabelDatabase extends WDatabase<String, DbLabel> {
 
-	//TODO: 
-	// It would be extremely cool to cache labels in a PatriciaTrie rather than a HashMap. 
+	//TODO: Labels cached as patricia trie
+	// It would be extremely cool to cache labels in a Patricia Trie rather than a HashMap. 
 	// This would give us:
 	// - iteration in lexicographical order
 	// - prefix-based search (i.e. autocomplete queries)
