@@ -3,7 +3,7 @@
 <wikipediaHubConfiguration>
 
     <!-- Options requred to allow retrieval of web content via proxy -->
-    <proxy host="" port="" user="" password="">
+    <proxy host="" port="" user="" password=""/>
 
     <!-- 
 	A version of wikipedia that will be made available via the service hub. 

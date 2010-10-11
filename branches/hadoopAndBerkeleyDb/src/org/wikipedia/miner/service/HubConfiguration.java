@@ -22,7 +22,7 @@ import org.xml.sax.SAXException;
 
 public class HubConfiguration {
 	
-	private enum ParamName{proxyHost, proxyPort, proxyUser, proxyPassword, wikipedia, unknown} ;
+	private enum ParamName{proxy, wikipedia, unknown} ;
 	
 	private String proxyHost ;
 	private String proxyPort ;
@@ -101,22 +101,13 @@ public class HubConfiguration {
 				String paramName = xmlParam.getNodeName() ;
 				String paramValue = getParamValue(xmlParam) ;
 				
-				if (paramValue == null)
-					continue ;
-				
 				switch(resolveParamName(xmlParam.getNodeName())) {
 				
-				case proxyHost:
-					this.proxyHost = paramValue ;
-					break ;
-				case proxyPort:
-					this.proxyPort = paramValue ;
-					break ;
-				case proxyUser:
-					this.proxyUser = paramValue ;
-					break ;
-				case proxyPassword:
-					this.proxyPassword = paramValue ;
+				case proxy:
+					proxyHost = xmlParam.getAttribute("host") ;
+					proxyPort = xmlParam.getAttribute("port") ;
+					proxyUser = xmlParam.getAttribute("user") ;
+					proxyPassword = xmlParam.getAttribute("password") ;
 					break ;
 				case wikipedia:
 					
@@ -126,7 +117,6 @@ public class HubConfiguration {
 					boolean isDefault = false ;
 					if (xmlParam.hasAttribute("default"))
 						isDefault = Boolean.parseBoolean(xmlParam.getAttribute("default")) ;
-					
 					
 					if (firstWikipedia == null)
 						firstWikipedia = name ;
