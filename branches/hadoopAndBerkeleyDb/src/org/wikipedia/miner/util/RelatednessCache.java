@@ -19,7 +19,11 @@
 
 package org.wikipedia.miner.util;
 
+import java.util.EnumSet;
+
 import org.wikipedia.miner.model.Article;
+import org.wikipedia.miner.model.Article.RelatednessMode;
+
 import gnu.trove.* ;
 
 /**
@@ -31,13 +35,20 @@ import gnu.trove.* ;
 public class RelatednessCache {
 
 	TLongFloatHashMap cachedRelatedness ;
+	EnumSet<RelatednessMode> relatednessModes ;
 	
 	/**
-	 * Initializes the relatedness cache.
+	 * Initialises the relatedness cache, where relatedness will be measured using the given modes
+	 * 
+	 * @see Article#getRelatednessTo(Article, EnumSet) 
+	 * 
+	 * @param modes the modes that will be used to measure relatedness
 	 */
-	public RelatednessCache() {
+	public RelatednessCache(EnumSet<RelatednessMode> modes) {
 		cachedRelatedness = new TLongFloatHashMap() ;
+		relatednessModes = modes ;
 	}
+	
 	
 	/**
 	 * Calculates (or retrieves) the semantic relatedness of two articles. 
@@ -46,7 +57,6 @@ public class RelatednessCache {
 	 * @param art1 
 	 * @param art2
 	 * @return the semantic relatedness of art1 and art2
-	 * @throws SQLException
 	 */
 	public float getRelatedness(Article art1, Article art2) {
 		
@@ -56,7 +66,7 @@ public class RelatednessCache {
 		long key = min + (max << 30) ;
 				
 		if (!cachedRelatedness.containsKey(key)) {		
-			float rel = art1.getRelatednessTo(art2) ;		
+			float rel = art1.getRelatednessTo(art2, relatednessModes) ;		
 			cachedRelatedness.put(key, rel) ;
 			return rel ;
 		} else {			

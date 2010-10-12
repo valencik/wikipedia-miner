@@ -97,7 +97,6 @@ public class BrowseService extends Service {
 		int max = prmMax.getValue(request) ;
 		boolean getRelatedness = prmRelatedness.getValue(request) ;
 
-
 		if (prmOutLinks.getValue(request)) {
 
 			Article[] linksOut = art.getLinksOut() ;

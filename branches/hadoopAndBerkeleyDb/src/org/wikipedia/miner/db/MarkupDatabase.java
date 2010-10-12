@@ -50,13 +50,24 @@ public class MarkupDatabase extends WDatabase<Integer, String> {
 	public WEntry<Integer,String> deserialiseCsvRecord(CsvRecordInput record) throws IOException {
 		throw new UnsupportedOperationException() ;
 	}
+	
+	@Override 
+	public void loadFromCsvFile(File dataFile, boolean overwrite, ProgressTracker tracker) throws IOException  {
+		throw new UnsupportedOperationException() ;
+	}
+
+	
 
 	/**
-	 * This differs from the loadFromFile functions of other WDatabases, in that it expects an XML dump of Wikipedia, rather than a 
-	 * Summarised CSV file. 
+	 * Builds the persistent markup database from an XML dump
+	 * 
+	 * @param dataFile the XML file containing a wikipedia dump 
+	 * @param overwrite true if the existing database should be overwritten, otherwise false
+	 * @param tracker an optional progress tracker (may be null)
+	 * @throws IOException if there is a problem reading or deserialising the given data file.
+	 * @throws XMLStreamException if the XML within the data file cannot be parsed.
 	 */
-	@Override 
-	public void loadFromFile(File dataFile, boolean overwrite, ProgressTracker tracker) throws IOException, XMLStreamException  {
+	public void loadFromXmlFile(File dataFile, boolean overwrite, ProgressTracker tracker) throws IOException, XMLStreamException  {
 
 		if (exists() && !overwrite)
 			return ;

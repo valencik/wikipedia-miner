@@ -26,7 +26,7 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.Tool;
 import org.apache.log4j.Logger;
 
-import org.wikipedia.miner.db.struct.DbIdList;
+import org.wikipedia.miner.db.struct.DbIntList;
 import org.wikipedia.miner.extraction.DumpExtractor.ExtractionStep;
 import org.wikipedia.miner.model.Page.PageType;
 
@@ -55,7 +55,7 @@ public class RedirectStep extends Configured implements Tool {
 		conf.setJobName("WM: resolve redirects");
 
 		conf.setOutputKeyClass(IntWritable.class);
-		conf.setOutputValueClass(DbIdList.class);		
+		conf.setOutputValueClass(DbIntList.class);		
 
 		conf.setMapperClass(Step2Mapper.class);
 		conf.setCombinerClass(Step2Reducer.class) ;
@@ -101,7 +101,7 @@ public class RedirectStep extends Configured implements Tool {
 	 *		-key: redirect id
 	 *		-value: redirect target id
 	 */
-	private static class Step2Mapper extends MapReduceBase implements Mapper<LongWritable, Text, IntWritable, DbIdList> {
+	private static class Step2Mapper extends MapReduceBase implements Mapper<LongWritable, Text, IntWritable, DbIntList> {
 
 		private LanguageConfiguration lc ;
 		private SiteInfo si ;
@@ -158,7 +158,7 @@ public class RedirectStep extends Configured implements Tool {
 
 		@SuppressWarnings("unchecked")
 		@Override
-		public void map(LongWritable key, Text value, OutputCollector<IntWritable, DbIdList> output, Reporter reporter) throws IOException {
+		public void map(LongWritable key, Text value, OutputCollector<IntWritable, DbIntList> output, Reporter reporter) throws IOException {
 
 			try {
 				
@@ -194,7 +194,7 @@ public class RedirectStep extends Configured implements Tool {
 					
 					ArrayList<Integer> sources = new ArrayList<Integer>() ;
 					sources.add(sourceId) ;
-					output.collect(new IntWritable(targetId), new DbIdList(sources)) ;
+					output.collect(new IntWritable(targetId), new DbIntList(sources)) ;
 				}
 
 			} catch (Exception e) {
@@ -209,20 +209,20 @@ public class RedirectStep extends Configured implements Tool {
 		}
 	}
 	
-	public static class Step2Reducer extends MapReduceBase implements Reducer<IntWritable, DbIdList, IntWritable, DbIdList> {
+	public static class Step2Reducer extends MapReduceBase implements Reducer<IntWritable, DbIntList, IntWritable, DbIntList> {
 
-		public void reduce(IntWritable key, Iterator<DbIdList> values, OutputCollector<IntWritable, DbIdList> output, Reporter reporter) throws IOException {
+		public void reduce(IntWritable key, Iterator<DbIntList> values, OutputCollector<IntWritable, DbIntList> output, Reporter reporter) throws IOException {
 
 			ArrayList<Integer> valueIds = new ArrayList<Integer>() ;
 	
 			while (values.hasNext()) {
-				ArrayList<Integer> ls = values.next().getIds() ;
+				ArrayList<Integer> ls = values.next().getValues() ;
 				for (Integer i:ls) {
 					valueIds.add(i) ;
 				}
 			}
 
-			output.collect(key, new DbIdList(valueIds));
+			output.collect(key, new DbIntList(valueIds));
 		}
 	}
 	
@@ -230,9 +230,9 @@ public class RedirectStep extends Configured implements Tool {
 	
 
 
-	private static class RedirectOutputFormat extends FileOutputFormat<IntWritable, DbIdList> {
+	private static class RedirectOutputFormat extends FileOutputFormat<IntWritable, DbIntList> {
 
-		public RecordWriter<IntWritable, DbIdList> getRecordWriter(FileSystem ignored,
+		public RecordWriter<IntWritable, DbIntList> getRecordWriter(FileSystem ignored,
 				JobConf job,
 				String name,
 				Progressable progress)
@@ -246,7 +246,7 @@ public class RedirectStep extends Configured implements Tool {
 			return new RedirectRecordWriter(fileOut);
 		}
 
-		protected static class RedirectRecordWriter implements RecordWriter<IntWritable, DbIdList> {
+		protected static class RedirectRecordWriter implements RecordWriter<IntWritable, DbIntList> {
 
 			protected DataOutputStream outStream ;
 
@@ -254,9 +254,9 @@ public class RedirectStep extends Configured implements Tool {
 				this.outStream = out ; 
 			}
 
-			public synchronized void write(IntWritable key, DbIdList value) throws IOException {
+			public synchronized void write(IntWritable key, DbIntList value) throws IOException {
 				
-				ArrayList<Integer> sources = value.getIds() ;
+				ArrayList<Integer> sources = value.getValues() ;
 				Collections.sort(sources) ;
 
 				CsvRecordOutput csvOutput = new CsvRecordOutput(outStream);

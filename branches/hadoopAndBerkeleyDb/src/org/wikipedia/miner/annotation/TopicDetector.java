@@ -101,7 +101,8 @@ public class TopicDetector {
 	public Vector<Topic> getTopics(PreprocessedDocument doc, RelatednessCache rc) throws Exception {
 		
 		if (rc == null)
-			rc = new RelatednessCache() ;
+			rc = new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessModes()) ;
+		
 
 		//Vector<String> sentences = ss.getSentences(doc.getPreprocessedText(), SentenceSplitter.MULTIPLE_NEWLINES) ;
 		Vector<TopicReference> references = getReferences(doc.getPreprocessedText()) ;
@@ -129,7 +130,8 @@ public class TopicDetector {
 	public Collection<Topic> getTopics(String text, RelatednessCache rc) throws Exception {
 		
 		if (rc == null)
-			rc = new RelatednessCache() ;
+			rc = new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessModes()) ;
+			
 
 		//Vector<String> sentences = ss.getSentences(text, SentenceSplitter.MULTIPLE_NEWLINES) ;
 		Vector<TopicReference> references = getReferences(text) ;
@@ -237,7 +239,12 @@ public class TopicDetector {
 			}
 		}
 		
-		Context context = new Context(unambigLabels, cache, disambiguator.getMaxContextSize()) ;	
+		Context context ;
+		if (cache == null)
+			context = new Context(unambigLabels, new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessModes()), disambiguator.getMaxContextSize()) ;
+		
+		else 
+			context = new Context(unambigLabels, cache, disambiguator.getMaxContextSize()) ;	
 		unambigLabels = null ;
 
 		//now disambiguate all references

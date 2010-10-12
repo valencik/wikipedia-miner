@@ -1,10 +1,12 @@
 package org.wikipedia.miner.model;
 
+import java.util.EnumSet;
 import java.util.TreeSet;
 
 import org.wikipedia.miner.db.WEnvironment;
 import org.wikipedia.miner.db.struct.DbLabel;
 import org.wikipedia.miner.db.struct.DbSenseForLabel;
+import org.wikipedia.miner.model.Article.RelatednessMode;
 import org.wikipedia.miner.util.RelatednessCache;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.text.TextProcessor;
@@ -146,17 +148,36 @@ public class Label {
 	}
 	
 	/**
-	 * Returns the semantic relatedness of this label to another. 
+	 * Returns the semantic relatedness of this label to another, calculated using the given relatedness modes
 	 * 
 	 * The relatedness measure is described in:
 	 * Milne, D. and Witten, I.H. (2008) An effective, low-cost measure of semantic relatedness obtained from Wikipedia links. In Proceedings of the first AAAI Workshop on Wikipedia and Artificial Intelligence (WIKIAI'08), Chicago, I.L.
 	 * 
 	 * @param label the anchor to which this should be compared.
+	 * @param modes the modes to use when measuring relatedness between label senses
+	 * @return see above.
+	 */
+	public float getRelatednessTo(Label label, EnumSet<RelatednessMode> modes) {
+		
+		DisambiguatedSensePair sp = this.disambiguateAgainst(label, modes) ;
+		return sp.getRelatedness() ;
+	}
+	
+	
+	/**
+	 * Returns the semantic relatedness of this label to another, calculated using the modes recommended by the current wikipedia configuration
+	 * 
+	 * @see #getRelatednessTo(Label,EnumSet)
+	 * @see WikipediaConfiguration#getReccommendedRelatednessModes() ;
+	 *	 
+	 * @param label the anchor to which this should be compared.
 	 * @return see above.
 	 */
 	public float getRelatednessTo(Label label) {
 		
-		DisambiguatedSensePair sp = this.disambiguateAgainst(label) ;
+		EnumSet<RelatednessMode> modes = env.getConfiguration().getReccommendedRelatednessModes() ;
+		
+		DisambiguatedSensePair sp = this.disambiguateAgainst(label, modes) ;
 		return sp.getRelatedness() ;
 	}
 	
@@ -168,9 +189,10 @@ public class Label {
 	 * Milne, D. and Witten, I.H. (2008) An effective, low-cost measure of semantic relatedness obtained from Wikipedia links. In Proceedings of the first AAAI Workshop on Wikipedia and Artificial Intelligence (WIKIAI'08), Chicago, I.L.
 	 *
 	 * @param label the label to disambiguate against
+	 * @param modes the modes to use when measuring relatedness between label senses
 	 * @return a DisambiguatedSensePair describing the senses chosen for each label, and the relatedness between them.
 	 */
-	public DisambiguatedSensePair disambiguateAgainst(Label label) {
+	public DisambiguatedSensePair disambiguateAgainst(Label label, EnumSet<RelatednessMode> modes) {
 		
 		Label anchCombined = new Label(env, this.getText() + " " + label.getText(), null) ;
 		double wc = anchCombined.getLinkDocCount() ;
@@ -186,7 +208,8 @@ public class Label {
 		int sensesA = 0 ;
 		int sensesB = 0 ;
 		
-		RelatednessCache rc = new RelatednessCache() ;
+		
+		RelatednessCache rc = new RelatednessCache(modes) ;
 
 		for (Label.Sense senseA: this.getSenses()) {
 
@@ -223,6 +246,21 @@ public class Label {
 		return sp ;
 	}
 	
+	/**
+	 * Disambiguates this label against another using the relatedness modes recommended by the current Wikipedia configuration. 
+	 * 
+	 * @see #disambiguateAgainst(Label, EnumSet)
+	 * @see WikipediaConfiguration#getReccommendedRelatednessModes() ;
+	 * 
+	 * @param label
+	 * @return a DisambiguatedSensePair describing the senses chosen for each label, and the relatedness between them.
+	 */
+	public DisambiguatedSensePair disambiguateAgainst(Label label) {
+		
+		EnumSet<RelatednessMode> modes = env.getConfiguration().getReccommendedRelatednessModes() ;
+		
+		return disambiguateAgainst(label, modes) ;
+	}
 	
 	
 	/**

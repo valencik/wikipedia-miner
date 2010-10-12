@@ -2,8 +2,15 @@ package org.wikipedia.miner.db;
 
 import gnu.trove.TIntHash;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
+
+import javax.xml.stream.XMLStreamException;
 
 import org.apache.hadoop.record.CsvRecordInput;
 import org.apache.log4j.Logger;
@@ -11,6 +18,7 @@ import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.*;
 import org.wikipedia.miner.model.Page.PageType;
+import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.text.TextProcessor;
 
@@ -18,21 +26,23 @@ import org.wikipedia.miner.util.text.TextProcessor;
 import com.sleepycat.bind.tuple.IntegerBinding;
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
+import com.sleepycat.je.Database;
+import com.sleepycat.je.DatabaseEntry;
 
 /**
  * A factory for creating WDatabases of various types
  */
 public class WDatabaseFactory {
-
-	WEnvironment env ;
 	
+	WEnvironment env ;
+
 	/**
 	 * Creates a new WDatabaseFactory for the given WEnvironment
 	 * 
 	 * @param env a WEnvironment
 	 */
 	public WDatabaseFactory(WEnvironment env) {
-		
+
 		this.env = env ;
 	}
 
@@ -57,10 +67,10 @@ public class WDatabaseFactory {
 			@Override
 			public WEntry<Integer,DbPage> deserialiseCsvRecord(CsvRecordInput record) throws IOException {
 				Integer id = record.readInt(null) ;
-				
+
 				DbPage p = new DbPage() ;
 				p.deserialize(record) ;
-				
+
 				return new WEntry<Integer,DbPage>(id, p) ;
 			}
 
@@ -80,7 +90,7 @@ public class WDatabaseFactory {
 			}
 		};
 	}
-	
+
 	/**
 	 * Returns a database associating either article or category titles with their ids.
 	 * 
@@ -88,11 +98,11 @@ public class WDatabaseFactory {
 	 * @return a database associating either article or category titles with their ids.
 	 */
 	public WDatabase<String,Integer> buildTitleDatabase(DatabaseType type) {
-		
+
 		if (type != DatabaseType.articlesByTitle && type != DatabaseType.categoriesByTitle) 
 			throw new IllegalArgumentException("type must be either DatabaseType.articlesByTitle or DatabaseType.categoriesByTitle") ;
-		
-			
+
+
 		return new WDatabase<String,Integer>(
 				env, 
 				type, 
@@ -104,19 +114,19 @@ public class WDatabaseFactory {
 			public WEntry<String, Integer> deserialiseCsvRecord(
 					CsvRecordInput record) throws IOException {
 				Integer id = record.readInt(null) ;
-				
+
 				DbPage p = new DbPage() ;
 				p.deserialize(record) ;
-				
+
 				PageType pageType = PageType.values()[p.getType()];
 				DatabaseType dbType = getType() ;
-				
+
 				if (dbType == DatabaseType.articlesByTitle && (pageType != PageType.article && pageType != PageType.disambiguation && pageType != PageType.redirect))
 					return null ;
-				
+
 				if (dbType == DatabaseType.categoriesByTitle && pageType != PageType.category)
 					return null ;
-				
+
 				return new WEntry<String,Integer>(p.getTitle(), id) ;
 			}
 
@@ -124,12 +134,12 @@ public class WDatabaseFactory {
 			public Integer filterCacheEntry(
 					WEntry<String, Integer> e, WikipediaConfiguration conf,
 					TIntHash validIds) {
-				
+
 				if (getType() == DatabaseType.articlesByTitle) {
 					if (validIds != null && !validIds.contains(e.getValue()))
 						return null ;
 				}
-				
+
 				return e.getValue();
 			}
 		};	
@@ -184,16 +194,16 @@ public class WDatabaseFactory {
 
 				DbLabelForPageList labels = new DbLabelForPageList() ;
 				labels.deserialize(record) ;
-				
+
 				return new WEntry<Integer,DbLabelForPageList>(id, labels) ;
 			}
 
 			@Override
 			public DbLabelForPageList filterCacheEntry(WEntry<Integer,DbLabelForPageList> e, WikipediaConfiguration conf, TIntHash validIds) {
-				
+
 				if (validIds != null && !validIds.contains(e.getKey()))
 					return null ;
-				
+
 				return e.getValue();
 			}
 		} ;
@@ -209,7 +219,7 @@ public class WDatabaseFactory {
 
 		if (type != DatabaseType.pageLinksIn && type != DatabaseType.pageLinksOut)
 			throw new IllegalArgumentException("type must be either DatabaseType.pageLinksIn or DatabaseType.pageLinksOut") ;
-		
+
 		RecordBinding<DbLinkLocationList> keyBinding = new RecordBinding<DbLinkLocationList>() {
 			public DbLinkLocationList createRecordInstance() {
 				return new DbLinkLocationList() ;
@@ -264,14 +274,14 @@ public class WDatabaseFactory {
 		} ;
 	}
 
-	
+
 	/**
 	 * Returns a database appropriate for the given {@link DatabaseType}
 	 * 
 	 * @param type {@link DatabaseType#categoryParents}, {@link DatabaseType#articleParents}, {@link DatabaseType#childCategories},{@link DatabaseType#childArticles}, {@link DatabaseType#redirectSourcesByTarget}, {@link DatabaseType#sentenceSplits}
 	 * @return see the description of the appropriate DatabaseType
 	 */
-	public WDatabase<Integer,DbIdList> buildIntIntListDatabase(final DatabaseType type) {
+	public WDatabase<Integer,DbIntList> buildIntIntListDatabase(final DatabaseType type) {
 
 		switch (type) {
 		case categoryParents:
@@ -285,37 +295,37 @@ public class WDatabaseFactory {
 			throw new IllegalArgumentException(type.name() + " is not a valid DatabaseType for IntIntListDatabase") ;
 		}
 
-		RecordBinding<DbIdList> keyBinding = new RecordBinding<DbIdList>() {
-			public DbIdList createRecordInstance() {
-				return new DbIdList() ;
+		RecordBinding<DbIntList> keyBinding = new RecordBinding<DbIntList>() {
+			public DbIntList createRecordInstance() {
+				return new DbIntList() ;
 			}
 		} ;
 
-		return new IntObjectDatabase<DbIdList>(
+		return new IntObjectDatabase<DbIntList>(
 				env, 
 				type, 
 				keyBinding
 		) {
 			@Override
-			public WEntry<Integer, DbIdList> deserialiseCsvRecord(CsvRecordInput record) throws IOException {
+			public WEntry<Integer, DbIntList> deserialiseCsvRecord(CsvRecordInput record) throws IOException {
 
 				Integer k = record.readInt(null) ;
-				
-				DbIdList v = new DbIdList() ;
+
+				DbIntList v = new DbIntList() ;
 				v.deserialize(record) ;
-				
-				return new WEntry<Integer, DbIdList>(k,v) ;
+
+				return new WEntry<Integer, DbIntList>(k,v) ;
 			}
 
 			@Override
-			public DbIdList filterCacheEntry(WEntry<Integer,DbIdList> e, WikipediaConfiguration conf, TIntHash validIds) {
+			public DbIntList filterCacheEntry(WEntry<Integer,DbIntList> e, WikipediaConfiguration conf, TIntHash validIds) {
 				int key = e.getKey() ;
-				ArrayList<Integer> values = e.getValue().getIds() ;
-				
+				ArrayList<Integer> values = e.getValue().getValues() ;
+
 				ArrayList<Integer> newValues = null ;
-				
+
 				switch (type) {
-				
+
 				case articleParents :
 				case sentenceSplits :
 				case redirectSourcesByTarget :
@@ -334,22 +344,22 @@ public class WDatabaseFactory {
 					//cache everything
 					newValues = values ;
 				}
-				
+
 				if (newValues == null || newValues.size() == 0)
 					return null ;
-			
-				return new DbIdList(newValues) ;
+
+				return new DbIntList(newValues) ;
 			}
 		} ;
 	}
-	
+
 	/**
 	 * Returns a database associating integer id of redirect with the id of its target
 	 * 
 	 * @return a database associating integer id of redirect with the id of its target
 	 */
 	public WDatabase<Integer,Integer> buildRedirectTargetBySourceDatabase() {
-		
+
 		return new IntObjectDatabase<Integer>(
 				env, 
 				DatabaseType.redirectTargetBySource, 
@@ -361,7 +371,7 @@ public class WDatabaseFactory {
 					CsvRecordInput record) throws IOException {
 				int k = record.readInt(null) ;
 				int v = record.readInt(null) ;
-				
+
 				return new WEntry<Integer, Integer>(k,v) ;
 			}
 
@@ -369,23 +379,23 @@ public class WDatabaseFactory {
 			public Integer filterCacheEntry(
 					WEntry<Integer, Integer> e, WikipediaConfiguration conf,
 					TIntHash validIds) {
-				
+
 				if (validIds != null && !validIds.contains(e.getValue()))
 					return null ; 
-				
+
 				return e.getValue();
-				
+
 			}
 		} ;
 	}
-	
+
 	/**
 	 * Returns a database associating integer {@link WEnvironment.StatisticName#ordinal()} with the value relevant to this statistic.
 	 * 
 	 * @return a database associating integer {@link WEnvironment.StatisticName#ordinal()} with the value relevant to this statistic.
 	 */
 	public IntObjectDatabase<Long> buildStatisticsDatabase() {
-		
+
 		return new IntObjectDatabase<Long>(
 				env, 
 				DatabaseType.statistics, 
@@ -395,12 +405,12 @@ public class WDatabaseFactory {
 			@Override
 			public WEntry<Integer, Long> deserialiseCsvRecord(
 					CsvRecordInput record) throws IOException {
-				
+
 				String statName = record.readString(null) ;
 				Long v = record.readLong(null) ;
-				
+
 				Integer k = null;
-				
+
 				try {
 					k = StatisticName.valueOf(statName).ordinal() ;
 				} catch (Exception e) {
@@ -418,14 +428,14 @@ public class WDatabaseFactory {
 			}
 		} ;
 	}
-	
+
 	/**
 	 * Returns a database associating integer id of page with DbTranslations (language links)
 	 * 
 	 * @return a database associating integer id of page with DbTranslations (language links)
 	 */
 	public WDatabase<Integer,DbTranslations> buildTranslationsDatabase() {
-		
+
 		return new IntObjectDatabase<DbTranslations>(
 				env, 
 				DatabaseType.translations, 
@@ -441,10 +451,10 @@ public class WDatabaseFactory {
 			public WEntry<Integer, DbTranslations> deserialiseCsvRecord(
 					CsvRecordInput record) throws IOException {
 				int k = record.readInt(null) ;
-							
+
 				DbTranslations v = new DbTranslations() ;
 				v.deserialize(record) ;
-				
+
 				return new WEntry<Integer, DbTranslations>(k,v) ;
 			}
 
@@ -452,18 +462,26 @@ public class WDatabaseFactory {
 			public DbTranslations filterCacheEntry(
 					WEntry<Integer, DbTranslations> e, WikipediaConfiguration conf,
 					TIntHash validIds) {
-				
+
 				if (validIds != null && !validIds.contains(e.getKey()))
 					return null ; 
-				
+
 				return e.getValue();
-				
+
 			}
 		} ;
 	}
-	
 
-	
+	/**
+	 * Returns a database associating integer ids with counts of how many pages it links to or that link to it
+	 * 
+	 * @return a database associating integer ids with counts of how many pages it links to or that link to it
+	 */
+	public PageLinkCountDatabase buildPageLinkCountDatabase() {
+
+		return new PageLinkCountDatabase(env) ;
+	}
+
 	/**
 	 * Returns a database associating integer id of page with its content, in mediawiki markup format
 	 * 

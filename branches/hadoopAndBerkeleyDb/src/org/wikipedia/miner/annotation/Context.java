@@ -38,19 +38,16 @@ public class Context {
 	private RelatednessCache relatednessCache ;
 	
 	/**
-	 * Initializes a collection of context articles from the given set of unambiguous anchors. 
+	 * Initialises a collection of context articles from the given set of unambiguous anchors. 
 	 * 
 	 * @param unambigAnchors a set of unambiguous anchors, the most useful of which will be used to disambiguate other terms
-	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated. This may be null. 
+	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated.
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
 	public Context(Collection<Label> unambigLabels, RelatednessCache relatednessCache, double maxSize) throws SQLException {
 		
-		if (relatednessCache == null)
-			this.relatednessCache = new RelatednessCache() ;
-		else
-			this.relatednessCache = relatednessCache ;
+		this.relatednessCache = relatednessCache ;
 		
 		HashSet<Integer> doneIds = new HashSet<Integer>() ;		
 		Vector<Label.Sense> senses = new Vector<Label.Sense>() ;
@@ -96,20 +93,17 @@ public class Context {
 	
 	
 	/**
-	 * Initializes a collection of context articles from the given set of ambiguous anchors,  
+	 * Initialises a collection of context articles from the given set of ambiguous anchors,  
 	 * 
 	 * @param ambigAnchors a set of ambiguous anchors, the most useful of which will be used to disambiguate other terms
-	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated. This may be null. 
+	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated. 
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
 	 * @param minSenseLimit the minimum prior probability of an anchors sense that will be used as context.  
 	 * @throws SQLException if there is a problem with the wikipedia database
 	 */
 	public Context(Collection<Label> ambigAnchors, RelatednessCache relatednessCache, double maxSize, double minSenseLimit) throws SQLException {
 		
-		if (relatednessCache == null)
-			this.relatednessCache = new RelatednessCache() ;
-		else
-			this.relatednessCache = relatednessCache ;
+		this.relatednessCache = relatednessCache ;
 		
 		HashSet<Integer> doneIds = new HashSet<Integer>() ;		
 		Vector<Label.Sense> senses = new Vector<Label.Sense>() ;

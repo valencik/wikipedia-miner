@@ -44,7 +44,7 @@ public class CategoryLinkSummaryStep extends Configured implements Tool {
 		conf.setJobName("WM: summarize " + linksToSummarize.name()) ;
 		
 		conf.setOutputKeyClass(ExLinkKey.class);
-		conf.setOutputValueClass(DbIdList.class);
+		conf.setOutputValueClass(DbIntList.class);
 
 		conf.setMapperClass(CategoryLinkSummaryMapper.class);
 		conf.setCombinerClass(CategoryLinkSummaryReducer.class) ;
@@ -72,10 +72,10 @@ public class CategoryLinkSummaryStep extends Configured implements Tool {
 		return 0;
 	}
 	
-	private static class CategoryLinkSummaryMapper extends MapReduceBase implements Mapper<LongWritable, Text, ExLinkKey, DbIdList> {
+	private static class CategoryLinkSummaryMapper extends MapReduceBase implements Mapper<LongWritable, Text, ExLinkKey, DbIntList> {
 
 		@Override
-		public void map(LongWritable key, Text value, OutputCollector<ExLinkKey, DbIdList> output, Reporter reporter) throws IOException {
+		public void map(LongWritable key, Text value, OutputCollector<ExLinkKey, DbIntList> output, Reporter reporter) throws IOException {
 			
 			String values[] = value.toString().split(",") ;
 			
@@ -84,36 +84,36 @@ public class CategoryLinkSummaryStep extends Configured implements Tool {
 			
 			ArrayList<Integer> out = new ArrayList<Integer>() ;
 			out.add(toId) ;
-			output.collect(new ExLinkKey(fromId, true), new DbIdList(out)) ;
+			output.collect(new ExLinkKey(fromId, true), new DbIntList(out)) ;
 			
 			ArrayList<Integer> in = new ArrayList<Integer>() ;
 			in.add(fromId) ;
-			output.collect(new ExLinkKey(toId, false), new DbIdList(in)) ;
+			output.collect(new ExLinkKey(toId, false), new DbIntList(in)) ;
 		}
 	}
 	
 	
-	public static class CategoryLinkSummaryReducer extends MapReduceBase implements Reducer<ExLinkKey, DbIdList, ExLinkKey, DbIdList> {
+	public static class CategoryLinkSummaryReducer extends MapReduceBase implements Reducer<ExLinkKey, DbIntList, ExLinkKey, DbIntList> {
 
-		public void reduce(ExLinkKey key, Iterator<DbIdList> values, OutputCollector<ExLinkKey, DbIdList> output, Reporter reporter) throws IOException {
+		public void reduce(ExLinkKey key, Iterator<DbIntList> values, OutputCollector<ExLinkKey, DbIntList> output, Reporter reporter) throws IOException {
 
 			ArrayList<Integer> valueIds = new ArrayList<Integer>() ;
 	
 			while (values.hasNext()) {
-				ArrayList<Integer> ls = values.next().getIds() ;
+				ArrayList<Integer> ls = values.next().getValues() ;
 				for (Integer i:ls) {
 					valueIds.add(i) ;
 				}
 			}
 
-			output.collect(key, new DbIdList(valueIds));
+			output.collect(key, new DbIntList(valueIds));
 		}
 	}
 	
 	
-	protected static class CategoryLinkSummaryOutputFormat extends TextOutputFormat<ExLinkKey, DbIdList> {
+	protected static class CategoryLinkSummaryOutputFormat extends TextOutputFormat<ExLinkKey, DbIntList> {
 
-		public RecordWriter<ExLinkKey, DbIdList> getRecordWriter(FileSystem ignored,
+		public RecordWriter<ExLinkKey, DbIntList> getRecordWriter(FileSystem ignored,
 				JobConf job,
 				String name,
 				Progressable progress)
@@ -147,7 +147,7 @@ public class CategoryLinkSummaryStep extends Configured implements Tool {
 			return new CategoryLinkSummaryRecordWriter(streamOut, streamIn);
 		}	
 		
-		protected static class CategoryLinkSummaryRecordWriter implements RecordWriter<ExLinkKey, DbIdList> {
+		protected static class CategoryLinkSummaryRecordWriter implements RecordWriter<ExLinkKey, DbIntList> {
 
 			protected OutputStream linksOut_outStream ;
 			protected OutputStream linksIn_outStream ;
@@ -157,9 +157,9 @@ public class CategoryLinkSummaryStep extends Configured implements Tool {
 				this.linksIn_outStream = linksIn_outStream ;
 			}
 			
-			public synchronized void write(ExLinkKey key, DbIdList value) throws IOException {
+			public synchronized void write(ExLinkKey key, DbIntList value) throws IOException {
 				
-				ArrayList<Integer> links = value.getIds() ;
+				ArrayList<Integer> links = value.getValues() ;
 				Collections.sort(links) ;
 				
 				OutputStream stream ;
