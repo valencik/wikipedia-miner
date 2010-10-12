@@ -24,13 +24,15 @@ import java.util.* ;
 import org.wikipedia.miner.db.WEnvironment;
 import org.wikipedia.miner.db.WDatabase.DatabaseType ;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
-import org.wikipedia.miner.db.struct.DbIdList;
+import org.wikipedia.miner.db.struct.DbIntList;
 import org.wikipedia.miner.db.struct.DbLabelForPage;
 import org.wikipedia.miner.db.struct.DbLabelForPageList;
 import org.wikipedia.miner.db.struct.DbLinkLocation;
 import org.wikipedia.miner.db.struct.DbLinkLocationList;
 import org.wikipedia.miner.db.struct.DbPage;
+import org.wikipedia.miner.db.struct.DbPageLinkCounts;
 import org.wikipedia.miner.db.struct.DbTranslations;
+import org.wikipedia.miner.util.WikipediaConfiguration;
 
 /**
  * Represents articles in Wikipedia; the pages that contain descriptive text regarding a particular topic. 
@@ -40,7 +42,7 @@ public class Article extends Page {
 	/**
 	 * Modes available for measuring relatedness between articles. 
 	 * 
-	 * @see Article#getRelatednessTo(Article)
+	 * @see Article#getRelatednessTo(Article, EnumSet)
 	 */
 	public enum RelatednessMode{
 		
@@ -48,14 +50,9 @@ public class Article extends Page {
 	 * Use links made to articles to measure relatedness. You should cache {@link DatabaseType#pageLinksIn} if using this mode extensively.  
 	 */
 	inLinks, 
-	
+		
 	/**
-	 * Use {@link RelatednessMode#inLinks}, but ignore relations (return {@value 0}) that don't have sentence that explain them.
-	 */
-	sentences, 
-	
-	/**
-	 * Use links made from articles to measure relatedness. You should cache {@link DatabaseType#pageLinksOut} if using this mode extensively. 
+	 * Use links made from articles to measure relatedness. You should cache {@link DatabaseType#pageLinksOut} and {@link DatabaseType#pageLinkCounts} if using this mode extensively. 
 	 */
 	outLinks
 	} ;
@@ -82,13 +79,13 @@ public class Article extends Page {
 	 */
 	public Redirect[] getRedirects()  {
 
-		DbIdList tmpRedirects = env.getDbRedirectSourcesByTarget().retrieve(id) ;
-		if (tmpRedirects == null || tmpRedirects.getIds() == null) 
+		DbIntList tmpRedirects = env.getDbRedirectSourcesByTarget().retrieve(id) ;
+		if (tmpRedirects == null || tmpRedirects.getValues() == null) 
 			return new Redirect[0] ;
 
-		Redirect[] redirects = new Redirect[tmpRedirects.getIds().size()] ;
-		for (int i=0 ; i<tmpRedirects.getIds().size() ; i++)
-			redirects[i] = new Redirect(env, tmpRedirects.getIds().get(i)) ;	
+		Redirect[] redirects = new Redirect[tmpRedirects.getValues().size()] ;
+		for (int i=0 ; i<tmpRedirects.getValues().size() ; i++)
+			redirects[i] = new Redirect(env, tmpRedirects.getValues().get(i)) ;	
 
 		return redirects ;	
 	}
@@ -102,14 +99,14 @@ public class Article extends Page {
 	 */
 	public Category[] getParentCategories() {
 
-		DbIdList tmpParents = env.getDbArticleParents().retrieve(id) ;
-		if (tmpParents == null || tmpParents.getIds() == null) 
+		DbIntList tmpParents = env.getDbArticleParents().retrieve(id) ;
+		if (tmpParents == null || tmpParents.getValues() == null) 
 			return new Category[0] ;
 
-		Category[] parentCategories = new Category[tmpParents.getIds().size()] ;
+		Category[] parentCategories = new Category[tmpParents.getValues().size()] ;
 
 		int index = 0 ;
-		for (int id:tmpParents.getIds()) {
+		for (int id:tmpParents.getValues()) {
 			parentCategories[index] = new Category(env, id) ;
 			index++ ;
 		}
@@ -235,7 +232,9 @@ public class Article extends Page {
 	 * Calculates a weight of the semantic relation between this article and the argument one. 
 	 * The stronger the semantic relation, the higher the weight returned. 
 	 * i.e "6678: Cat" has a higher relatedness to "4269567: Dog" than to "27178: Shoe".
-	 * This is based on the links extending out from and in to each of the articles being compared. 
+	 * <p>
+	 * The measure is based on the links extending out from and/or in to each of the articles being compared, 
+	 * depending on the given relatedness modes.
 	 * </p>
 	 * 
 	 * <p>
@@ -244,123 +243,142 @@ public class Article extends Page {
 	 * Milne, D and Witten, I.H. (2008) An effective, low-cost measure of semantic relatedness obtained from Wikipedia links. In Proceedings of WIKIAI'08. 
 	 * </p>
 	 * 
-	 * <p>
-	 * If you only cache inLinks, then for efficiency's sake relatedness measures will only be calculated from them.
-	 * Measures obtained only from inLinks are only marginally less accurate than those obtained from both anyway.
-	 * </p>
+	 * @param article the article to measure relatedness against
+	 * @param modes the set of modes to use to calculate the measure. If more than one mode is specified, then the average will be returned.
+	 * @return the weight of the semantic relation between this article and the argument one.
+	 */
+	public float getRelatednessTo(Article article, EnumSet<RelatednessMode> modes) {
+		
+		if (modes == null || modes.isEmpty())
+			throw new IllegalArgumentException("You must specify at least one relatedness mode to use") ;
+		
+		float total = 0 ;
+		int count = 0 ;
+		
+		if (modes.contains(RelatednessMode.inLinks)) {
+			total += getRelatednessFromInLinks(article) ;
+			count ++ ;
+		}
+		
+		if (modes.contains(RelatednessMode.outLinks)) {
+			total += getRelatednessFromOutLinks(article) ;
+			count ++ ;
+		}
+		
+		return total/count ;
+	}
+	
+	
+	/**
+	 * Measures the semantic relatedness between this article and the argument one, using
+	 * the modes recommended by the current Wikipedia configuration. 
 	 * 
-	 * <p>
-	 * The reverse is true if you cache only outLinks, although that isnt reccomended. They take up much more memory, and 
-	 * resulting measures are not as accurate. 
-	 * </p>
+	 * @see WikipediaConfiguration#getReccommendedRelatednessModes() ;
 	 * 
-	 * @param article the other article of interest
+	 * @param article the article to measure relatedness against
 	 * @return the weight of the semantic relation between this article and the argument one.
 	 */
 	public float getRelatednessTo(Article article) {
-
-		return getRelatednessFromInLinks(article) ;
-
-		//TODO:use in and out links to calculate relatedness, unless caching says otherwise.
-		/*
-		if (database.areOutLinksCached() && database.areInLinksCached()) 
-			return (getRelatednessFromInLinks(article) + getRelatednessFromOutLinks(article))/2 ;
-
-		if (database.areOutLinksCached()) 
-			return getRelatednessFromOutLinks(article) ;
-
-		if (database.areInLinksCached()) 
-			return getRelatednessFromInLinks(article) ;
-
-		return (getRelatednessFromInLinks(article) + getRelatednessFromOutLinks(article))/2 ;
-		 */
+		EnumSet<RelatednessMode> modes = env.getConfiguration().getReccommendedRelatednessModes() ;
+		
+		return getRelatednessTo(article, modes) ;
 	}
+		
+	
 
 	/**
 	 * @return the total number of links that are made to this article 
-	 * @
-	 *//*
-	public int getTotalLinksInCount() throws DatabaseException {
+	 */
+	public int getTotalLinksInCount()  {
 
-		int[] linkCounts = environment.getLinkCounts(id) ;
-
-		if (linkCounts == null) 
+		DbPageLinkCounts lc = env.getDbPageLinkCounts().retrieve(id) ;
+		
+		if (lc == null) 
 			return 0 ;
 		else
-			return linkCounts[2] ;
-	}*/
+			return lc.getTotalLinksIn() ;
+	}
 
 	/**
 	 * @return the number of distinct articles which contain a link to this article 
-	 *//*
-	public int getDistinctLinksInCount() throws DatabaseException {
+	 */
+	public int getDistinctLinksInCount()  {
 
-		int[] linkCounts = environment.getLinkCounts(id) ;
-
-		if (linkCounts == null) 
+		DbPageLinkCounts lc = env.getDbPageLinkCounts().retrieve(id) ;
+		
+		if (lc == null) 
 			return 0 ;
 		else
-			return linkCounts[3] ;
-	}*/
+			return lc.getDistinctLinksIn() ;
+	}
 
 	/**
 	 * @return the total number links that this article makes to other articles 
-	 *//*
-	public int getTotalLinksOutCount() throws DatabaseException {
+	 */
+	public int getTotalLinksOutCount() {
 
-		int[] linkCounts = environment.getLinkCounts(id) ;
-
-		if (linkCounts == null) 
+		DbPageLinkCounts lc = env.getDbPageLinkCounts().retrieve(id) ;
+		
+		if (lc == null) 
 			return 0 ;
 		else
-			return linkCounts[0] ;
-	}*/
+			return lc.getTotalLinksOut() ;
+	}
 
 	/**
 	 * @return the number of distinct articles that this article links to 
-	 *//*
-	public int getDistinctLinksOutCount() throws DatabaseException {
+	 */
+	public int getDistinctLinksOutCount() {
 
-		int[] linkCounts = environment.getLinkCounts(id) ;
-		if (linkCounts == null) 
+		DbPageLinkCounts lc = env.getDbPageLinkCounts().retrieve(id) ;
+		
+		if (lc == null) 
 			return 0 ;
 		else
-			return linkCounts[1] ;
-	}*/
+			return lc.getDistinctLinksOut() ;
+	}
 
 	
-	/*
-	private double getRelatednessFromOutLinks(Article article) {
+	private float getRelatednessFromOutLinks(Article article) {
 
 		if (getId() == article.getId()) 
 			return 1 ;
 
-		int totalArticles = database.getArticleCount() ;
-		int[][] dataA = getLinksOutIdsAndCounts() ;
-		int[][] dataB = article.getLinksOutIdsAndCounts() ;
-
-		if (dataA.length == 0 || dataB.length == 0)
+		int totalArticles = env.retrieveStatistic(StatisticName.articleCount).intValue() ;
+		
+		DbLinkLocationList idListA = env.getDbPageLinkOut().retrieve(id) ; 
+		DbLinkLocationList idListB = env.getDbPageLinkOut().retrieve(article.id) ; 
+		
+		if (idListA==null || idListB==null) 
 			return 0 ;
 
+		ArrayList<DbLinkLocation> linksA = idListA.getLinkLocations() ;
+		ArrayList<DbLinkLocation> linksB = idListB.getLinkLocations() ;
+
+		if (linksA==null || linksB==null) 
+			return 0 ;
+		
 		int indexA = 0 ;
 		int indexB = 0 ;
 
-		Vector<Double> vectA = new Vector<Double>() ;
-		Vector<Double> vectB = new Vector<Double>() ;
+		ArrayList<Double> vectA = new ArrayList<Double>() ;
+		ArrayList<Double> vectB = new ArrayList<Double>() ;
 
-		while (indexA < dataA.length || indexB < dataB.length) {
+		while (indexA < linksA.size() || indexB < linksB.size()) {
 
-			int idA = -1 ;
-			int idB = -1 ;
+			DbLinkLocation linkA = null ;
+			DbLinkLocation linkB = null ;		
 
-			if (indexA < dataA.length)
-				idA = dataA[indexA][0] ;
+			if (indexA < linksA.size())
+				linkA = linksA.get(indexA) ;
 
-			if (indexB < dataB.length)
-				idB = dataB[indexB][0] ;
+			if (indexB < linksB.size())
+				linkB = linksB.get(indexB) ;
 
-			if (idA == idB) {
-				double probability = Math.log((double)totalArticles/dataA[indexA][1]) ;
+			if (linkA != null && linkB != null && linkA.getLinkId()==linkB.getLinkId()) {
+				
+				int totalLinksIn = new Article(env, linkA.getLinkId()).getTotalLinksInCount() ;
+				double probability = Math.log((double)totalArticles/totalLinksIn) ;
 				vectA.add(probability) ;
 				vectB.add(probability) ;
 
@@ -368,21 +386,24 @@ public class Article extends Page {
 				indexB ++ ;
 			} else {
 
-				if ((idA < idB && idA > 0)|| idB < 0) {
+				if (linkA != null && (linkB == null || linkA.getLinkId() < linkB.getLinkId())) {
 
-					double probability = Math.log((double)totalArticles/dataA[indexA][1]) ;
+					int totalLinksIn = new Article(env, linkA.getLinkId()).getTotalLinksInCount() ;
+					double probability = Math.log((double)totalArticles/totalLinksIn) ;
 					vectA.add(probability) ;
-					if (idA == article.getId())
+					
+					if (linkA.getLinkId() == article.getId())
 						vectB.add(probability) ;
 					else
 						vectB.add(0.0) ;
 
 					indexA ++ ;
 				} else {
-
-					double probability = Math.log((double)totalArticles/dataB[indexB][1]) ;
-					vectB.add(new Double(probability)) ;
-					if (idB == id)
+					int totalLinksIn = new Article(env, linkB.getLinkId()).getTotalLinksInCount() ;
+					double probability = Math.log((double)totalArticles/totalLinksIn) ;					
+					vectB.add(probability) ;
+					
+					if (linkB.getLinkId() == id)
 						vectA.add(probability) ;
 					else
 						vectA.add(0.0) ;
@@ -398,8 +419,8 @@ public class Article extends Page {
 		double magnitudeB = 0 ;
 
 		for (int x=0;x<vectA.size();x++) {
-			double valA = ((Double)vectA.elementAt(x)).doubleValue() ;
-			double valB = ((Double)vectB.elementAt(x)).doubleValue() ;
+			float valA = vectA.get(x).floatValue() ;
+			float valB = vectB.get(x).floatValue() ;
 
 			dotProduct = dotProduct + (valA * valB) ;
 			magnitudeA = magnitudeA + (valA * valA) ;
@@ -409,12 +430,12 @@ public class Article extends Page {
 		magnitudeA = Math.sqrt(magnitudeA) ;
 		magnitudeB = Math.sqrt(magnitudeB) ;
 
-		double sr = Math.acos(dotProduct / (magnitudeA * magnitudeB)) ;		
+		Double sr = Math.acos(dotProduct / (magnitudeA * magnitudeB)) ;		
 		sr = (Math.PI/2) - sr ; // reverse, so 0=no relation, PI/2= same
-		sr = sr / (Math.PI/2) ; // normalize, so measure is between 0 and 1 ;				
+		sr = sr / (Math.PI/2) ; // normalise, so measure is between 0 and 1 ;				
 
-		return sr ;
-	}*/
+		return sr.floatValue() ;
+	}
 
 
 	private float getRelatednessFromInLinks(Article article) {

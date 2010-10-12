@@ -36,13 +36,20 @@ module org.wikipedia.miner.db.struct {
     vector<DbLabelForPage> Labels ;
   }
   
-  class DbIdList {
-  	vector<int> Ids ;
+  class DbPageLinkCounts {
+  	int TotalLinksIn ;
+  	int DistinctLinksIn ;
+  	int TotalLinksOut ;
+  	int DistinctLinksOut ;
   }
   
-  class DbIdPair {
-  	int IdA ;
-  	int IdB ;  
+  class DbIntList {
+  	vector<int> Values ;
+  }
+  
+  class DbIntPair {
+  	int ValueA ;
+  	int ValueB ;  
   }
   
   class DbSentenceSplitList {

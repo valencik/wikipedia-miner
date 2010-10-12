@@ -84,18 +84,19 @@ public class WEnvironment  {
 	private WDatabase<String,Integer> dbCategoriesByTitle ;
 	
 	private WDatabase<Integer,Integer> dbRedirectTargetBySource ;
-	private WDatabase<Integer,DbIdList> dbRedirectSourcesByTarget ;
+	private WDatabase<Integer,DbIntList> dbRedirectSourcesByTarget ;
 	
 	private WDatabase<Integer, DbLinkLocationList> dbPageLinkIn ;
 	private WDatabase<Integer, DbLinkLocationList> dbPageLinkOut ;
+	private PageLinkCountDatabase dbPageLinkCounts ;
 	
-	private WDatabase<Integer, DbIdList> dbCategoryParents ;
-	private WDatabase<Integer, DbIdList> dbArticleParents ;
-	private WDatabase<Integer, DbIdList> dbChildCategories ;
-	private WDatabase<Integer, DbIdList> dbChildArticles ;
+	private WDatabase<Integer, DbIntList> dbCategoryParents ;
+	private WDatabase<Integer, DbIntList> dbArticleParents ;
+	private WDatabase<Integer, DbIntList> dbChildCategories ;
+	private WDatabase<Integer, DbIntList> dbChildArticles ;
 	
 	private MarkupDatabase dbMarkup ;
-	private WDatabase<Integer, DbIdList> dbSentenceSplits ;
+	private WDatabase<Integer, DbIntList> dbSentenceSplits ;
 	
 	private WDatabase<Integer, DbTranslations> dbTranslations ;
 	
@@ -187,7 +188,7 @@ public class WEnvironment  {
 	 * 
 	 * @return see {@link DatabaseType#redirectSourcesByTarget} 
 	 */
-	public WDatabase<Integer, DbIdList> getDbRedirectSourcesByTarget() {
+	public WDatabase<Integer, DbIntList> getDbRedirectSourcesByTarget() {
 		return dbRedirectSourcesByTarget ;
 	}
 
@@ -208,13 +209,22 @@ public class WEnvironment  {
 	public WDatabase<Integer, DbLinkLocationList> getDbPageLinkOut() {
 		return dbPageLinkOut;
 	}
-
+	
+	/**
+	 * Returns the {@link DatabaseType#pageLinkCounts} database
+	 * 
+	 * @return see {@link DatabaseType#pageLinkCounts} 
+	 */
+	public WDatabase<Integer, DbPageLinkCounts> getDbPageLinkCounts() {
+		return dbPageLinkCounts;
+	}
+	
 	/**
 	 * Returns the {@link DatabaseType#categoryParents} database
 	 * 
 	 * @return see {@link DatabaseType#categoryParents} 
 	 */
-	public WDatabase<Integer, DbIdList> getDbCategoryParents() {
+	public WDatabase<Integer, DbIntList> getDbCategoryParents() {
 		return dbCategoryParents;
 	}
 
@@ -223,7 +233,7 @@ public class WEnvironment  {
 	 * 
 	 * @return see {@link DatabaseType#articleParents} 
 	 */
-	public WDatabase<Integer, DbIdList> getDbArticleParents() {
+	public WDatabase<Integer, DbIntList> getDbArticleParents() {
 		return dbArticleParents;
 	}
 
@@ -232,7 +242,7 @@ public class WEnvironment  {
 	 * 
 	 * @return see {@link DatabaseType#childCategories} 
 	 */
-	public WDatabase<Integer, DbIdList> getDbChildCategories() {
+	public WDatabase<Integer, DbIntList> getDbChildCategories() {
 		return dbChildCategories;
 	}
 
@@ -241,7 +251,7 @@ public class WEnvironment  {
 	 * 
 	 * @return see {@link DatabaseType#childArticles} 
 	 */
-	public WDatabase<Integer, DbIdList> getDbChildArticles() {
+	public WDatabase<Integer, DbIntList> getDbChildArticles() {
 		return dbChildArticles;
 	}
 
@@ -259,7 +269,7 @@ public class WEnvironment  {
 	 * 
 	 * @return see {@link DatabaseType#sentenceSplits} 
 	 */
-	public WDatabase<Integer, DbIdList> getDbSentenceSplits() {
+	public WDatabase<Integer, DbIntList> getDbSentenceSplits() {
 		return dbSentenceSplits;
 	}
 	
@@ -336,7 +346,9 @@ public class WEnvironment  {
 		databasesByType.put(DatabaseType.pageLinksIn, dbPageLinkIn) ;
 		dbPageLinkOut = dbFactory.buildPageLinkDatabase(DatabaseType.pageLinksOut) ; 
 		databasesByType.put(DatabaseType.pageLinksOut, dbPageLinkOut) ;
-
+		dbPageLinkCounts = dbFactory.buildPageLinkCountDatabase() ;
+		databasesByType.put(DatabaseType.pageLinkCounts, dbPageLinkCounts) ;
+		
 		dbCategoryParents = dbFactory.buildIntIntListDatabase(DatabaseType.categoryParents) ;
 		databasesByType.put(DatabaseType.categoryParents, dbCategoryParents) ;
 		dbArticleParents = dbFactory.buildIntIntListDatabase(DatabaseType.articleParents) ;
@@ -664,30 +676,31 @@ public class WEnvironment  {
 		WEnvironment env = new WEnvironment(conf) ;
 		
 		
-		env.dbStatistics.loadFromFile(statistics, overwrite, null) ;
-		env.dbPage.loadFromFile(page, overwrite, null) ;
-		env.dbLabel.loadFromFile(label, overwrite, null) ;
-		env.dbLabelsForPage.loadFromFile(pageLabel, overwrite, null) ;
+		env.dbStatistics.loadFromCsvFile(statistics, overwrite, null) ;
+		env.dbPage.loadFromCsvFile(page, overwrite, null) ;
+		env.dbLabel.loadFromCsvFile(label, overwrite, null) ;
+		env.dbLabelsForPage.loadFromCsvFile(pageLabel, overwrite, null) ;
 		
-		env.dbArticlesByTitle.loadFromFile(page, overwrite, null) ;
-		env.dbCategoriesByTitle.loadFromFile(page, overwrite, null) ;
+		env.dbArticlesByTitle.loadFromCsvFile(page, overwrite, null) ;
+		env.dbCategoriesByTitle.loadFromCsvFile(page, overwrite, null) ;
 		
-		env.dbRedirectTargetBySource.loadFromFile(redirectTargetBySource, overwrite, null) ;
-		env.dbRedirectSourcesByTarget.loadFromFile(redirectSourcesByTarget, overwrite, null) ;
+		env.dbRedirectTargetBySource.loadFromCsvFile(redirectTargetBySource, overwrite, null) ;
+		env.dbRedirectSourcesByTarget.loadFromCsvFile(redirectSourcesByTarget, overwrite, null) ;
 		
-		env.dbPageLinkIn.loadFromFile(pageLinksIn, overwrite, null) ;
-		env.dbPageLinkOut.loadFromFile(pageLinksOut, overwrite, null) ;
+		env.dbPageLinkIn.loadFromCsvFile(pageLinksIn, overwrite, null) ;
+		env.dbPageLinkOut.loadFromCsvFile(pageLinksOut, overwrite, null) ;
+		env.dbPageLinkCounts.loadFromCsvFiles(pageLinksIn, pageLinksOut, overwrite, null) ;
 		
-		env.dbCategoryParents.loadFromFile(categoryParents, overwrite, null) ;
-		env.dbArticleParents.loadFromFile(articleParents, overwrite, null) ;
-		env.dbChildCategories.loadFromFile(childCategories, overwrite, null) ;
-		env.dbChildArticles.loadFromFile(childArticles, overwrite, null) ;
+		env.dbCategoryParents.loadFromCsvFile(categoryParents, overwrite, null) ;
+		env.dbArticleParents.loadFromCsvFile(articleParents, overwrite, null) ;
+		env.dbChildCategories.loadFromCsvFile(childCategories, overwrite, null) ;
+		env.dbChildArticles.loadFromCsvFile(childArticles, overwrite, null) ;
 		
-		env.dbSentenceSplits.loadFromFile(sentenceSplits, overwrite, null) ;
+		env.dbSentenceSplits.loadFromCsvFile(sentenceSplits, overwrite, null) ;
 		
-		env.dbTranslations.loadFromFile(translations, overwrite, null) ;
+		env.dbTranslations.loadFromCsvFile(translations, overwrite, null) ;
 		
-		env.dbMarkup.loadFromFile(markup, overwrite, null) ;
+		env.dbMarkup.loadFromXmlFile(markup, overwrite, null) ;
 		
 		env.close();
 	}

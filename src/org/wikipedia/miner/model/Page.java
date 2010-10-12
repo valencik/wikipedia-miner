@@ -1,7 +1,7 @@
 package org.wikipedia.miner.model;
 
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
-import org.wikipedia.miner.db.struct.DbIdList;
+import org.wikipedia.miner.db.struct.DbIntList;
 import org.wikipedia.miner.db.struct.DbPage;
 import org.wikipedia.miner.db.WEnvironment;
 import org.wikipedia.miner.util.MarkupStripper;
@@ -228,12 +228,12 @@ public class Page implements Comparable<Page> {
 	 */
 	public Integer[] getSentenceSplits() {
 
-		DbIdList splits = env.getDbSentenceSplits().retrieve(id) ; 
+		DbIntList splits = env.getDbSentenceSplits().retrieve(id) ; 
 
-		if (splits == null || splits.getIds() == null) 
+		if (splits == null || splits.getValues() == null) 
 			return new Integer[0] ;
 
-		return splits.getIds().toArray(new Integer[splits.getIds().size()]) ;
+		return splits.getValues().toArray(new Integer[splits.getValues().size()]) ;
 	}
 
 	/**

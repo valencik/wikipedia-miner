@@ -3,6 +3,7 @@ package org.wikipedia.miner.service;
 import gnu.trove.TIntFloatHashMap;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,6 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.w3c.dom.Element;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
+import org.wikipedia.miner.model.Article.RelatednessMode;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.StringParameter;
 import org.wikipedia.miner.util.Position;
@@ -97,7 +99,7 @@ public class SearchService extends Service {
 
 
 		Wikipedia wikipedia = getWikipedia(request) ;
-		ExhaustiveDisambiguator disambiguator = new ExhaustiveDisambiguator() ;
+		ExhaustiveDisambiguator disambiguator = new ExhaustiveDisambiguator(wikipedia) ;
 
 		//resolve query
 		ArrayList<QueryLabel> queryLabels = getReferences(query, wikipedia) ;	
@@ -285,13 +287,21 @@ public class SearchService extends Service {
 	private class ExhaustiveDisambiguator {
 
 		ArrayList<QueryLabel> queryTerms ;
-		RelatednessCache rc = new RelatednessCache() ;
+		RelatednessCache rc ;
 
 		Label.Sense currCombo[] ;
 		Label.Sense bestCombo[] ;
 		float bestComboWeight ;
 
 		private TIntFloatHashMap bestSenseWeights ;
+		
+		public ExhaustiveDisambiguator(Wikipedia wikipedia) {
+			
+			EnumSet<RelatednessMode> modes = wikipedia.getConfig().getReccommendedRelatednessModes() ;
+			
+			rc = new RelatednessCache(modes) ;
+			
+		}
 
 		public ArrayList<QueryLabel> disambiguate(ArrayList<QueryLabel> queryTerms) {
 

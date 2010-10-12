@@ -550,12 +550,12 @@ public class DumpExtractor {
 				CsvRecordInput cri = new CsvRecordInput(new ByteArrayInputStream((line + "\n").getBytes("UTF-8"))) ;
 
 				int parentId = cri.readInt("parent") ;
-				DbIdList childIds = new DbIdList() ;
+				DbIntList childIds = new DbIntList() ;
 				childIds.deserialize(cri) ;
 				
-				if (childIds.getIds() != null && !childIds.getIds().isEmpty()) {
+				if (childIds.getValues() != null && !childIds.getValues().isEmpty()) {
 					TIntArrayList cIds = new TIntArrayList() ;
-					for (Integer childId:childIds.getIds()) 
+					for (Integer childId:childIds.getValues()) 
 						cIds.add(childId) ;
 	
 					children.put(parentId, new TIntArrayList()) ;

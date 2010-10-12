@@ -44,7 +44,6 @@ import org.apache.hadoop.util.Tool;
 import org.apache.log4j.Logger;
 
 import org.wikipedia.miner.model.Page.PageType;
-import org.wikipedia.miner.db.struct.DbIdList;
 import org.wikipedia.miner.db.struct.DbLinkLocation;
 import org.wikipedia.miner.db.struct.DbSentenceSplitList;
 import org.wikipedia.miner.db.struct.DbTranslations;

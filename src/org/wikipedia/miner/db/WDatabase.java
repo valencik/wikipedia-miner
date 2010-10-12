@@ -79,6 +79,11 @@ public abstract class WDatabase<K,V> {
 		pageLinksOut, 
 		
 		/**
+		 * Associates integer ids with counts of how many pages it links to or that link to it
+		 */
+		pageLinkCounts,
+		
+		/**
 		 * Associates integer ids of categories with the ids of categories it belongs to
 		 */
 		categoryParents, 
@@ -332,15 +337,11 @@ public abstract class WDatabase<K,V> {
 	 * @param overwrite true if the existing database should be overwritten, otherwise false
 	 * @param tracker an optional progress tracker (may be null)
 	 * @throws IOException if there is a problem reading or deserialising the given data file.
-	 * @throws XMLStreamException if the data file is in XML format and cannot be deserialised.
 	 */
-	public void loadFromFile(File dataFile, boolean overwrite, ProgressTracker tracker) throws IOException, XMLStreamException  {
-		
-		if (exists() && !overwrite) {
-			System.out.println("Not overwriting " + name) ;
-			return ;	
-		}
-			
+	public void loadFromCsvFile(File dataFile, boolean overwrite, ProgressTracker tracker) throws IOException  {
+				
+		if (exists() && !overwrite)
+			return ;
 		
 		if (tracker == null) tracker = new ProgressTracker(1, WDatabase.class) ;
 		tracker.startTask(dataFile.length(), "Loading " + name + " database") ;

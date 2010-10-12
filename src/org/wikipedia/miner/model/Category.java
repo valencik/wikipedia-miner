@@ -21,7 +21,7 @@ package org.wikipedia.miner.model;
 
 import java.util.Collections;
 import org.wikipedia.miner.db.WEnvironment;
-import org.wikipedia.miner.db.struct.DbIdList;
+import org.wikipedia.miner.db.struct.DbIntList;
 import org.wikipedia.miner.db.struct.DbPage;
 
 /**
@@ -50,14 +50,14 @@ public class Category extends Page {
 	 * @return	an array of Categories (sorted by id)
 	 */
 	public Category[] getParentCategories() {
-		DbIdList tmpParents = env.getDbCategoryParents().retrieve(id) ; 
-		if (tmpParents == null || tmpParents.getIds() == null) 
+		DbIntList tmpParents = env.getDbCategoryParents().retrieve(id) ; 
+		if (tmpParents == null || tmpParents.getValues() == null) 
 			return new Category[0] ;
 
-		Category[] parentCategories = new Category[tmpParents.getIds().size()] ;
+		Category[] parentCategories = new Category[tmpParents.getValues().size()] ;
 
 		int index = 0 ;
-		for (int id:tmpParents.getIds()) {
+		for (int id:tmpParents.getValues()) {
 			parentCategories[index] = new Category(env, id) ;
 			index++ ;
 		}
@@ -72,14 +72,14 @@ public class Category extends Page {
 	 * @return	an array of Categories, sorted by id
 	 */
 	public Category[] getChildCategories() {
-		DbIdList tmpChildCats = env.getDbChildCategories().retrieve(id) ; 
-		if (tmpChildCats == null || tmpChildCats.getIds() == null) 
+		DbIntList tmpChildCats = env.getDbChildCategories().retrieve(id) ; 
+		if (tmpChildCats == null || tmpChildCats.getValues() == null) 
 			return new Category[0] ;
 
-		Category[] childCategories = new Category[tmpChildCats.getIds().size()] ;
+		Category[] childCategories = new Category[tmpChildCats.getValues().size()] ;
 
 		int index = 0 ;
-		for (int id:tmpChildCats.getIds()) {
+		for (int id:tmpChildCats.getValues()) {
 			childCategories[index] = new Category(env, id) ;
 			index++ ;
 		}
@@ -95,11 +95,11 @@ public class Category extends Page {
 	 */
 	public boolean contains(Article article) {
 
-		DbIdList tmpChildCats = env.getDbChildArticles().retrieve(id) ;
-		if (tmpChildCats == null || tmpChildCats.getIds() == null) 
+		DbIntList tmpChildCats = env.getDbChildArticles().retrieve(id) ;
+		if (tmpChildCats == null || tmpChildCats.getValues() == null) 
 			return false ;
 		
-		return Collections.binarySearch(tmpChildCats.getIds(), article.getId()) >= 0 ;
+		return Collections.binarySearch(tmpChildCats.getValues(), article.getId()) >= 0 ;
 	}
 	
 	/**
@@ -109,14 +109,14 @@ public class Category extends Page {
 	 */
 	public Article[] getChildArticles() {
 
-		DbIdList tmpChildArts = env.getDbChildArticles().retrieve(id) ;
-		if (tmpChildArts == null || tmpChildArts.getIds() == null) 
+		DbIntList tmpChildArts = env.getDbChildArticles().retrieve(id) ;
+		if (tmpChildArts == null || tmpChildArts.getValues() == null) 
 			return new Article[0] ;
 
-		Article[] childArticles = new Article[tmpChildArts.getIds().size()] ;
+		Article[] childArticles = new Article[tmpChildArts.getValues().size()] ;
 
 		int index = 0 ;
-		for (int id:tmpChildArts.getIds()) {
+		for (int id:tmpChildArts.getValues()) {
 			childArticles[index] = new Article(env, id) ;
 			index++ ;
 		}

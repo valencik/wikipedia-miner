@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -19,6 +21,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.wikipedia.miner.db.WDatabase.CachePriority;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
+import org.wikipedia.miner.model.Article.RelatednessMode;
 import org.wikipedia.miner.util.text.TextProcessor;
 import org.xml.sax.SAXException;
 
@@ -167,7 +170,21 @@ public class WikipediaConfiguration {
 		this.disambigModel = disambigModel;
 	}
 	
-	
+	public EnumSet<RelatednessMode> getReccommendedRelatednessModes() {
+		
+		ArrayList<RelatednessMode> modes = new ArrayList<RelatednessMode>() ;
+		
+		if (this.databasesToCache.containsKey(DatabaseType.pageLinksIn))
+			modes.add(RelatednessMode.inLinks) ;
+		
+		if (this.databasesToCache.containsKey(DatabaseType.pageLinksOut) && this.databasesToCache.containsKey(DatabaseType.pageLinkCounts))
+			modes.add(RelatednessMode.outLinks) ;
+		
+		if (modes.isEmpty())
+			modes.add(RelatednessMode.inLinks) ;
+		
+		return EnumSet.copyOf(modes) ;
+	}
 	
 	@SuppressWarnings("unchecked")
 	private void initFromXml(Element xml) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {

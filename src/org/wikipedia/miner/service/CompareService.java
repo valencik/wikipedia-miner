@@ -3,6 +3,7 @@ package org.wikipedia.miner.service;
 import gnu.trove.TLongHashSet;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.TreeSet;
 
@@ -14,8 +15,10 @@ import org.w3c.dom.Element;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
+import org.wikipedia.miner.model.Article.RelatednessMode;
 import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.service.param.BooleanParameter;
+import org.wikipedia.miner.service.param.EnumSetParameter;
 import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.IntListParameter;
 import org.wikipedia.miner.service.param.IntParameter;
@@ -70,6 +73,7 @@ public class CompareService extends Service{
 	private BooleanParameter prmEscape ;
 	
 	private FloatParameter prmMinRelatedness ;
+	private EnumSetParameter<RelatednessMode> prmRelatednessModes ;
 	
 	
 	
@@ -136,8 +140,13 @@ public class CompareService extends Service{
 		addGlobalParameter(getHub().getFormatter().getLinkFormatParam()) ;
 		
 		prmMinRelatedness = new FloatParameter("minRelatedness", "The minimum relatedness a term pair must have before it will be returned. This parameter is ignored unless comparing sets of ids.", 0F) ;
+		addGlobalParameter(prmMinRelatedness) ;
 		
-		prmEscape = new BooleanParameter("escapeDefinition", "<true> if sense definitions and sentence snippets should be escaped, <em>false</em> if they are to be encoded directly", false) ;
+		String[] descRelatednessModes = {"Use links made to articles","Use links made from articles"} ;
+		prmRelatednessModes = new EnumSetParameter<RelatednessMode>("relatednessModes", "The modes that will be used to calculate relatedness ", null, RelatednessMode.values(), descRelatednessModes) ;
+		addGlobalParameter(prmRelatednessModes) ;
+		
+		prmEscape = new BooleanParameter("escapeDefinition", "<true> if sentence snippets should be escaped, <em>false</em> if they are to be encoded directly", false) ;
 		addGlobalParameter(prmEscape) ;
 	}
 
@@ -146,6 +155,10 @@ public class CompareService extends Service{
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		TextProcessor tp = wikipedia.getEnvironment().getConfiguration().getDefaultTextProcessor() ;
+		
+		EnumSet<RelatednessMode> modes = prmRelatednessModes.getValue(request) ;
+		if (modes == null) 
+			modes = wikipedia.getConfig().getReccommendedRelatednessModes() ;
 		
 		
 		ParameterGroup grp = getSpecifiedParameterGroup(request) ;
@@ -178,7 +191,7 @@ public class CompareService extends Service{
 				return xmlResponse ;
 			}
 		
-			Label.DisambiguatedSensePair disambiguatedSenses = label1.disambiguateAgainst(label2) ;
+			Label.DisambiguatedSensePair disambiguatedSenses = label1.disambiguateAgainst(label2, modes) ;
 
 			xmlResponse.setAttribute("relatedness", getHub().format(disambiguatedSenses.getRelatedness())) ;
 		
@@ -200,7 +213,7 @@ public class CompareService extends Service{
 				return xmlResponse ;
 			}
 			
-			xmlResponse.setAttribute("relatedness", getHub().format(art1.getRelatednessTo(art2))) ;
+			xmlResponse.setAttribute("relatedness", getHub().format(art1.getRelatednessTo(art2, modes))) ;
 			
 			addMutualLinksOrSnippets(xmlResponse, art1, art2, request, wikipedia) ;
 			break ;
@@ -262,7 +275,7 @@ public class CompareService extends Service{
 					if(doneKeys.contains(key))
 						continue ;
 					
-					float relatedness = a1.getRelatednessTo(a2) ;
+					float relatedness = a1.getRelatednessTo(a2, modes) ;
 					
 					if (relatedness >= minRelatedness) {
 					
@@ -318,10 +331,13 @@ public class CompareService extends Service{
 		if (!getConnections && !getSnippets)
 			return response;
 		
+		EnumSet<RelatednessMode> modes = prmRelatednessModes.getValue(request) ;
+		if (modes == null) 
+			modes = wikipedia.getConfig().getReccommendedRelatednessModes() ;
 		
 		//Build a list of pages that link to both art1 and art2, ordered by average relatedness to them
 		TreeSet<Article> connections = new TreeSet<Article>() ;
-		RelatednessCache rc = new RelatednessCache() ;
+		RelatednessCache rc = new RelatednessCache(modes) ;
 
 		Article[] links1 = art1.getLinksIn() ;
 		Article[] links2 = art2.getLinksIn() ;
