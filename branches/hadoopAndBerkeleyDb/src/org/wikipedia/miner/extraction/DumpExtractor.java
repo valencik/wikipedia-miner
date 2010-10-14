@@ -214,8 +214,7 @@ public class DumpExtractor {
 
 		int result = 0 ;
 		
-		ExtractionStep lastCompletedStep = readProgress() ;
-				
+		ExtractionStep lastCompletedStep = readProgress() ;		
 		TreeMap<String,Long> stats ;
 		
 		if (lastCompletedStep != null)
@@ -489,8 +488,9 @@ public class DumpExtractor {
 					for(int i=0 ; i<childArts.size() ; i++) {
 						Integer childArt = childArts.get(i) ;
 						
-						if (!pageDepths.containsKey(childArt))
+						if (!pageDepths.containsKey(childArt)) {					
 							pageDepths.put(childArt, (short)(currDepth + 1)) ;
+						}
 					}
 				}
 
@@ -541,7 +541,7 @@ public class DumpExtractor {
 		}) ;
 
 		for (FileStatus fs:fileStatuses) {
-
+			
 			BufferedReader reader = new BufferedReader(new InputStreamReader(dfs.open(fs.getPath()))) ;
 
 			String line = null;
@@ -558,7 +558,7 @@ public class DumpExtractor {
 					for (Integer childId:childIds.getValues()) 
 						cIds.add(childId) ;
 	
-					children.put(parentId, new TIntArrayList()) ;
+					children.put(parentId, cIds) ;
 				}
 			}
 		}
@@ -598,9 +598,9 @@ public class DumpExtractor {
 
 		TIntObjectHashMap<TIntArrayList> childCategories = gatherChildren(ExtractionStep.categoryParent, CategoryLinkSummaryStep.Output.childCategories.name()) ;
 		TIntObjectHashMap<TIntArrayList> childArticles = gatherChildren(ExtractionStep.articleParent, CategoryLinkSummaryStep.Output.childArticles.name()) ;
-		
+				
 		HashMap<Integer, Short> pageDepths = calculatePageDepths(stats, childCategories, childArticles) ;
-
+				
 		BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(dfs.create(new Path(finalDir + "/page.csv")))) ;
 
 		FileStatus[] fileStatuses = dfs.listStatus(new Path(outputDir + "/" + getDirectoryName(ExtractionStep.page)), new PathFilter() {
