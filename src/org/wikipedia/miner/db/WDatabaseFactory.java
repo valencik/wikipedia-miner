@@ -2,15 +2,8 @@ package org.wikipedia.miner.db;
 
 import gnu.trove.TIntHash;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
-
-import javax.xml.stream.XMLStreamException;
 
 import org.apache.hadoop.record.CsvRecordInput;
 import org.apache.log4j.Logger;
@@ -18,16 +11,13 @@ import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.*;
 import org.wikipedia.miner.model.Page.PageType;
-import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.text.TextProcessor;
 
 
 import com.sleepycat.bind.tuple.IntegerBinding;
 import com.sleepycat.bind.tuple.LongBinding;
-import com.sleepycat.bind.tuple.StringBinding;
-import com.sleepycat.je.Database;
-import com.sleepycat.je.DatabaseEntry;
+
 
 /**
  * A factory for creating WDatabases of various types
@@ -99,50 +89,7 @@ public class WDatabaseFactory {
 	 */
 	public WDatabase<String,Integer> buildTitleDatabase(DatabaseType type) {
 
-		if (type != DatabaseType.articlesByTitle && type != DatabaseType.categoriesByTitle) 
-			throw new IllegalArgumentException("type must be either DatabaseType.articlesByTitle or DatabaseType.categoriesByTitle") ;
-
-
-		return new WDatabase<String,Integer>(
-				env, 
-				type, 
-				new StringBinding(),
-				new IntegerBinding()
-		){
-
-			@Override
-			public WEntry<String, Integer> deserialiseCsvRecord(
-					CsvRecordInput record) throws IOException {
-				Integer id = record.readInt(null) ;
-
-				DbPage p = new DbPage() ;
-				p.deserialize(record) ;
-
-				PageType pageType = PageType.values()[p.getType()];
-				DatabaseType dbType = getType() ;
-
-				if (dbType == DatabaseType.articlesByTitle && (pageType != PageType.article && pageType != PageType.disambiguation && pageType != PageType.redirect))
-					return null ;
-
-				if (dbType == DatabaseType.categoriesByTitle && pageType != PageType.category)
-					return null ;
-
-				return new WEntry<String,Integer>(p.getTitle(), id) ;
-			}
-
-			@Override
-			public Integer filterCacheEntry(
-					WEntry<String, Integer> e, WikipediaConfiguration conf,
-					TIntHash validIds) {
-
-				if (getType() == DatabaseType.articlesByTitle) {
-					if (validIds != null && !validIds.contains(e.getValue()))
-						return null ;
-				}
-
-				return e.getValue();
-			}
-		};	
+		return new TitleDatabase(env, type) ;
 	}
 
 	/**
