@@ -10,7 +10,7 @@ public class FloatParameter extends Parameter<Float> {
 	}
 
 	@Override
-	public Float getValue(HttpServletRequest request) {
+	public Float getValue(HttpServletRequest request) throws IllegalArgumentException {
 		
 		String s = request.getParameter(getName()) ;
 		

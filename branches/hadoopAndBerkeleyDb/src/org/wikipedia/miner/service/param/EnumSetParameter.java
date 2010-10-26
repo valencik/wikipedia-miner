@@ -9,6 +9,11 @@ import javax.servlet.http.HttpServletRequest;
 import org.w3c.dom.Element;
 import org.wikipedia.miner.service.ServiceHub;
 
+/**
+ * @author dmilne
+ *
+ * @param <T>
+ */
 public class EnumSetParameter<T extends Enum<T>> extends Parameter<EnumSet<T>> {
 
 	
@@ -51,7 +56,7 @@ public class EnumSetParameter<T extends Enum<T>> extends Parameter<EnumSet<T>> {
 	
 
 	@Override
-	public EnumSet<T> getValue(HttpServletRequest request) {
+	public EnumSet<T> getValue(HttpServletRequest request) throws IllegalArgumentException {
 		
 		String allVals = request.getParameter(getName()) ;
 		

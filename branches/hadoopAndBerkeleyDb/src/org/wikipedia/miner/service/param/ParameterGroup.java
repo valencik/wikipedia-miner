@@ -4,37 +4,63 @@ import java.util.Vector;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.wikipedia.miner.service.ServiceHub;
 
-import org.apache.xerces.parsers.DOMParser ;
-
+/**
+ * A group of parameters that are somehow related to each other
+ */
 @SuppressWarnings("unchecked")
 public class ParameterGroup {
 	
 	String name ;
 	Vector<Parameter> parameters ;
 	
+	/**
+	 * Initialises a parameter group
+	 * 
+	 * @param name the name of this parameter group
+	 */
 	public ParameterGroup(String name) {
 		this.name = name ;
 		this.parameters = new Vector<Parameter>() ;
 	}
 	
+	/**
+	 * Adds a parameter to this group
+	 * 
+	 * @param param the parameter to add
+	 */
 	public void addParameter(Parameter param) {
 		parameters.add(param) ;
 	}
 	
 	
 	
+	/**
+	 * Returns the name of this parameter group
+	 * 
+	 * @return the name of this parameter group
+	 */
 	public String getName() {
 		return name;
 	}
 
+	/**
+	 * Returns a vector of parameters within this group
+	 * 
+	 * @return a vector of parameters within this group
+	 */
 	public Vector<Parameter> getParameters() {
 		return parameters;
 	}
 
+	/**
+	 * Returns an XML description of this parameter group
+	 * 
+	 * @param hub a hub with utility functions for creating XML elements
+	 * @return an XML description of this parameter group
+	 */
 	public Element getXmlDescription(ServiceHub hub) {
 		
 		Element xml = hub.createElement("ParameterGroup") ;
@@ -46,6 +72,12 @@ public class ParameterGroup {
 		return xml ;
 	}
 	
+	/**
+	 * Returns true if all mandatory parameters within this group have been specified in the given request, otherwise false
+	 * 
+	 * @param request the request to check
+	 * @return true if all mandatory parameters within this group have been specified in the given request
+	 */
 	public boolean isSpecified(HttpServletRequest request) {
 				
 		for (Parameter param:parameters) {
@@ -58,9 +90,4 @@ public class ParameterGroup {
 		return true ;
 	}
 	
-	public static void main(String[] args) {
-		
-		
-	}
-
 }
