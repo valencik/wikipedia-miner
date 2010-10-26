@@ -45,7 +45,7 @@ public class StringArrayParameter extends Parameter<String> {
 	}
 
 	@Override
-	public String getValue(HttpServletRequest request) {
+	public String getValue(HttpServletRequest request) throws IllegalArgumentException {
 		
 		String s = request.getParameter(getName()) ;
 		

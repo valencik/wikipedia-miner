@@ -10,7 +10,7 @@ public class IntListParameter extends Parameter<ArrayList<Integer>> {
 	}
 
 	@Override
-	public ArrayList<Integer> getValue(HttpServletRequest request) {
+	public ArrayList<Integer> getValue(HttpServletRequest request) throws IllegalArgumentException {
 		
 		String s = request.getParameter(getName()) ;
 		
