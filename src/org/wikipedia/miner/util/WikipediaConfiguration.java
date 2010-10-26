@@ -21,7 +21,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.wikipedia.miner.db.WDatabase.CachePriority;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
-import org.wikipedia.miner.model.Article.RelatednessMode;
+import org.wikipedia.miner.model.Article.RelatednessDependancy;
 import org.wikipedia.miner.util.text.TextProcessor;
 import org.xml.sax.SAXException;
 
@@ -44,8 +44,6 @@ public class WikipediaConfiguration {
 	private int minLinksIn = 0;
 	private float minLinkProbability = 0 ;
 	private float minSenseProbability = 0 ;
-
-	private boolean readOnly ;
 	
 	
 	
@@ -65,10 +63,9 @@ public class WikipediaConfiguration {
 		initFromXml(doc.getDocumentElement()) ;
 	}
 
-	public WikipediaConfiguration(String langCode, File dbDirectory, boolean readOnly) {
+	public WikipediaConfiguration(String langCode, File dbDirectory) {
 		this.langCode = langCode ;
 		this.dbDirectory = dbDirectory ;
-		this.readOnly = readOnly ;
 	}
 	
 	
@@ -81,10 +78,6 @@ public class WikipediaConfiguration {
 		
 	public File getDatabaseDirectory() {
 		return dbDirectory ;
-	}
-
-	public boolean isReadOnly() {
-		return readOnly ;
 	}
 
 	public void setDefaultTextProcessor(TextProcessor tp) {
@@ -170,20 +163,30 @@ public class WikipediaConfiguration {
 		this.disambigModel = disambigModel;
 	}
 	
-	public EnumSet<RelatednessMode> getReccommendedRelatednessModes() {
+	public EnumSet<RelatednessDependancy> getReccommendedRelatednessDependancies() {
 		
-		ArrayList<RelatednessMode> modes = new ArrayList<RelatednessMode>() ;
+		ArrayList<RelatednessDependancy> dependancies = new ArrayList<RelatednessDependancy>() ;
 		
-		if (this.databasesToCache.containsKey(DatabaseType.pageLinksIn))
-			modes.add(RelatednessMode.inLinks) ;
+		boolean valid = false ;
 		
-		if (this.databasesToCache.containsKey(DatabaseType.pageLinksOut) && this.databasesToCache.containsKey(DatabaseType.pageLinkCounts))
-			modes.add(RelatednessMode.outLinks) ;
+		if (this.databasesToCache.containsKey(DatabaseType.pageLinksIn)) {
+			dependancies.add(RelatednessDependancy.inLinks) ;
+			valid = true ;
+		}
 		
-		if (modes.isEmpty())
-			modes.add(RelatednessMode.inLinks) ;
+		if (this.databasesToCache.containsKey(DatabaseType.pageLinksOut)) {
+			dependancies.add(RelatednessDependancy.outLinks) ;
+			valid = true ;
+		}
 		
-		return EnumSet.copyOf(modes) ;
+		if (this.databasesToCache.containsKey(DatabaseType.pageLinkCounts)) {
+			dependancies.add(RelatednessDependancy.linkCounts) ;	
+		}
+		
+		if (!valid)
+			dependancies.add(RelatednessDependancy.inLinks) ;
+		
+		return EnumSet.copyOf(dependancies) ;
 	}
 	
 	@SuppressWarnings("unchecked")

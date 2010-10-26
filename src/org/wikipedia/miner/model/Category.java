@@ -25,7 +25,7 @@ import org.wikipedia.miner.db.struct.DbIntList;
 import org.wikipedia.miner.db.struct.DbPage;
 
 /**
- * Represents categories in Wikipedia; the pages that exist to hirachically organise other pages
+ * Represents categories in Wikipedia; the pages that exist to hierarchically organise other pages
  */
 public class Category extends Page {
 

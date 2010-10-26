@@ -22,7 +22,7 @@ package org.wikipedia.miner.util;
 import java.util.EnumSet;
 
 import org.wikipedia.miner.model.Article;
-import org.wikipedia.miner.model.Article.RelatednessMode;
+import org.wikipedia.miner.model.Article.RelatednessDependancy;
 
 import gnu.trove.* ;
 
@@ -35,7 +35,7 @@ import gnu.trove.* ;
 public class RelatednessCache {
 
 	TLongFloatHashMap cachedRelatedness ;
-	EnumSet<RelatednessMode> relatednessModes ;
+	EnumSet<RelatednessDependancy> relatednessDependancies ;
 	
 	/**
 	 * Initialises the relatedness cache, where relatedness will be measured using the given modes
@@ -44,9 +44,9 @@ public class RelatednessCache {
 	 * 
 	 * @param modes the modes that will be used to measure relatedness
 	 */
-	public RelatednessCache(EnumSet<RelatednessMode> modes) {
+	public RelatednessCache(EnumSet<RelatednessDependancy> dependancies) {
 		cachedRelatedness = new TLongFloatHashMap() ;
-		relatednessModes = modes ;
+		relatednessDependancies = dependancies ;
 	}
 	
 	
@@ -66,7 +66,7 @@ public class RelatednessCache {
 		long key = min + (max << 30) ;
 				
 		if (!cachedRelatedness.containsKey(key)) {		
-			float rel = art1.getRelatednessTo(art2, relatednessModes) ;		
+			float rel = art1.getRelatednessTo(art2, relatednessDependancies) ;		
 			cachedRelatedness.put(key, rel) ;
 			return rel ;
 		} else {			

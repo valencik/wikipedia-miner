@@ -171,7 +171,7 @@ public class CommandLineThesaurus {
 		
 		File envDir = new File(args[0]) ;
 		
-		WikipediaConfiguration conf = new WikipediaConfiguration("en", envDir, true) ;
+		WikipediaConfiguration conf = new WikipediaConfiguration("en", envDir) ;
 
 		CommandLineThesaurus clt = new CommandLineThesaurus(conf) ;
 		clt.start() ;

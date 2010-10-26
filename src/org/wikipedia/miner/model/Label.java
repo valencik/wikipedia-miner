@@ -6,7 +6,7 @@ import java.util.TreeSet;
 import org.wikipedia.miner.db.WEnvironment;
 import org.wikipedia.miner.db.struct.DbLabel;
 import org.wikipedia.miner.db.struct.DbSenseForLabel;
-import org.wikipedia.miner.model.Article.RelatednessMode;
+import org.wikipedia.miner.model.Article.RelatednessDependancy;
 import org.wikipedia.miner.util.RelatednessCache;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.text.TextProcessor;
@@ -157,9 +157,9 @@ public class Label {
 	 * @param modes the modes to use when measuring relatedness between label senses
 	 * @return see above.
 	 */
-	public float getRelatednessTo(Label label, EnumSet<RelatednessMode> modes) {
+	public float getRelatednessTo(Label label, EnumSet<RelatednessDependancy> dependancies) {
 		
-		DisambiguatedSensePair sp = this.disambiguateAgainst(label, modes) ;
+		DisambiguatedSensePair sp = this.disambiguateAgainst(label, dependancies) ;
 		return sp.getRelatedness() ;
 	}
 	
@@ -175,9 +175,9 @@ public class Label {
 	 */
 	public float getRelatednessTo(Label label) {
 		
-		EnumSet<RelatednessMode> modes = env.getConfiguration().getReccommendedRelatednessModes() ;
+		EnumSet<RelatednessDependancy> dependancies = env.getConfiguration().getReccommendedRelatednessDependancies() ;
 		
-		DisambiguatedSensePair sp = this.disambiguateAgainst(label, modes) ;
+		DisambiguatedSensePair sp = this.disambiguateAgainst(label, dependancies) ;
 		return sp.getRelatedness() ;
 	}
 	
@@ -192,7 +192,7 @@ public class Label {
 	 * @param modes the modes to use when measuring relatedness between label senses
 	 * @return a DisambiguatedSensePair describing the senses chosen for each label, and the relatedness between them.
 	 */
-	public DisambiguatedSensePair disambiguateAgainst(Label label, EnumSet<RelatednessMode> modes) {
+	public DisambiguatedSensePair disambiguateAgainst(Label label, EnumSet<RelatednessDependancy> dependancies) {
 		
 		Label anchCombined = new Label(env, this.getText() + " " + label.getText(), null) ;
 		double wc = anchCombined.getLinkDocCount() ;
@@ -209,7 +209,7 @@ public class Label {
 		int sensesB = 0 ;
 		
 		
-		RelatednessCache rc = new RelatednessCache(modes) ;
+		RelatednessCache rc = new RelatednessCache(dependancies) ;
 
 		for (Label.Sense senseA: this.getSenses()) {
 
@@ -257,9 +257,9 @@ public class Label {
 	 */
 	public DisambiguatedSensePair disambiguateAgainst(Label label) {
 		
-		EnumSet<RelatednessMode> modes = env.getConfiguration().getReccommendedRelatednessModes() ;
+		EnumSet<RelatednessDependancy> dependancies = env.getConfiguration().getReccommendedRelatednessDependancies() ;
 		
-		return disambiguateAgainst(label, modes) ;
+		return disambiguateAgainst(label, dependancies) ;
 	}
 	
 	

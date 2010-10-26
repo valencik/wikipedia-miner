@@ -371,7 +371,7 @@ public class LinkDetector extends TopicWeighter{
 		System.out.println(" - testing " + article) ;
 		
 		if (rc == null)
-			rc = new RelatednessCache(article.getEnvironment().getConfiguration().getReccommendedRelatednessModes()) ;
+			rc = new RelatednessCache(article.getEnvironment().getConfiguration().getReccommendedRelatednessDependancies()) ;
 		
 		String text = cleaner.getCleanedContent(article, snippetLength) ;
 		
