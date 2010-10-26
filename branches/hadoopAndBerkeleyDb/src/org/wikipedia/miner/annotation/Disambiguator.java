@@ -586,7 +586,7 @@ public class Disambiguator {
 		}
 
 		if (rc == null) 
-			return new Context(unambigLabels, new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessModes()), maxContextSize) ;
+			return new Context(unambigLabels, new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessDependancies()), maxContextSize) ;
 		else
 			return new Context(unambigLabels, rc, maxContextSize) ;
 	}

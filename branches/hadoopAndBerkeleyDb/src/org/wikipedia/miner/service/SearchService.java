@@ -13,7 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.w3c.dom.Element;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.model.Article.RelatednessMode;
+import org.wikipedia.miner.model.Article.RelatednessDependancy;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.StringParameter;
 import org.wikipedia.miner.util.Position;
@@ -297,7 +297,7 @@ public class SearchService extends Service {
 		
 		public ExhaustiveDisambiguator(Wikipedia wikipedia) {
 			
-			EnumSet<RelatednessMode> modes = wikipedia.getConfig().getReccommendedRelatednessModes() ;
+			EnumSet<RelatednessDependancy> modes = wikipedia.getConfig().getReccommendedRelatednessDependancies() ;
 			
 			rc = new RelatednessCache(modes) ;
 			

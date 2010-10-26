@@ -15,7 +15,7 @@ import org.w3c.dom.Element;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.model.Article.RelatednessMode;
+import org.wikipedia.miner.model.Article.RelatednessDependancy;
 import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.EnumSetParameter;
@@ -73,7 +73,7 @@ public class CompareService extends Service{
 	private BooleanParameter prmEscape ;
 	
 	private FloatParameter prmMinRelatedness ;
-	private EnumSetParameter<RelatednessMode> prmRelatednessModes ;
+	private EnumSetParameter<RelatednessDependancy> prmRelatednessDependancies ;
 	
 	
 	
@@ -142,9 +142,9 @@ public class CompareService extends Service{
 		prmMinRelatedness = new FloatParameter("minRelatedness", "The minimum relatedness a term pair must have before it will be returned. This parameter is ignored unless comparing sets of ids.", 0F) ;
 		addGlobalParameter(prmMinRelatedness) ;
 		
-		String[] descRelatednessModes = {"Use links made to articles","Use links made from articles"} ;
-		prmRelatednessModes = new EnumSetParameter<RelatednessMode>("relatednessModes", "The modes that will be used to calculate relatedness ", null, RelatednessMode.values(), descRelatednessModes) ;
-		addGlobalParameter(prmRelatednessModes) ;
+		String[] descRelatednessDependancies = {"Use links made to articles","Use links made from articles", "Use summary counts of links made to and from articles"} ;
+		prmRelatednessDependancies = new EnumSetParameter<RelatednessDependancy>("dependancies", "The data that will be used to calculate relatedness ", null, RelatednessDependancy.values(), descRelatednessDependancies) ;
+		addGlobalParameter(prmRelatednessDependancies) ;
 		
 		prmEscape = new BooleanParameter("escapeDefinition", "<true> if sentence snippets should be escaped, <em>false</em> if they are to be encoded directly", false) ;
 		addGlobalParameter(prmEscape) ;
@@ -156,9 +156,9 @@ public class CompareService extends Service{
 		Wikipedia wikipedia = getWikipedia(request) ;
 		TextProcessor tp = wikipedia.getEnvironment().getConfiguration().getDefaultTextProcessor() ;
 		
-		EnumSet<RelatednessMode> modes = prmRelatednessModes.getValue(request) ;
+		EnumSet<RelatednessDependancy> modes = prmRelatednessDependancies.getValue(request) ;
 		if (modes == null) 
-			modes = wikipedia.getConfig().getReccommendedRelatednessModes() ;
+			modes = wikipedia.getConfig().getReccommendedRelatednessDependancies() ;
 		
 		
 		ParameterGroup grp = getSpecifiedParameterGroup(request) ;
@@ -331,9 +331,9 @@ public class CompareService extends Service{
 		if (!getConnections && !getSnippets)
 			return response;
 		
-		EnumSet<RelatednessMode> modes = prmRelatednessModes.getValue(request) ;
+		EnumSet<RelatednessDependancy> modes = prmRelatednessDependancies.getValue(request) ;
 		if (modes == null) 
-			modes = wikipedia.getConfig().getReccommendedRelatednessModes() ;
+			modes = wikipedia.getConfig().getReccommendedRelatednessDependancies() ;
 		
 		//Build a list of pages that link to both art1 and art2, ordered by average relatedness to them
 		TreeSet<Article> connections = new TreeSet<Article>() ;

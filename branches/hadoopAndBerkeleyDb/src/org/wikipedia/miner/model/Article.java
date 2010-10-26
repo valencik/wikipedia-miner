@@ -40,24 +40,29 @@ import org.wikipedia.miner.util.WikipediaConfiguration;
 public class Article extends Page {
 
 	/**
-	 * Modes available for measuring relatedness between articles. 
+	 * Data used to calculate relatedness measures. 
 	 * 
 	 * @see Article#getRelatednessTo(Article, EnumSet)
 	 */
-	public enum RelatednessMode{
+	public enum RelatednessDependancy{
+
+		/**
+		 * Use links made to articles to measure relatedness. You should cache {@link DatabaseType#pageLinksIn} if using this mode extensively.  
+		 */
+		inLinks, 
+
+		/**
+		 * Use links made from articles to measure relatedness. You should cache {@link DatabaseType#pageLinksOut} and {@link DatabaseType#pageLinkCounts} if using this mode extensively. 
+		 */
+		outLinks,
 		
-	/**
-	 * Use links made to articles to measure relatedness. You should cache {@link DatabaseType#pageLinksIn} if using this mode extensively.  
-	 */
-	inLinks, 
-		
-	/**
-	 * Use links made from articles to measure relatedness. You should cache {@link DatabaseType#pageLinksOut} and {@link DatabaseType#pageLinkCounts} if using this mode extensively. 
-	 */
-	outLinks
+		/**
+		 * Use link counts to measure relatedness. You should cache {@link DatabaseType#pageLinkCounts} if using this mode extensively. 
+		 */
+		linkCounts
 	} ;
-	
-	
+
+
 	/**
 	 * Initialises a newly created Article so that it represents the article given by <em>id</em>.
 	 * 
@@ -201,15 +206,15 @@ public class Article extends Page {
 	 * @return the translated title if it is available; otherwise null.
 	 */	
 	public String getTranslation(String languageCode)  {		
-		
+
 		DbTranslations t = env.getDbTranslations().retrieve(id) ;
-		
+
 		if (t == null)
 			return null ;
-		
+
 		if (t.getTranslationsByLangCode() == null)
 			return null ;
-		
+
 		return t.getTranslationsByLangCode().get(languageCode.toLowerCase()) ;
 	}
 
@@ -220,7 +225,7 @@ public class Article extends Page {
 	 */	
 	public TreeMap<String,String> getTranslations() {
 		DbTranslations t = env.getDbTranslations().retrieve(id) ;
-		
+
 		if (t == null)
 			return new TreeMap<String,String>() ;
 		else
@@ -247,28 +252,28 @@ public class Article extends Page {
 	 * @param modes the set of modes to use to calculate the measure. If more than one mode is specified, then the average will be returned.
 	 * @return the weight of the semantic relation between this article and the argument one.
 	 */
-	public float getRelatednessTo(Article article, EnumSet<RelatednessMode> modes) {
-		
-		if (modes == null || modes.isEmpty())
-			throw new IllegalArgumentException("You must specify at least one relatedness mode to use") ;
-		
+	public float getRelatednessTo(Article article, EnumSet<RelatednessDependancy> dependancies) {
+
+		if (dependancies == null || dependancies.isEmpty())
+			throw new IllegalArgumentException("You must specify at least one relatedness dependancy") ;
+
 		float total = 0 ;
 		int count = 0 ;
-		
-		if (modes.contains(RelatednessMode.inLinks)) {
+
+		if (dependancies.contains(RelatednessDependancy.inLinks)) {
 			total += getRelatednessFromInLinks(article) ;
 			count ++ ;
 		}
-		
-		if (modes.contains(RelatednessMode.outLinks)) {
+
+		if (dependancies.contains(RelatednessDependancy.outLinks)) {
 			total += getRelatednessFromOutLinks(article) ;
 			count ++ ;
 		}
-		
+
 		return total/count ;
 	}
-	
-	
+
+
 	/**
 	 * Measures the semantic relatedness between this article and the argument one, using
 	 * the modes recommended by the current Wikipedia configuration. 
@@ -279,12 +284,12 @@ public class Article extends Page {
 	 * @return the weight of the semantic relation between this article and the argument one.
 	 */
 	public float getRelatednessTo(Article article) {
-		EnumSet<RelatednessMode> modes = env.getConfiguration().getReccommendedRelatednessModes() ;
-		
+		EnumSet<RelatednessDependancy> modes = env.getConfiguration().getReccommendedRelatednessDependancies() ;
+
 		return getRelatednessTo(article, modes) ;
 	}
-		
-	
+
+
 
 	/**
 	 * @return the total number of links that are made to this article 
@@ -292,7 +297,7 @@ public class Article extends Page {
 	public int getTotalLinksInCount()  {
 
 		DbPageLinkCounts lc = env.getDbPageLinkCounts().retrieve(id) ;
-		
+
 		if (lc == null) 
 			return 0 ;
 		else
@@ -305,7 +310,7 @@ public class Article extends Page {
 	public int getDistinctLinksInCount()  {
 
 		DbPageLinkCounts lc = env.getDbPageLinkCounts().retrieve(id) ;
-		
+
 		if (lc == null) 
 			return 0 ;
 		else
@@ -318,7 +323,7 @@ public class Article extends Page {
 	public int getTotalLinksOutCount() {
 
 		DbPageLinkCounts lc = env.getDbPageLinkCounts().retrieve(id) ;
-		
+
 		if (lc == null) 
 			return 0 ;
 		else
@@ -331,24 +336,24 @@ public class Article extends Page {
 	public int getDistinctLinksOutCount() {
 
 		DbPageLinkCounts lc = env.getDbPageLinkCounts().retrieve(id) ;
-		
+
 		if (lc == null) 
 			return 0 ;
 		else
 			return lc.getDistinctLinksOut() ;
 	}
 
-	
+
 	private float getRelatednessFromOutLinks(Article article) {
 
 		if (getId() == article.getId()) 
 			return 1 ;
 
 		int totalArticles = env.retrieveStatistic(StatisticName.articleCount).intValue() ;
-		
+
 		DbLinkLocationList idListA = env.getDbPageLinkOut().retrieve(id) ; 
 		DbLinkLocationList idListB = env.getDbPageLinkOut().retrieve(article.id) ; 
-		
+
 		if (idListA==null || idListB==null) 
 			return 0 ;
 
@@ -357,7 +362,7 @@ public class Article extends Page {
 
 		if (linksA==null || linksB==null) 
 			return 0 ;
-		
+
 		int indexA = 0 ;
 		int indexB = 0 ;
 
@@ -376,7 +381,7 @@ public class Article extends Page {
 				linkB = linksB.get(indexB) ;
 
 			if (linkA != null && linkB != null && linkA.getLinkId()==linkB.getLinkId()) {
-				
+
 				int totalLinksIn = new Article(env, linkA.getLinkId()).getTotalLinksInCount() ;
 				double probability = Math.log((double)totalArticles/totalLinksIn) ;
 				vectA.add(probability) ;
@@ -391,7 +396,7 @@ public class Article extends Page {
 					int totalLinksIn = new Article(env, linkA.getLinkId()).getTotalLinksInCount() ;
 					double probability = Math.log((double)totalArticles/totalLinksIn) ;
 					vectA.add(probability) ;
-					
+
 					if (linkA.getLinkId() == article.getId())
 						vectB.add(probability) ;
 					else
@@ -402,7 +407,7 @@ public class Article extends Page {
 					int totalLinksIn = new Article(env, linkB.getLinkId()).getTotalLinksInCount() ;
 					double probability = Math.log((double)totalArticles/totalLinksIn) ;					
 					vectB.add(probability) ;
-					
+
 					if (linkB.getLinkId() == id)
 						vectA.add(probability) ;
 					else
@@ -500,7 +505,7 @@ public class Article extends Page {
 		return sr ;
 	}
 
-	
+
 	/**
 	 * Returns an array of {@link Label Labels} that have been used to refer to this article.
 	 * They are sorted by the number of times each label is used.
@@ -626,7 +631,7 @@ public class Article extends Page {
 			this.isPrimary = l.getIsPrimary() ;
 		}
 
-		
+
 		/**
 		 * @return the text of this label (the title of the article or redirect, or the anchor of the link
 		 */
@@ -669,12 +674,12 @@ public class Article extends Page {
 			return isPrimary;
 		}
 	}
-	
-	
+
+
 
 	//public static ============================================================
 
-/*
+	/*
 	public static void main(String[] args) throws Exception {
 
 
@@ -684,26 +689,26 @@ public class Article extends Page {
 
 		Wikipedia w = new Wikipedia(databaseDirectory) ;
 
-		
+
 
 
 		Article nzBirds = w.getMostLikelyArticle("Birds of New Zealand", null) ;
 		//Article kiwi = w.getMostLikelyArticle("Kiwi", null) ;
-		
+
 		/*
 		DbLinkLocationList ll = w.getEnvironment().getDbPageLinkOut().retrieve(kiwi.getId()) ;
-		
+
 		for (DbLinkLocation l:ll.getLinkLocations()) {
 			System.out.print(" - " + l.getLinkId() +  ":") ;
 			for (Integer s:l.getSentenceIndexes()) 
 				System.out.print(" " + s) ;
 			System.out.println() ;
 		}
-		*/
-		
-		//System.out.println(kiwi) ;
+	 */
 
-		/*
+	//System.out.println(kiwi) ;
+
+	/*
 		Article nz = w.getMostLikelyArticle("New Zealand", null) ;
 
 		for (Article art:kiwi.getLinksOut()){
@@ -716,7 +721,7 @@ public class Article extends Page {
 			if (art.equals(kiwi))
 				System.out.println(" - link in: " + art) ;
 		}
-	
+
 
 		ArrayList<Article> arts = new ArrayList<Article>() ;
 		arts.add(w.getMostLikelyArticle("Kiwi", null)) ;
@@ -728,21 +733,21 @@ public class Article extends Page {
 
 		for (Article art:arts) {
 			System.out.println("retrieving sentences mentioning " + art) ;
-			
+
 			for (int si: nzBirds.getSentenceIndexesMentioning(art)){
 				System.out.println(nzBirds.getSentenceMarkup(si)) ;
 			}
-			
+
 		}
-		
+
 		System.out.println("retrieving sentences mentioning all") ;
-		
+
 		for (int si: nzBirds.getSentenceIndexesMentioning(arts)){
 			System.out.println(nzBirds.getSentenceMarkup(si)) ;
 		}
-		
-		
-		
+
+
+
 	}*/
 
 

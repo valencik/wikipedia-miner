@@ -101,7 +101,7 @@ public class TopicDetector {
 	public Vector<Topic> getTopics(PreprocessedDocument doc, RelatednessCache rc) throws Exception {
 		
 		if (rc == null)
-			rc = new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessModes()) ;
+			rc = new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessDependancies()) ;
 		
 
 		//Vector<String> sentences = ss.getSentences(doc.getPreprocessedText(), SentenceSplitter.MULTIPLE_NEWLINES) ;
@@ -130,7 +130,7 @@ public class TopicDetector {
 	public Collection<Topic> getTopics(String text, RelatednessCache rc) throws Exception {
 		
 		if (rc == null)
-			rc = new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessModes()) ;
+			rc = new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessDependancies()) ;
 			
 
 		//Vector<String> sentences = ss.getSentences(text, SentenceSplitter.MULTIPLE_NEWLINES) ;
@@ -241,7 +241,7 @@ public class TopicDetector {
 		
 		Context context ;
 		if (cache == null)
-			context = new Context(unambigLabels, new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessModes()), disambiguator.getMaxContextSize()) ;
+			context = new Context(unambigLabels, new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessDependancies()), disambiguator.getMaxContextSize()) ;
 		
 		else 
 			context = new Context(unambigLabels, cache, disambiguator.getMaxContextSize()) ;	
