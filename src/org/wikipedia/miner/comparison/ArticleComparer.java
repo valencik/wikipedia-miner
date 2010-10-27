@@ -40,7 +40,7 @@ public class ArticleComparer {
 	 * Data used to generate article relatedness measures. 
 	 * 
 	 */
-	public enum DataDependancy {
+	public enum DataDependency {
 		
 		
 		/**
@@ -63,7 +63,7 @@ public class ArticleComparer {
 
 
 	Wikipedia wikipedia ;
-	EnumSet<DataDependancy> dependancies ;
+	EnumSet<DataDependency> dependancies ;
 
 	int wikipediaArticleCount ;
 	Double m ;
@@ -81,13 +81,13 @@ public class ArticleComparer {
 		init(wikipeida, conf.getArticleComparisonDependancies()) ;
 	}
 	
-	public ArticleComparer(Wikipedia wikipedia, EnumSet<DataDependancy> dependancies) throws Exception {
+	public ArticleComparer(Wikipedia wikipedia, EnumSet<DataDependency> dependancies) throws Exception {
 		init(wikipedia, dependancies) ;
 	}
 	
-	private void init(Wikipedia wikipedia, EnumSet<DataDependancy> dependancies) throws Exception {
+	private void init(Wikipedia wikipedia, EnumSet<DataDependency> dependancies) throws Exception {
 		
-		if (!dependancies.contains(DataDependancy.pageLinksIn) && !dependancies.contains(DataDependancy.pageLinksOut))
+		if (!dependancies.contains(DataDependency.pageLinksIn) && !dependancies.contains(DataDependency.pageLinksOut))
 			throw new Exception("Dependancies must include at least pageLinksIn or pageLinksOut") ;
 
 		this.wikipedia = wikipedia ;
@@ -98,23 +98,23 @@ public class ArticleComparer {
 
 		ArrayList<String> attrNames = new ArrayList<String>();
 
-		if (dependancies.contains(DataDependancy.pageLinksIn)) {
+		if (dependancies.contains(DataDependency.pageLinksIn)) {
 
 			attrNames.add("inLinkGoogleMeasure") ;
 			attrNames.add("inLinkUnion") ;
 			attrNames.add("inLinkIntersection") ;
 
-			if (dependancies.contains(DataDependancy.linkCounts)) 
+			if (dependancies.contains(DataDependency.linkCounts)) 
 				attrNames.add("inLinkVectorMeasure") ;
 		}
 
-		if (dependancies.contains(DataDependancy.pageLinksOut)) {
+		if (dependancies.contains(DataDependency.pageLinksOut)) {
 
 			attrNames.add("outLinkGoogleMeasure") ;
 			attrNames.add("outLinkUnion") ;
 			attrNames.add("outLinkIntersection") ;
 
-			if (dependancies.contains(DataDependancy.linkCounts)) 
+			if (dependancies.contains(DataDependency.linkCounts)) 
 				attrNames.add("outLinkVectorMeasure") ;
 		}
 
@@ -294,11 +294,11 @@ public class ArticleComparer {
 
 		ArticleComparison cmp = new ArticleComparison(artA, artB) ;
 
-		if (dependancies.contains(DataDependancy.pageLinksIn)) 
-			cmp = setPageLinkFeatures(cmp, LinkDirection.In, dependancies.contains(DataDependancy.linkCounts)) ;
+		if (dependancies.contains(DataDependency.pageLinksIn)) 
+			cmp = setPageLinkFeatures(cmp, LinkDirection.In, dependancies.contains(DataDependency.linkCounts)) ;
 
-		if (dependancies.contains(DataDependancy.pageLinksOut)) 
-			cmp = setPageLinkFeatures(cmp, LinkDirection.Out, dependancies.contains(DataDependancy.linkCounts)) ;
+		if (dependancies.contains(DataDependency.pageLinksOut)) 
+			cmp = setPageLinkFeatures(cmp, LinkDirection.Out, dependancies.contains(DataDependency.linkCounts)) ;
 
 		if (!cmp.inLinkFeaturesSet() && !cmp.outLinkFeaturesSet())
 			return null ;
@@ -556,23 +556,23 @@ public class ArticleComparer {
 
 		TDoubleArrayList features = new TDoubleArrayList() ;
 
-		if (dependancies.contains(DataDependancy.pageLinksIn)) {
+		if (dependancies.contains(DataDependency.pageLinksIn)) {
 
 			features.add(wrapMissingValue(cmp.getInLinkGoogleMeasure())) ;
 			features.add(wrapMissingValue(cmp.getInLinkUnion()));
 			features.add(wrapMissingValue(cmp.getInLinkIntersectionProportion())) ;
 
-			if (dependancies.contains(DataDependancy.linkCounts)) 
+			if (dependancies.contains(DataDependency.linkCounts)) 
 				features.add(wrapMissingValue(cmp.getInLinkVectorMeasure())) ;
 		}
 
-		if (dependancies.contains(DataDependancy.pageLinksOut)) {
+		if (dependancies.contains(DataDependency.pageLinksOut)) {
 
 			features.add(wrapMissingValue(cmp.getOutLinkGoogleMeasure())) ;
 			features.add(wrapMissingValue(cmp.getOutLinkUnion()));
 			features.add(wrapMissingValue(cmp.getOutLinkIntersectionProportion())) ;
 
-			if (dependancies.contains(DataDependancy.linkCounts)) 
+			if (dependancies.contains(DataDependency.linkCounts)) 
 				features.add(wrapMissingValue(cmp.getOutLinkVectorMeasure())) ;
 		}
 

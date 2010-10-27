@@ -57,15 +57,39 @@
 	<!--
 		A database that should be cached to memory, to make access to it much more efficient. 
 		The value must correspond to an org.wikipedia.miner.db.WDatabase.DatabaseType. 
-		The mode attribute can be either 'compact' (default) or 'fast'. 
+		The priority attribute can be either 'space' (default) or 'speed'. 
 	-->
 	<databaseToCache priority="space">pageLinksIn</databaseToCache>
 	<databaseToCache priority="space">label</databaseToCache>
 
 
-	<!-- A file containing a Weka classifier for performing automatic disambiguation -->
-	<disambiguationModel>
-	</disambiguationModel>
+	<!--
+		A list of data dependencies that will be involved in generating relatedness measures between articles.
+		The more you add, the more accurate your measures will be, but the longer they will take to calculate. 
+		
+		The value must correspond to an org.wikipedia.miner.comparison.ArticleComparer.DataDependency 
+	-->
+	<articleComparisonDependency>pageLinksIn<articleComparisonDependency>
+
+	<!-- 
+		A file containing a Weka classifier for generating relatedness measures between articles
+		This must be trained using the same dependancies listed above.
+	 -->
+	<articleComparisonModel>
+	</articleComparisonModel>
+	
+	<!-- A file containing a Weka classifier for disambiguating pairs of labels -->
+	<labelDisambiguationModel>
+	</labelDisambiguationModel>
+	
+	<!-- A file containing a Weka classifier for generating relatedness measures between labels -->
+	<labelComparisonModel>
+	</labelComparisonModel>
+
+
+	<!-- A file containing a Weka classifier for performing automatic disambiguation of topics in documents -->
+	<topicDisambiguationModel>
+	</topicDisambiguationModel>
 
 
 	<!-- A file containing a Weka classifier for performing automatic link detection -->
