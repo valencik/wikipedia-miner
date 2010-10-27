@@ -55,7 +55,7 @@
 
 
 	<!--
-		A database that should be cached to memory, to make access to it much more efficient. 
+		A list of databases that should be cached to memory, to make access to them much more efficient. 
 		The value must correspond to an org.wikipedia.miner.db.WDatabase.DatabaseType. 
 		The priority attribute can be either 'space' (default) or 'speed'. 
 	-->
@@ -73,7 +73,7 @@
 
 	<!-- 
 		A file containing a Weka classifier for generating relatedness measures between articles
-		This must be trained using the same dependancies listed above.
+		This must be trained using the same dependencies listed above.
 	 -->
 	<articleComparisonModel>
 	</articleComparisonModel>
