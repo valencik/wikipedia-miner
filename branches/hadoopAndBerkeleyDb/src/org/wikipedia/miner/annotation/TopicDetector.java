@@ -101,7 +101,7 @@ public class TopicDetector {
 	public Vector<Topic> getTopics(PreprocessedDocument doc, RelatednessCache rc) throws Exception {
 		
 		if (rc == null)
-			rc = new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessDependancies()) ;
+			rc = new RelatednessCache(disambiguator.getArticleComparer()) ;
 		
 
 		//Vector<String> sentences = ss.getSentences(doc.getPreprocessedText(), SentenceSplitter.MULTIPLE_NEWLINES) ;
@@ -130,7 +130,7 @@ public class TopicDetector {
 	public Collection<Topic> getTopics(String text, RelatednessCache rc) throws Exception {
 		
 		if (rc == null)
-			rc = new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessDependancies()) ;
+			rc = new RelatednessCache(disambiguator.getArticleComparer()) ;
 			
 
 		//Vector<String> sentences = ss.getSentences(text, SentenceSplitter.MULTIPLE_NEWLINES) ;
@@ -144,7 +144,7 @@ public class TopicDetector {
 		return topics ;
 	}
 	
-	private void calculateRelatedness(Collection<Topic> topics, RelatednessCache cache) throws SQLException{
+	private void calculateRelatedness(Collection<Topic> topics, RelatednessCache cache) throws Exception{
 		
 		for (Topic topicA: topics) {
 			float avgRelatedness = 0 ;
@@ -241,7 +241,7 @@ public class TopicDetector {
 		
 		Context context ;
 		if (cache == null)
-			context = new Context(unambigLabels, new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessDependancies()), disambiguator.getMaxContextSize()) ;
+			context = new Context(unambigLabels, new RelatednessCache(disambiguator.getArticleComparer()), disambiguator.getMaxContextSize()) ;
 		
 		else 
 			context = new Context(unambigLabels, cache, disambiguator.getMaxContextSize()) ;	
@@ -269,10 +269,10 @@ public class TopicDetector {
 					if (!allowDisambiguations && sense.getType() == PageType.disambiguation)
 						continue ;
 
-					float relatedness = context.getRelatednessTo(sense) ;
-					float commonness = sense.getPriorProbability() ;
+					double relatedness = context.getRelatednessTo(sense) ;
+					double commonness = sense.getPriorProbability() ;
 
-					float disambigProb = disambiguator.getProbabilityOfSense(commonness, relatedness, context) ;
+					double disambigProb = disambiguator.getProbabilityOfSense(commonness, relatedness, context) ;
 
 					//System.out.println(" - sense " + sense + ", " + disambigProb) ;
 					
@@ -325,9 +325,9 @@ public class TopicDetector {
 	private class CachedSense implements Comparable<CachedSense>{
 		
 		int id ;
-		float commonness ;
-		float relatedness ;
-		float disambigConfidence ;
+		double commonness ;
+		double relatedness ;
+		double disambigConfidence ;
 
 		/**
 		 * Initializes a new CachedSense
@@ -337,7 +337,7 @@ public class TopicDetector {
 		 * @param relatedness the relatedness of this sense to the surrounding unambiguous topics
 		 * @param disambigConfidence the probability that this sense is valid, as defined by the disambiguator.
 		 */
-		public CachedSense(int id, float commonness, float relatedness, float disambigConfidence) {
+		public CachedSense(int id, double commonness, double relatedness, double disambigConfidence) {
 			this.id = id ;
 			this.commonness = commonness ;
 			this.relatedness = relatedness ;

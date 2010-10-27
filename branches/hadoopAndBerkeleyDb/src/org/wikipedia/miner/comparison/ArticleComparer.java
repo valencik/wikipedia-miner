@@ -20,29 +20,50 @@ import jsc.correlation.SpearmanCorrelation;
 import jsc.datastructures.PairedData;
 
 import org.apache.log4j.Logger;
+import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.DbLinkLocation;
 import org.wikipedia.miner.db.struct.DbLinkLocationList;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.model.Article.RelatednessDependancy;
 import org.wikipedia.miner.util.ProgressTracker;
+import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.ml.DoublePredictor;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.GaussianProcesses;
-import weka.core.Attribute;
-import weka.core.FastVector;
 import weka.core.Instance;
-import weka.core.Instances;
 
 public class ArticleComparer {
 
+	/**
+	 * Data used to generate article relatedness measures. 
+	 * 
+	 */
+	public enum DataDependancy {
+		
+		
+		/**
+		 * Use links made to articles to measure relatedness. You should cache {@link DatabaseType#pageLinksIn} if using this mode extensively.  
+		 */
+		pageLinksIn,
+		
+		/**
+		 * Use links made from articles to measure relatedness. You should cache {@link DatabaseType#pageLinksOut} and {@link DatabaseType#pageLinkCounts} if using this mode extensively. 
+		 */
+		pageLinksOut, 
+		
+		/**
+		 * Use link counts to measure relatedness. You should cache {@link DatabaseType#pageLinkCounts} if using this mode extensively. 
+		 */
+		linkCounts
+	} ;
+	
 	private enum LinkDirection{In, Out} ;
 
 
 	Wikipedia wikipedia ;
-	EnumSet<RelatednessDependancy> dependancies ;
+	EnumSet<DataDependancy> dependancies ;
 
 	int wikipediaArticleCount ;
 	Double m ;
@@ -50,10 +71,24 @@ public class ArticleComparer {
 
 	DoublePredictor relatednessMeasurer ;
 
-	public ArticleComparer(Wikipedia wikipedia, EnumSet<RelatednessDependancy> dependancies) throws Exception {
-
-		if (!dependancies.contains(RelatednessDependancy.inLinks) && !dependancies.contains(RelatednessDependancy.outLinks))
-			throw new Exception("Dependancies must include at least inLinks or outLinks") ;
+	public ArticleComparer(Wikipedia wikipeida) throws Exception {
+		
+		WikipediaConfiguration conf = wikipedia.getConfig() ;
+		
+		if (conf.getArticleComparisonDependancies() == null) 
+			throw new Exception("The given wikipedia configuration does not specify default article comparison data dependancies");
+		
+		init(wikipeida, conf.getArticleComparisonDependancies()) ;
+	}
+	
+	public ArticleComparer(Wikipedia wikipedia, EnumSet<DataDependancy> dependancies) throws Exception {
+		init(wikipedia, dependancies) ;
+	}
+	
+	private void init(Wikipedia wikipedia, EnumSet<DataDependancy> dependancies) throws Exception {
+		
+		if (!dependancies.contains(DataDependancy.pageLinksIn) && !dependancies.contains(DataDependancy.pageLinksOut))
+			throw new Exception("Dependancies must include at least pageLinksIn or pageLinksOut") ;
 
 		this.wikipedia = wikipedia ;
 		this.dependancies = dependancies ;
@@ -63,27 +98,31 @@ public class ArticleComparer {
 
 		ArrayList<String> attrNames = new ArrayList<String>();
 
-		if (dependancies.contains(RelatednessDependancy.inLinks)) {
+		if (dependancies.contains(DataDependancy.pageLinksIn)) {
 
 			attrNames.add("inLinkGoogleMeasure") ;
 			attrNames.add("inLinkUnion") ;
 			attrNames.add("inLinkIntersection") ;
 
-			if (dependancies.contains(RelatednessDependancy.linkCounts)) 
+			if (dependancies.contains(DataDependancy.linkCounts)) 
 				attrNames.add("inLinkVectorMeasure") ;
 		}
 
-		if (dependancies.contains(RelatednessDependancy.outLinks)) {
+		if (dependancies.contains(DataDependancy.pageLinksOut)) {
 
 			attrNames.add("outLinkGoogleMeasure") ;
 			attrNames.add("outLinkUnion") ;
 			attrNames.add("outLinkIntersection") ;
 
-			if (dependancies.contains(RelatednessDependancy.linkCounts)) 
+			if (dependancies.contains(DataDependancy.linkCounts)) 
 				attrNames.add("outLinkVectorMeasure") ;
 		}
 
 		relatednessMeasurer = new DoublePredictor("articleRelatednessMeasurer", attrNames.toArray(new String[attrNames.size()]), "articleRelatedness") ;
+		
+		
+		if (wikipedia.getConfig().getArticleComparisonModel() != null) 
+			this.loadClassifier(wikipedia.getConfig().getArticleComparisonModel()) ;
 	}
 
 	public Double getRelatedness(Article artA, Article artB) throws Exception {
@@ -255,11 +294,11 @@ public class ArticleComparer {
 
 		ArticleComparison cmp = new ArticleComparison(artA, artB) ;
 
-		if (dependancies.contains(RelatednessDependancy.inLinks)) 
-			cmp = setPageLinkFeatures(cmp, LinkDirection.In, dependancies.contains(RelatednessDependancy.linkCounts)) ;
+		if (dependancies.contains(DataDependancy.pageLinksIn)) 
+			cmp = setPageLinkFeatures(cmp, LinkDirection.In, dependancies.contains(DataDependancy.linkCounts)) ;
 
-		if (dependancies.contains(RelatednessDependancy.outLinks)) 
-			cmp = setPageLinkFeatures(cmp, LinkDirection.Out, dependancies.contains(RelatednessDependancy.linkCounts)) ;
+		if (dependancies.contains(DataDependancy.pageLinksOut)) 
+			cmp = setPageLinkFeatures(cmp, LinkDirection.Out, dependancies.contains(DataDependancy.linkCounts)) ;
 
 		if (!cmp.inLinkFeaturesSet() && !cmp.outLinkFeaturesSet())
 			return null ;
@@ -517,23 +556,23 @@ public class ArticleComparer {
 
 		TDoubleArrayList features = new TDoubleArrayList() ;
 
-		if (dependancies.contains(RelatednessDependancy.inLinks)) {
+		if (dependancies.contains(DataDependancy.pageLinksIn)) {
 
 			features.add(wrapMissingValue(cmp.getInLinkGoogleMeasure())) ;
 			features.add(wrapMissingValue(cmp.getInLinkUnion()));
 			features.add(wrapMissingValue(cmp.getInLinkIntersectionProportion())) ;
 
-			if (dependancies.contains(RelatednessDependancy.linkCounts)) 
+			if (dependancies.contains(DataDependancy.linkCounts)) 
 				features.add(wrapMissingValue(cmp.getInLinkVectorMeasure())) ;
 		}
 
-		if (dependancies.contains(RelatednessDependancy.outLinks)) {
+		if (dependancies.contains(DataDependancy.pageLinksOut)) {
 
 			features.add(wrapMissingValue(cmp.getOutLinkGoogleMeasure())) ;
 			features.add(wrapMissingValue(cmp.getOutLinkUnion()));
 			features.add(wrapMissingValue(cmp.getOutLinkIntersectionProportion())) ;
 
-			if (dependancies.contains(RelatednessDependancy.linkCounts)) 
+			if (dependancies.contains(DataDependancy.linkCounts)) 
 				features.add(wrapMissingValue(cmp.getOutLinkVectorMeasure())) ;
 		}
 

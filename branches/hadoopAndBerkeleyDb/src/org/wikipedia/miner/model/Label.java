@@ -1,13 +1,9 @@
 package org.wikipedia.miner.model;
 
-import java.util.EnumSet;
-import java.util.TreeSet;
 
 import org.wikipedia.miner.db.WEnvironment;
 import org.wikipedia.miner.db.struct.DbLabel;
 import org.wikipedia.miner.db.struct.DbSenseForLabel;
-import org.wikipedia.miner.model.Article.RelatednessDependancy;
-import org.wikipedia.miner.util.RelatednessCache;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.text.TextProcessor;
 
@@ -130,11 +126,11 @@ public class Label {
 	/**
 	 * @return the probability that this label is used as a link in Wikipedia ({@link #getLinkDocCount()}/{@link #getDocCount()}.  
 	 */
-	public float getLinkProbability() {
+	public double getLinkProbability() {
 		if (!detailsSet) setDetails() ;
 		
 		if (textDocCount > 0)		
-			return (float) linkDocCount/textDocCount ;
+			return (double) linkDocCount/textDocCount ;
 		else
 			return 0 ;
 	}
@@ -145,123 +141,7 @@ public class Label {
 	public Sense[] getSenses() {
 		if (!detailsSet) setDetails() ;	
 		return senses ;
-	}
-	
-	/**
-	 * Returns the semantic relatedness of this label to another, calculated using the given relatedness modes
-	 * 
-	 * The relatedness measure is described in:
-	 * Milne, D. and Witten, I.H. (2008) An effective, low-cost measure of semantic relatedness obtained from Wikipedia links. In Proceedings of the first AAAI Workshop on Wikipedia and Artificial Intelligence (WIKIAI'08), Chicago, I.L.
-	 * 
-	 * @param label the anchor to which this should be compared.
-	 * @param modes the modes to use when measuring relatedness between label senses
-	 * @return see above.
-	 */
-	public float getRelatednessTo(Label label, EnumSet<RelatednessDependancy> dependancies) {
-		
-		DisambiguatedSensePair sp = this.disambiguateAgainst(label, dependancies) ;
-		return sp.getRelatedness() ;
-	}
-	
-	
-	/**
-	 * Returns the semantic relatedness of this label to another, calculated using the modes recommended by the current wikipedia configuration
-	 * 
-	 * @see #getRelatednessTo(Label,EnumSet)
-	 * @see WikipediaConfiguration#getReccommendedRelatednessModes() ;
-	 *	 
-	 * @param label the anchor to which this should be compared.
-	 * @return see above.
-	 */
-	public float getRelatednessTo(Label label) {
-		
-		EnumSet<RelatednessDependancy> dependancies = env.getConfiguration().getReccommendedRelatednessDependancies() ;
-		
-		DisambiguatedSensePair sp = this.disambiguateAgainst(label, dependancies) ;
-		return sp.getRelatedness() ;
-	}
-	
-	
-	/**
-	 * Disambiguates this label against another, by evaluating the relatedness and prior probabilities of the senses of each label.
-	 * 
-	 * The approach is described in:
-	 * Milne, D. and Witten, I.H. (2008) An effective, low-cost measure of semantic relatedness obtained from Wikipedia links. In Proceedings of the first AAAI Workshop on Wikipedia and Artificial Intelligence (WIKIAI'08), Chicago, I.L.
-	 *
-	 * @param label the label to disambiguate against
-	 * @param modes the modes to use when measuring relatedness between label senses
-	 * @return a DisambiguatedSensePair describing the senses chosen for each label, and the relatedness between them.
-	 */
-	public DisambiguatedSensePair disambiguateAgainst(Label label, EnumSet<RelatednessDependancy> dependancies) {
-		
-		Label anchCombined = new Label(env, this.getText() + " " + label.getText(), null) ;
-		double wc = anchCombined.getLinkDocCount() ;
-		if (wc > 0) 
-			wc = Math.log(wc)/30 ;
-		
-		double minProb = 0.01 ;
-		double benchmark_relatedness = 0 ;
-		double benchmark_distance = 0.40 ;
-		
-		TreeSet<DisambiguatedSensePair> candidates = new TreeSet<DisambiguatedSensePair>() ;
-		
-		int sensesA = 0 ;
-		int sensesB = 0 ;
-		
-		
-		RelatednessCache rc = new RelatednessCache(dependancies) ;
-
-		for (Label.Sense senseA: this.getSenses()) {
-
-			if (senseA.getPriorProbability() < minProb) break ;
-			sensesA++ ;
-			sensesB = 0 ;
-
-			for (Label.Sense senseB: label.getSenses()) {
-
-				if (senseB.getPriorProbability() < minProb) break ;
-				sensesB++ ;
-
-				//double relatedness = artA.getRelatednessTo(artB) ;
-				float relatedness = rc.getRelatedness(senseA, senseB) ;
-				float obviousness = (senseA.getPriorProbability() + senseB.getPriorProbability()) / 2 ;
-
-				if (relatedness > (benchmark_relatedness - benchmark_distance)) {
-
-					if (relatedness > benchmark_relatedness + benchmark_distance) {
-						//this has set a new benchmark of what we consider likely
-						benchmark_relatedness = relatedness ;
-						candidates.clear() ;
-					}
-					candidates.add(new DisambiguatedSensePair(senseA, senseB, relatedness, obviousness)) ;
-				}
-			}
-		}
-		
-		DisambiguatedSensePair sp = candidates.first() ;
-		sp.relatedness += wc ;
-		if (sp.relatedness > 1)
-			sp.relatedness = 1 ;
-		
-		return sp ;
-	}
-	
-	/**
-	 * Disambiguates this label against another using the relatedness modes recommended by the current Wikipedia configuration. 
-	 * 
-	 * @see #disambiguateAgainst(Label, EnumSet)
-	 * @see WikipediaConfiguration#getReccommendedRelatednessModes() ;
-	 * 
-	 * @param label
-	 * @return a DisambiguatedSensePair describing the senses chosen for each label, and the relatedness between them.
-	 */
-	public DisambiguatedSensePair disambiguateAgainst(Label label) {
-		
-		EnumSet<RelatednessDependancy> dependancies = env.getConfiguration().getReccommendedRelatednessDependancies() ;
-		
-		return disambiguateAgainst(label, dependancies) ;
-	}
-	
+	}	
 	
 	/**
 	 * A possible sense for a label
@@ -334,7 +214,7 @@ public class Label {
 		 * 
 		 * @return the probability that the surrounding label goes to this destination 
 		 */
-		public float getPriorProbability() {
+		public double getPriorProbability() {
 
 			if (getSenses().length == 1)
 				return 1 ;
@@ -342,7 +222,7 @@ public class Label {
 			if (linkOccCount == 0)
 				return 0 ;
 			else 			
-				return ((float)sLinkOccCount) / linkOccCount ;
+				return ((double)sLinkOccCount) / linkOccCount ;
 		}
 		
 		/**
@@ -355,78 +235,6 @@ public class Label {
 		}
 		
 	}
-	
-	/**
-	 * The result of measuring the relatedness of two labels: the disambiguated sense chosen to 
-	 * represent each label, and their relatedness.
-	 */
-	public class DisambiguatedSensePair implements Comparable<DisambiguatedSensePair> {
-		
-		private Sense senseA ;
-		private Sense senseB ;
-		private float relatedness ;
-		private float obviousness ;
-		
-		//constructor =============================================================
-		
-		protected DisambiguatedSensePair(Sense senseA, Sense senseB, float relatedness, float obviousness) {
-			this.senseA = senseA ;
-			this.senseB = senseB ;
-			this.relatedness = relatedness ;
-			this.obviousness = obviousness ;			
-		}
-		
-		//public ==================================================================
-		
-		@Override
-		public int compareTo(DisambiguatedSensePair cp) {
-			return new Float(cp.obviousness).compareTo(obviousness) ;
-		}
-		
-		@Override
-		public String toString() {
-			return senseA + "," + senseB + ",r=" + relatedness + ",o=" + obviousness ;
-		}
-		
-		
-		/**
-		 * Returns the sense chosen to represent the first label
-		 * 
-		 * @return the sense chosen to represent the first label
-		 */
-		public Sense getSenseA() {
-			return senseA ;
-		}
-		
-		/**
-		 * Returns the sense chosen to represent the second label
-		 * 
-		 * @return the sense chosen to represent the second label
-		 */
-		public Sense getSenseB() {
-			return senseB ;
-		}
-		
-		/**
-		 * Returns the semantic relatedness of the two labels
-		 * 
-		 * @return the semantic relatedness of the two labels
-		 */
-		public float getRelatedness() {
-			return relatedness ;
-		}
-		
-		/**
-		 * Returns the average prior probability of the two senses 
-		 * 
-		 * @return the average prior probability of the two senses 
-		 */
-		public float getAvgPriorProbability() {
-			return obviousness ;
-		}
-	}
-	
-	
 	
 	
 	//protected and private ====================================================

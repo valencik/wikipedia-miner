@@ -90,12 +90,12 @@ public class WikifyService extends Service {
 			
 			try {
 				Disambiguator d = new Disambiguator(w) ;
-				d.loadClassifier(w.getConfig().getDisambigModel()) ;
+				d.loadClassifier(w.getConfig().getTopicDisambiguationModel()) ;
 				
 				TopicDetector td = new TopicDetector(w, d, false, false) ;
 							
 				LinkDetector ld = new LinkDetector(w) ;
-				ld.loadClassifier(w.getConfig().getDetectionModel()) ;
+				ld.loadClassifier(w.getConfig().getLinkDetectionModel()) ;
 				
 				topicDetectors.put(wikiName, td) ;
 				linkDetectors.put(wikiName, ld) ;
@@ -119,7 +119,7 @@ public class WikifyService extends Service {
 		ArrayList<Topic> detectedTopics = new ArrayList<Topic>() ;
 		String wikifiedDoc = wikifyAndGatherTopics(request, detectedTopics, wikipedia) ;
 		
-		float docScore = 0 ;
+		double docScore = 0 ;
 		for (Topic t:detectedTopics)
 			docScore = docScore + t.getRelatednessToOtherTopics() ;
 		

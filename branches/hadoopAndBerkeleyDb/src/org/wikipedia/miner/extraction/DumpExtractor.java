@@ -4,6 +4,8 @@ import gnu.trove.TIntArrayList;
 import gnu.trove.TIntObjectHashMap;
 
 import java.io.*;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.* ;
 
 import org.apache.hadoop.conf.Configuration;
@@ -222,11 +224,16 @@ public class DumpExtractor {
 		else
 			stats = new TreeMap<String, Long>() ;
 		
+		DateFormat timeFormat = new SimpleDateFormat("HH:mm:ss") ;
+		
 		if (lastCompletedStep == null) {
+			
+			
 			ExtractionStep currStep = ExtractionStep.page ;
 			Logger.getLogger(DumpExtractor.class).info("Starting " + currStep + " step") ;
 			dfs.delete(new Path(outputDir + "/" + getDirectoryName(currStep)), true) ;
 
+			long startTime = System.currentTimeMillis() ;
 			
 			PageStep step = new PageStep() ;
 						
@@ -244,6 +251,9 @@ public class DumpExtractor {
 			//update progress
 			lastCompletedStep = currStep ;
 			writeProgress(lastCompletedStep) ;
+			
+			//print time
+			System.out.println(currStep + " step completed in " + timeFormat.format(System.currentTimeMillis()-startTime)) ;
 		}
 
 
@@ -251,6 +261,8 @@ public class DumpExtractor {
 			ExtractionStep currStep = ExtractionStep.redirect ;
 			Logger.getLogger(DumpExtractor.class).info("Starting " + currStep + " step") ;
 			dfs.delete(new Path(outputDir + "/" + getDirectoryName(currStep)), true) ;
+			
+			long startTime = System.currentTimeMillis() ;
 			
 			RedirectStep step = new RedirectStep() ;
 			result = ToolRunner.run(new Configuration(), step, args);
@@ -266,6 +278,9 @@ public class DumpExtractor {
 			//update progress
 			lastCompletedStep = currStep ;
 			writeProgress(lastCompletedStep) ;
+			
+			//print time
+			System.out.println(currStep + " step completed in " + timeFormat.format(System.currentTimeMillis()-startTime)) ;
 		}
 
 
@@ -273,6 +288,8 @@ public class DumpExtractor {
 			ExtractionStep currStep = ExtractionStep.labelSense ;
 			Logger.getLogger(DumpExtractor.class).info("Starting " + currStep + " step") ;
 			dfs.delete(new Path(outputDir + "/" + getDirectoryName(currStep)), true) ;
+			
+			long startTime = System.currentTimeMillis() ;
 			
 			LabelSensesStep step = new LabelSensesStep() ;
 			result = ToolRunner.run(new Configuration(), step, args);
@@ -287,12 +304,17 @@ public class DumpExtractor {
 			//update progress
 			lastCompletedStep = currStep ;
 			writeProgress(lastCompletedStep) ;
+			
+			//print time
+			System.out.println(currStep + " step completed in " + timeFormat.format(System.currentTimeMillis()-startTime)) ;
 		}
 		
 		if (lastCompletedStep.compareTo(ExtractionStep.pageLabel) < 0) {
 			ExtractionStep currStep = ExtractionStep.pageLabel ;
 			Logger.getLogger(DumpExtractor.class).info("Starting " + currStep + " step") ;
 			dfs.delete(new Path(outputDir + "/" + getDirectoryName(currStep)), true) ;
+			
+			long startTime = System.currentTimeMillis() ;
 			
 			PageLabelStep step = new PageLabelStep() ;
 			result = ToolRunner.run(new Configuration(), step, args);
@@ -306,12 +328,17 @@ public class DumpExtractor {
 			//update progress
 			lastCompletedStep = currStep ;
 			writeProgress(lastCompletedStep) ;
+			
+			//print time
+			System.out.println(currStep + " step completed in " + timeFormat.format(System.currentTimeMillis()-startTime)) ;
 		}
 		
 		if (lastCompletedStep.compareTo(ExtractionStep.labelOccurrence) < 0) {
 			ExtractionStep currStep = ExtractionStep.labelOccurrence ;
 			Logger.getLogger(DumpExtractor.class).info("Starting " + currStep + " step") ;
 			dfs.delete(new Path(outputDir + "/" + getDirectoryName(currStep)), true) ;
+			
+			long startTime = System.currentTimeMillis() ;
 			
 			LabelOccurrencesStep step = new LabelOccurrencesStep() ;
 			result = ToolRunner.run(new Configuration(), step, args);
@@ -325,12 +352,17 @@ public class DumpExtractor {
 			//update progress
 			lastCompletedStep = currStep ;
 			writeProgress(lastCompletedStep) ;
+			
+			//print time
+			System.out.println(currStep + " step completed in " + timeFormat.format(System.currentTimeMillis()-startTime)) ;
 		}
 
 		if (lastCompletedStep.compareTo(ExtractionStep.pageLink) < 0) {
 			ExtractionStep currStep = ExtractionStep.pageLink ;
 			Logger.getLogger(DumpExtractor.class).info("Starting " + currStep + " step") ;
 			dfs.delete(new Path(outputDir + "/" + getDirectoryName(currStep)), true) ;
+			
+			long startTime = System.currentTimeMillis() ;
 			
 			result = ToolRunner.run(new Configuration(), new PageLinkSummaryStep(), args);
 			if (result != 0) {
@@ -344,12 +376,17 @@ public class DumpExtractor {
 			//update progress
 			lastCompletedStep = currStep ;
 			writeProgress(lastCompletedStep) ;
+			
+			//print time
+			System.out.println(currStep + " step completed in " + timeFormat.format(System.currentTimeMillis()-startTime)) ;
 		}
 
 		if (lastCompletedStep.compareTo(ExtractionStep.categoryParent) < 0) {
 			ExtractionStep currStep = ExtractionStep.categoryParent ;
 			Logger.getLogger(DumpExtractor.class).info("Starting " + currStep + " step") ;
 			dfs.delete(new Path(outputDir + "/" + getDirectoryName(currStep)), true) ;
+			
+			long startTime = System.currentTimeMillis() ;
 			
 			result = ToolRunner.run(new Configuration(), new CategoryLinkSummaryStep(currStep), args);
 			if (result != 0) {
@@ -363,6 +400,9 @@ public class DumpExtractor {
 			//update progress
 			lastCompletedStep = currStep ;
 			writeProgress(lastCompletedStep) ;
+			
+			//print time
+			System.out.println(currStep + " step completed in " + timeFormat.format(System.currentTimeMillis()-startTime)) ;
 		}
 
 
@@ -370,6 +410,8 @@ public class DumpExtractor {
 			ExtractionStep currStep = ExtractionStep.articleParent ;
 			Logger.getLogger(DumpExtractor.class).info("Starting " + currStep + " step") ;
 			dfs.delete(new Path(outputDir + "/" + getDirectoryName(currStep)), true) ;
+			
+			long startTime = System.currentTimeMillis() ;
 			
 			result = ToolRunner.run(new Configuration(), new CategoryLinkSummaryStep(currStep), args);
 			if (result != 0) {
@@ -387,11 +429,11 @@ public class DumpExtractor {
 			//update progress
 			lastCompletedStep = currStep ;
 			writeProgress(lastCompletedStep) ;
+			
+			//print time
+			System.out.println(currStep + " step completed in " + timeFormat.format(System.currentTimeMillis()-startTime)) ;
 		}
 
-
-		
-		
 		return result ;
 	}
 

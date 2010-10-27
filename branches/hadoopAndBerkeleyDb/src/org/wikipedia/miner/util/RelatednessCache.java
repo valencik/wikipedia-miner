@@ -19,46 +19,40 @@
 
 package org.wikipedia.miner.util;
 
-import java.util.EnumSet;
-
+import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.model.Article;
-import org.wikipedia.miner.model.Article.RelatednessDependancy;
 
 import gnu.trove.* ;
 
 /**
- * @author David Milne
- *
- * This class caches the results of calculating relatedness measures; 
- * If all relatedness comparisons are performed via this class, then no calculations will be repeated.
+ * This class caches the results of calculating relatedness measures between articles; 
+ * If all article comparisons are performed via this class, then no calculations will be repeated.
  */
 public class RelatednessCache {
 
-	TLongFloatHashMap cachedRelatedness ;
-	EnumSet<RelatednessDependancy> relatednessDependancies ;
+	TLongDoubleHashMap cachedRelatedness ;
+	ArticleComparer comparer ;
 	
 	/**
-	 * Initialises the relatedness cache, where relatedness will be measured using the given modes
-	 * 
-	 * @see Article#getRelatednessTo(Article, EnumSet) 
-	 * 
-	 * @param modes the modes that will be used to measure relatedness
+	 * Initialises the relatedness cache, where relatedness will be measured using the given {@link  ArticleComparer}.
+	 *  
+	 * @param comparer the comparer to use. 
 	 */
-	public RelatednessCache(EnumSet<RelatednessDependancy> dependancies) {
-		cachedRelatedness = new TLongFloatHashMap() ;
-		relatednessDependancies = dependancies ;
+	public RelatednessCache(ArticleComparer comparer) {
+		cachedRelatedness = new TLongDoubleHashMap() ;
+		this.comparer = comparer ;
 	}
 	
 	
 	/**
 	 * Calculates (or retrieves) the semantic relatedness of two articles. 
-	 * The result will be identical to that returned by art1.getRelatednessTo(art2) or art2.getRelatednessTo(art1)
+	 * The result will be identical to that returned by {@link ArticleComparer#getRelatedness(Article, Article)}
 	 * 
 	 * @param art1 
 	 * @param art2
 	 * @return the semantic relatedness of art1 and art2
 	 */
-	public float getRelatedness(Article art1, Article art2) {
+	public double getRelatedness(Article art1, Article art2) throws Exception {
 		
 		//generate unique key for this pair
 		long min = Math.min(art1.getId(), art2.getId()) ;
@@ -66,7 +60,7 @@ public class RelatednessCache {
 		long key = min + (max << 30) ;
 				
 		if (!cachedRelatedness.containsKey(key)) {		
-			float rel = art1.getRelatednessTo(art2, relatednessDependancies) ;		
+			double rel = comparer.getRelatedness(art1, art2) ;		
 			cachedRelatedness.put(key, rel) ;
 			return rel ;
 		} else {			
