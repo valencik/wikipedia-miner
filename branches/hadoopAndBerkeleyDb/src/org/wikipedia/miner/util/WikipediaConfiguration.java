@@ -19,7 +19,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.wikipedia.miner.comparison.ArticleComparer.DataDependancy;
+import org.wikipedia.miner.comparison.ArticleComparer;
+import org.wikipedia.miner.comparison.ArticleComparer.DataDependency;
 import org.wikipedia.miner.db.WDatabase.CachePriority;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.util.text.TextProcessor;
@@ -27,7 +28,7 @@ import org.xml.sax.SAXException;
 
 public class WikipediaConfiguration {
 	
-	private enum ParamName{langCode,databaseDirectory,defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
+	private enum ParamName{langCode,databaseDirectory,defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
 	
 	private String langCode ;
 
@@ -38,7 +39,7 @@ public class WikipediaConfiguration {
 
 	private HashSet<String> stopwords = new HashSet<String>() ;
 	
-	private EnumSet<DataDependancy> articleComparisonDependancies ;
+	private EnumSet<DataDependency> articleComparisonDependencies ;
 	private File articleComparisonModel ;
 	private File labelDisambiguationModel ;
 	private File labelComparisonModel ;
@@ -152,12 +153,12 @@ public class WikipediaConfiguration {
 			stopwords.add(line.trim()) ;
 	}
 	
-	public EnumSet<DataDependancy> getArticleComparisonDependancies() {
-		return articleComparisonDependancies ;
+	public EnumSet<DataDependency> getArticleComparisonDependancies() {
+		return articleComparisonDependencies ;
 	}
 	
-	public void setArticleComparisonDependancies(EnumSet<DataDependancy> dependancies) {
-		articleComparisonDependancies = dependancies ;
+	public void setArticleComparisonDependancies(EnumSet<DataDependency> dependancies) {
+		articleComparisonDependencies = dependancies ;
 	}
 	
 	public File getArticleComparisonModel() {
@@ -200,34 +201,36 @@ public class WikipediaConfiguration {
 		topicDisambiguationModel = model;
 	}
 	
-	public EnumSet<DataDependancy> getReccommendedRelatednessDependancies() {
+	public EnumSet<DataDependency> getReccommendedRelatednessDependancies() {
 		
-		ArrayList<DataDependancy> dependancies = new ArrayList<DataDependancy>() ;
+		ArrayList<DataDependency> dependancies = new ArrayList<DataDependency>() ;
 		
 		boolean valid = false ;
 		
 		if (this.databasesToCache.containsKey(DatabaseType.pageLinksIn)) {
-			dependancies.add(DataDependancy.pageLinksIn) ;
+			dependancies.add(DataDependency.pageLinksIn) ;
 			valid = true ;
 		}
 		
 		if (this.databasesToCache.containsKey(DatabaseType.pageLinksOut)) {
-			dependancies.add(DataDependancy.pageLinksOut) ;
+			dependancies.add(DataDependency.pageLinksOut) ;
 			valid = true ;
 		}
 		
 		if (this.databasesToCache.containsKey(DatabaseType.pageLinkCounts)) {
-			dependancies.add(DataDependancy.linkCounts) ;	
+			dependancies.add(DataDependency.linkCounts) ;	
 		}
 		
 		if (!valid)
-			dependancies.add(DataDependancy.pageLinksIn) ;
+			dependancies.add(DataDependency.pageLinksIn) ;
 		
 		return EnumSet.copyOf(dependancies) ;
 	}
 	
 	@SuppressWarnings("unchecked")
 	private void initFromXml(Element xml) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+		
+		ArrayList<ArticleComparer.DataDependency> artCompDependencies = new ArrayList<ArticleComparer.DataDependency>() ;
 		
 		NodeList children = xml.getChildNodes() ;
 		
@@ -275,6 +278,9 @@ public class WikipediaConfiguration {
 				case stopwordFile:
 					this.setStopwords(new File(paramValue)) ;
 					break ;
+				case articleComparisonDependency: 
+					artCompDependencies.add(ArticleComparer.DataDependency.valueOf(paramValue)) ;
+					break ;
 				case articleComparisonModel:
 					articleComparisonModel = new File(paramValue) ;
 					break ;
@@ -294,6 +300,8 @@ public class WikipediaConfiguration {
 					Logger.getLogger(WikipediaConfiguration.class).warn("Ignoring unknown parameter: '" + paramName + "'") ;
 				} ;
 			}
+			
+			this.articleComparisonDependencies = EnumSet.copyOf(artCompDependencies) ; ;
 			
 		
 			//TODO: throw fit if mandatory params (langCode, dbDirectory) are missing. 	
