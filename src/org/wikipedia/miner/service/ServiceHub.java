@@ -18,6 +18,8 @@ import org.apache.xerces.parsers.DOMParser;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Text;
+import org.wikipedia.miner.comparison.ArticleComparer;
+import org.wikipedia.miner.comparison.LabelComparer;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.xml.sax.InputSource;
@@ -29,7 +31,10 @@ public class ServiceHub {
 	private static ServiceHub instance ;
 	
 	private HubConfiguration config ;
-	private HashMap<String, Wikipedia> wikipedias ;
+	private HashMap<String, Wikipedia> wikipediasByName ;
+	
+	private HashMap<String, ArticleComparer> articleComparersByWikiName ;
+	private HashMap<String, LabelComparer> labelComparersByWikiName ;
 	
 	
 	public HashSet<Service> registeredServices ;
@@ -49,7 +54,11 @@ public class ServiceHub {
 	// Protect the constructor, so no other class can call it
 	private ServiceHub(ServletContext context) throws ServletException {
 
-		wikipedias = new HashMap<String, Wikipedia>() ;
+		wikipediasByName = new HashMap<String, Wikipedia>() ;
+		articleComparersByWikiName = new HashMap<String, ArticleComparer>()  ;
+		labelComparersByWikiName = new HashMap<String, LabelComparer>()  ;
+		
+		
 		registeredServices = new HashSet<Service>() ;
 				
 		try {
@@ -61,7 +70,18 @@ public class ServiceHub {
 				WikipediaConfiguration wikiConfig = new WikipediaConfiguration(wikiConfigFile);
 				
 				Wikipedia wikipedia = new Wikipedia(wikiConfig, true) ;
-				wikipedias.put(wikiName, wikipedia) ;
+				wikipediasByName.put(wikiName, wikipedia) ;
+				
+				ArticleComparer artCmp = null ;
+				if (wikiConfig.getArticleComparisonModel() != null) {
+					artCmp = new ArticleComparer(wikipedia) ;
+					articleComparersByWikiName.put(wikiName, artCmp) ;
+				}
+				
+				if (artCmp != null && wikiConfig.getLabelDisambiguationModel() != null && wikiConfig.getLabelComparisonModel() != null) {
+					LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
+					labelComparersByWikiName.put(wikiName, lblCmp) ;
+				}
 			}
 		
 		
@@ -91,7 +111,7 @@ public class ServiceHub {
 		
 		if (registeredServices.isEmpty()) {
 			
-			for (Wikipedia w:wikipedias.values()) 
+			for (Wikipedia w:wikipediasByName.values()) 
 				w.close() ;
 		}
 	}
@@ -101,18 +121,25 @@ public class ServiceHub {
 	}
 	
 	public Wikipedia getWikipedia(String wikiName) {
-		return wikipedias.get(wikiName) ;
+		return wikipediasByName.get(wikiName) ;
 	}
 	
 	public String getWikipediaDescription(String wikiName) {
 		return config.getWikipediaDescription(wikiName) ;
 	}
 	
-	
 	public String[] getWikipediaNames() {
 		
-		Set<String> wikipediaNames = wikipedias.keySet() ;
+		Set<String> wikipediaNames = wikipediasByName.keySet() ;
 		return wikipediaNames.toArray(new String[wikipediaNames.size()]) ;
+	}
+	
+	public ArticleComparer getArticleComparer(String wikiName) {
+		return articleComparersByWikiName.get(wikiName) ;
+	}
+	
+	public LabelComparer getLabelComparer(String wikiName) {
+		return labelComparersByWikiName.get(wikiName) ;
 	}
 	
 	public MarkupFormatter getFormatter() {

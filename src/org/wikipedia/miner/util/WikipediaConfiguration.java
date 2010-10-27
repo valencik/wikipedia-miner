@@ -19,15 +19,15 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.wikipedia.miner.comparison.ArticleComparer.DataDependancy;
 import org.wikipedia.miner.db.WDatabase.CachePriority;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
-import org.wikipedia.miner.model.Article.RelatednessDependancy;
 import org.wikipedia.miner.util.text.TextProcessor;
 import org.xml.sax.SAXException;
 
 public class WikipediaConfiguration {
 	
-	private enum ParamName{langCode,databaseDirectory,defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,disambiguationModel,linkDetectionModel,unknown} ;
+	private enum ParamName{langCode,databaseDirectory,defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
 	
 	private String langCode ;
 
@@ -37,10 +37,15 @@ public class WikipediaConfiguration {
 	private HashMap<DatabaseType, CachePriority> databasesToCache = new HashMap<DatabaseType, CachePriority>() ;
 
 	private HashSet<String> stopwords = new HashSet<String>() ;
-	private File detectionModel ;
-	private File disambigModel ;
-
-
+	
+	private EnumSet<DataDependancy> articleComparisonDependancies ;
+	private File articleComparisonModel ;
+	private File labelDisambiguationModel ;
+	private File labelComparisonModel ;
+	
+	private File topicDisambiguationModel ;
+	private File linkDetectionModel ;
+	
 	private int minLinksIn = 0;
 	private float minLinkProbability = 0 ;
 	private float minSenseProbability = 0 ;
@@ -146,45 +151,77 @@ public class WikipediaConfiguration {
 		while ((line=input.readLine()) != null) 
 			stopwords.add(line.trim()) ;
 	}
-
-	public File getDetectionModel() {
-		return detectionModel;
-	}
-
-	public void setDetectionModel(File detectionModel) {
-		this.detectionModel = detectionModel;
-	}
-
-	public File getDisambigModel() {
-		return disambigModel;
-	}
-
-	public void setDisambigModel(File disambigModel) {
-		this.disambigModel = disambigModel;
+	
+	public EnumSet<DataDependancy> getArticleComparisonDependancies() {
+		return articleComparisonDependancies ;
 	}
 	
-	public EnumSet<RelatednessDependancy> getReccommendedRelatednessDependancies() {
+	public void setArticleComparisonDependancies(EnumSet<DataDependancy> dependancies) {
+		articleComparisonDependancies = dependancies ;
+	}
+	
+	public File getArticleComparisonModel() {
+		return articleComparisonModel;
+	}
+
+	public void setArticleComparisonModel(File model) {
+		articleComparisonModel = model;
+	}
+	
+	public File getLabelDisambiguationModel() {
+		return labelDisambiguationModel;
+	}
+
+	public void setLabelDisambiguationModel(File model) {
+		labelDisambiguationModel = model;
+	}
+	
+	public File getLabelComparisonModel() {
+		return labelComparisonModel;
+	}
+
+	public void LabelComparisonModel(File model) {
+		labelComparisonModel = model;
+	}
+	
+	public File getLinkDetectionModel() {
+		return linkDetectionModel;
+	}
+
+	public void setTopicDetectionModel(File model) {
+		linkDetectionModel = model;
+	}
+
+	public File getTopicDisambiguationModel() {
+		return topicDisambiguationModel;
+	}
+
+	public void setDisambigModel(File model) {
+		topicDisambiguationModel = model;
+	}
+	
+	public EnumSet<DataDependancy> getReccommendedRelatednessDependancies() {
 		
-		ArrayList<RelatednessDependancy> dependancies = new ArrayList<RelatednessDependancy>() ;
+		ArrayList<DataDependancy> dependancies = new ArrayList<DataDependancy>() ;
 		
 		boolean valid = false ;
 		
 		if (this.databasesToCache.containsKey(DatabaseType.pageLinksIn)) {
-			dependancies.add(RelatednessDependancy.inLinks) ;
+			dependancies.add(DataDependancy.pageLinksIn) ;
 			valid = true ;
 		}
 		
 		if (this.databasesToCache.containsKey(DatabaseType.pageLinksOut)) {
-			dependancies.add(RelatednessDependancy.outLinks) ;
+			dependancies.add(DataDependancy.pageLinksOut) ;
 			valid = true ;
 		}
 		
 		if (this.databasesToCache.containsKey(DatabaseType.pageLinkCounts)) {
-			dependancies.add(RelatednessDependancy.linkCounts) ;	
+			dependancies.add(DataDependancy.linkCounts) ;	
 		}
 		
 		if (!valid)
-			dependancies.add(RelatednessDependancy.inLinks) ;
+			dependancies.add(DataDependancy.pageLinksIn) ;
 		
 		return EnumSet.copyOf(dependancies) ;
 	}
@@ -238,11 +275,20 @@ public class WikipediaConfiguration {
 				case stopwordFile:
 					this.setStopwords(new File(paramValue)) ;
 					break ;
-				case disambiguationModel:
-					this.disambigModel = new File(paramValue) ;
+				case articleComparisonModel:
+					articleComparisonModel = new File(paramValue) ;
+					break ;
+				case labelDisambiguationModel:
+					labelDisambiguationModel = new File(paramValue) ;
+					break ;
+				case labelComparisonModel:
+					labelComparisonModel = new File(paramValue) ;
+					break ;
+				case topicDisambiguationModel:
+					topicDisambiguationModel = new File(paramValue) ;
 					break ;
 				case linkDetectionModel:
-					this.detectionModel = new File(paramValue) ;
+					this.linkDetectionModel = new File(paramValue) ;
 					break ;
 				default:
 					Logger.getLogger(WikipediaConfiguration.class).warn("Ignoring unknown parameter: '" + paramName + "'") ;

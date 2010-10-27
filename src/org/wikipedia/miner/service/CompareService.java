@@ -12,10 +12,11 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
 import org.w3c.dom.Element;
+import org.wikipedia.miner.comparison.ArticleComparer;
+import org.wikipedia.miner.comparison.LabelComparer;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.model.Article.RelatednessDependancy;
 import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.EnumSetParameter;
@@ -61,7 +62,7 @@ public class CompareService extends Service{
 	private IntListParameter prmIdList1 ;
 	private IntListParameter prmIdList2 ;
 	
-	private BooleanParameter prmSenses ;
+	private BooleanParameter prmInterpretations ;
 	private BooleanParameter prmConnections ;
 	private BooleanParameter prmSnippets ;
 	
@@ -72,9 +73,7 @@ public class CompareService extends Service{
 	
 	private BooleanParameter prmEscape ;
 	
-	private FloatParameter prmMinRelatedness ;
-	private EnumSetParameter<RelatednessDependancy> prmRelatednessDependancies ;
-	
+	private FloatParameter prmMinRelatedness ;	
 	
 	
 	private enum GroupName{termPair,idPair,idLists, none} ; 
@@ -99,9 +98,10 @@ public class CompareService extends Service{
 		prmTerm1 = new StringParameter("term1", "The first of two terms (or phrases) to compare", null) ;
 		grpTerms.addParameter(prmTerm1) ;
 		prmTerm2 = new StringParameter("term2", "The second of two terms (or phrases) to compare", null) ;
-		grpTerms.addParameter(prmTerm2) ;
-		prmSenses = new BooleanParameter("getSenses", "If <b>true</b>, then details of the senses chosen to represent each term will be returned", false) ;
-		grpTerms.addParameter(prmSenses) ;
+		grpTerms.addParameter(prmTerm2) ;		
+		prmInterpretations = new BooleanParameter("interpretations", "if <b>true</b>, then the service will list different interpretations (combinations of senses for ambiguous terms) that were considered.", false) ;
+		grpTerms.addParameter(prmInterpretations) ;
+		
 		addParameterGroup(grpTerms) ;
 		
 		grpIds = new ParameterGroup(GroupName.idPair.name()) ;
@@ -127,6 +127,9 @@ public class CompareService extends Service{
 		prmMaxConsReturned = new IntParameter("maxConnectionsReturned", "The maximum number of connections that will be returned. These will be the highest weighted connections. This parameter is ignored if comparing lists of ids.", 250) ;
 		addGlobalParameter(prmMaxConsReturned) ;
 		
+		prmInterpretations = new BooleanParameter("interpretations", "if <b>true</b>, then the service will list sentences that either mention both of the articles being compared, or come from one of the articles and mention the other. This parameter is ignored if comparing lists of ids.", false) ;
+		addGlobalParameter(prmInterpretations) ;
+		
 		prmSnippets = new BooleanParameter("snippets", "if <b>true</b>, then the service will list sentences that either mention both of the articles being compared, or come from one of the articles and mention the other. This parameter is ignored if comparing lists of ids.", false) ;
 		addGlobalParameter(prmSnippets) ;
 		
@@ -141,25 +144,16 @@ public class CompareService extends Service{
 		
 		prmMinRelatedness = new FloatParameter("minRelatedness", "The minimum relatedness a term pair must have before it will be returned. This parameter is ignored unless comparing sets of ids.", 0F) ;
 		addGlobalParameter(prmMinRelatedness) ;
-		
-		String[] descRelatednessDependancies = {"Use links made to articles","Use links made from articles", "Use summary counts of links made to and from articles"} ;
-		prmRelatednessDependancies = new EnumSetParameter<RelatednessDependancy>("dependancies", "The data that will be used to calculate relatedness ", null, RelatednessDependancy.values(), descRelatednessDependancies) ;
-		addGlobalParameter(prmRelatednessDependancies) ;
-		
+				
 		prmEscape = new BooleanParameter("escapeDefinition", "<true> if sentence snippets should be escaped, <em>false</em> if they are to be encoded directly", false) ;
 		addGlobalParameter(prmEscape) ;
 	}
 
 	@Override
-	public Element buildWrappedResponse(HttpServletRequest request, Element xmlResponse) {
+	public Element buildWrappedResponse(HttpServletRequest request, Element xmlResponse) throws Exception {
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		TextProcessor tp = wikipedia.getEnvironment().getConfiguration().getDefaultTextProcessor() ;
-		
-		EnumSet<RelatednessDependancy> modes = prmRelatednessDependancies.getValue(request) ;
-		if (modes == null) 
-			modes = wikipedia.getConfig().getReccommendedRelatednessDependancies() ;
-		
 		
 		ParameterGroup grp = getSpecifiedParameterGroup(request) ;
 		
@@ -171,6 +165,13 @@ public class CompareService extends Service{
 		switch(GroupName.valueOf(grp.getName())) {
 		
 		case termPair :
+			
+			LabelComparer lblComparer = getHub().getLabelComparer(getWikipediaName(request)) ;
+			if (lblComparer == null) {
+				this.buildErrorResponse("term comparisons are not available with this wikipedia instance", xmlResponse) ;
+				return xmlResponse ;
+			}
+				
 			
 			String term1 = prmTerm1.getValue(request).trim() ;
 			String term2 = prmTerm2.getValue(request).trim() ;
@@ -190,16 +191,28 @@ public class CompareService extends Service{
 				xmlResponse.setAttribute("unknownTerm", term2) ; 
 				return xmlResponse ;
 			}
+			
+			LabelComparer.ComparisonDetails details = lblComparer.compare(label1, label2) ;
+			
+			xmlResponse.setAttribute("relatedness", getHub().format(details.getLabelRelatedness())) ;
 		
-			Label.DisambiguatedSensePair disambiguatedSenses = label1.disambiguateAgainst(label2, modes) ;
-
-			xmlResponse.setAttribute("relatedness", getHub().format(disambiguatedSenses.getRelatedness())) ;
-		
-			addSenses(xmlResponse, senses1, senses2, disambiguatedSenses, request) ;
-			addMutualLinksOrSnippets(xmlResponse, disambiguatedSenses.getSenseA(), disambiguatedSenses.getSenseB(), request, wikipedia) ;
+			addInterpretations(xmlResponse, senses1, senses2, details, request) ;
+			
+			LabelComparer.SensePair bestInterpretation = details.getBestInterpretation() ;
+			if (bestInterpretation != null) 
+				addMutualLinksOrSnippets(xmlResponse, bestInterpretation.getSenseA(), bestInterpretation.getSenseB(), request, wikipedia) ;
+			else 
+				this.buildWarningResponse("Could not identify plausable senses for the given terms", xmlResponse) ;
+			
 			break ;
 			
 		case idPair:
+			
+			ArticleComparer artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
+			if (artComparer == null) {
+				this.buildErrorResponse("article comparisons are not available with this wikipedia instance", xmlResponse) ;
+				return xmlResponse ;
+			}
 			
 			Article art1 = new Article(wikipedia.getEnvironment(), prmId1.getValue(request)) ;
 			if (!(art1.getType() == PageType.article || art1.getType() == PageType.disambiguation)) {
@@ -213,11 +226,17 @@ public class CompareService extends Service{
 				return xmlResponse ;
 			}
 			
-			xmlResponse.setAttribute("relatedness", getHub().format(art1.getRelatednessTo(art2, modes))) ;
+			xmlResponse.setAttribute("relatedness", getHub().format(artComparer.getRelatedness(art1, art2))) ;
 			
 			addMutualLinksOrSnippets(xmlResponse, art1, art2, request, wikipedia) ;
 			break ;
 		case idLists :
+			
+			artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
+			if (artComparer == null) {
+				this.buildErrorResponse("article comparisons are not available with this wikipedia instance", xmlResponse) ;
+				return xmlResponse ;
+			}
 			
 			TreeSet<Integer> invalidIds = new TreeSet<Integer>() ;
 			
@@ -275,14 +294,14 @@ public class CompareService extends Service{
 					if(doneKeys.contains(key))
 						continue ;
 					
-					float relatedness = a1.getRelatednessTo(a2, modes) ;
+					double relatedness = artComparer.getRelatedness(a1, a2)  ;
 					
 					if (relatedness >= minRelatedness) {
 					
 						Element xmlMeasure = getHub().createElement("Measure") ;
 						xmlMeasure.setAttribute("lowId", String.valueOf(min)) ;
 						xmlMeasure.setAttribute("highId", String.valueOf(max)) ;
-						xmlMeasure.appendChild(getHub().createTextNode(getHub().format(a1.getRelatednessTo(a2)))) ;
+						xmlMeasure.appendChild(getHub().createTextNode(getHub().format(relatedness))) ;
 						
 						xmlMeasures.appendChild(xmlMeasure) ;
 					}
@@ -300,30 +319,39 @@ public class CompareService extends Service{
 	}
 	
 	
-	private Element addSenses(Element response, Label.Sense[] senses1, Label.Sense[] senses2, Label.DisambiguatedSensePair chosenSenses, HttpServletRequest request) {
+	private Element addInterpretations(Element response, Label.Sense[] senses1, Label.Sense[] senses2, LabelComparer.ComparisonDetails details, HttpServletRequest request) {
 		
-		if (!prmSenses.getValue(request)) 
+		if (!prmInterpretations.getValue(request)) 
 			return response ;
 		
-		Element xmlSense1 = getHub().createElement("Sense1");
-		xmlSense1.setAttribute("title", chosenSenses.getSenseA().getTitle()) ;
-		xmlSense1.setAttribute("id", String.valueOf(chosenSenses.getSenseA().getId())) ;		
-		xmlSense1.setAttribute("candidates", String.valueOf(senses1.length)) ;
-		response.appendChild(xmlSense1) ;
-
-		Element xmlSense2 = getHub().createElement("Sense2");
-		xmlSense2.setAttribute("title", chosenSenses.getSenseB().getTitle()) ;
-		xmlSense2.setAttribute("id", String.valueOf(chosenSenses.getSenseB().getId())) ;
-		xmlSense2.setAttribute("candidates", String.valueOf(senses2.length)) ;
-		response.appendChild(xmlSense2) ;
+		Element xmlInterpretations = getHub().createElement("Interpretations") ;
+		xmlInterpretations.setAttribute("term1Candidates", String.valueOf(senses1.length)) ;
+		xmlInterpretations.setAttribute("term2Candidates", String.valueOf(senses2.length)) ;
 		
 		
+		for (LabelComparer.SensePair interpretation:details.getPlausableInterpretations()) {
+			
+			Element xmlInterpretation = getHub().createElement("Interpretation") ;
+			
+			xmlInterpretation.setAttribute("id1", String.valueOf(interpretation.getSenseA().getId())) ;
+			xmlInterpretation.setAttribute("title1", interpretation.getSenseA().getTitle()) ;
+			
+			xmlInterpretation.setAttribute("id2", String.valueOf(interpretation.getSenseB().getId())) ;
+			xmlInterpretation.setAttribute("title2", interpretation.getSenseB().getTitle()) ;
+			
+			xmlInterpretation.setAttribute("relatedness", getHub().format(interpretation.getSenseRelatedness())) ;
+			xmlInterpretation.setAttribute("disambiguationConfidence", getHub().format(interpretation.getDisambiguationConfidence())) ;
+			
+			xmlInterpretations.appendChild(xmlInterpretation) ;
+		}
+		
+		response.appendChild(xmlInterpretations) ;
 		return response ;
 	}
 	
 	
 	
-	private Element addMutualLinksOrSnippets(Element response, Article art1, Article art2, HttpServletRequest request, Wikipedia wikipedia) {
+	private Element addMutualLinksOrSnippets(Element response, Article art1, Article art2, HttpServletRequest request, Wikipedia wikipedia) throws Exception {
 
 		boolean getConnections = prmConnections.getValue(request) ;
 		boolean getSnippets = prmSnippets.getValue(request) ;
@@ -331,13 +359,10 @@ public class CompareService extends Service{
 		if (!getConnections && !getSnippets)
 			return response;
 		
-		EnumSet<RelatednessDependancy> modes = prmRelatednessDependancies.getValue(request) ;
-		if (modes == null) 
-			modes = wikipedia.getConfig().getReccommendedRelatednessDependancies() ;
 		
 		//Build a list of pages that link to both art1 and art2, ordered by average relatedness to them
 		TreeSet<Article> connections = new TreeSet<Article>() ;
-		RelatednessCache rc = new RelatednessCache(modes) ;
+		RelatednessCache rc = new RelatednessCache(getHub().getArticleComparer(getWikipediaName(request))) ;
 
 		Article[] links1 = art1.getLinksIn() ;
 		Article[] links2 = art2.getLinksIn() ;
@@ -357,7 +382,7 @@ public class CompareService extends Service{
 			if (compare == 0) {
 				if (link1.compareTo(art1)!= 0 && link2.compareTo(art2)!= 0) {
 
-					float weight = (rc.getRelatedness(link1, art1) + rc.getRelatedness(link1, art2))/2 ;
+					double weight = (rc.getRelatedness(link1, art1) + rc.getRelatedness(link1, art2))/2 ;
 					link1.setWeight(weight) ;
 					connections.add(link1) ;
 

@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 import org.wikipedia.miner.annotation.ArticleCleaner.SnippetLength;
+import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
@@ -52,6 +53,7 @@ public class Disambiguator {
 	private ArticleCleaner cleaner ;
 	//private SentenceSplitter ss; 
 	private TextProcessor tp ;
+	private ArticleComparer comparer ;
 
 	private FastVector attributes ;
 	private Instances trainingData ;
@@ -68,11 +70,14 @@ public class Disambiguator {
 	public Disambiguator(Wikipedia wikipedia) throws IOException, Exception {
 		
 		WikipediaConfiguration conf = wikipedia.getConfig() ;
-		init(wikipedia, conf.getDefaultTextProcessor(), conf.getMinSenseProbability(), conf.getMinLinkProbability(), 50) ;
+			
+		ArticleComparer comparer = new ArticleComparer(wikipedia) ;
+		
+		init(wikipedia, comparer, conf.getDefaultTextProcessor(), conf.getMinSenseProbability(), conf.getMinLinkProbability(), 50) ;
 
 		
-		if (conf.getDisambigModel() != null)
-			loadClassifier(conf.getDisambigModel()) ;
+		if (conf.getTopicDisambiguationModel() != null)
+			loadClassifier(conf.getTopicDisambiguationModel()) ;
 	}
 	
 	
@@ -86,15 +91,14 @@ public class Disambiguator {
 	 * @param minLinkProbability the lowest probability (as a link in Wikipedia) for which terms will be mined from surrounding text
 	 * @param maxContextSize the maximum number of concepts that are used as context.
 	 */
-	public Disambiguator(Wikipedia wikipedia,  TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) {
-		init(wikipedia, textProcessor, minSenseProbability, minLinkProbability, maxContextSize) ;
-		
-		
+	public Disambiguator(Wikipedia wikipedia,  ArticleComparer comparer, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) {
+		init(wikipedia, comparer, textProcessor, minSenseProbability, minLinkProbability, maxContextSize) ;
 	}
 
 
-	private void init(Wikipedia wikipedia, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) {
+	private void init(Wikipedia wikipedia, ArticleComparer comparer, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) {
 		this.wikipedia = wikipedia ;
+		this.comparer = comparer ;
 		this.cleaner = new ArticleCleaner() ;
 		this.tp = textProcessor ;
 
@@ -133,7 +137,7 @@ public class Disambiguator {
 	 * @return the probability that the sense implied here is valid.
 	 * @throws Exception if we cannot classify this sense.
 	 */
-	public float getProbabilityOfSense(float commonness, float relatedness, Context context) throws Exception {
+	public double getProbabilityOfSense(double commonness, double relatedness, Context context) throws Exception {
 
 		double[] values = new double[attributes.size()];
 
@@ -149,8 +153,7 @@ public class Disambiguator {
 		Instance i = new Instance(1.0, values) ;
 		i.setDataset(header) ;
 
-		//TODO: is this stupid?
-		return (float)classifier.distributionForInstance(i)[0] ;		
+		return classifier.distributionForInstance(i)[0] ;		
 	}
 
 	/**
@@ -278,6 +281,10 @@ public class Disambiguator {
 			this.classifier = classifier ;
 			classifier.buildClassifier(trainingData) ;
 		}
+	}
+	
+	public ArticleComparer getArticleComparer() {
+		return comparer ;
 	}
 
 	private void train(Article article, SnippetLength snippetLength, RelatednessCache rc) throws Exception {
@@ -527,7 +534,7 @@ public class Disambiguator {
 				Instance i = new Instance(1.0, values) ;
 				i.setDataset(header) ;
 
-				float prob = (float)classifier.distributionForInstance(i)[0] ;
+				double prob = classifier.distributionForInstance(i)[0] ;
 
 				if (prob>0.5) {
 					Article art = new Article(wikipedia.getEnvironment(), sense.getId()) ;
@@ -586,7 +593,7 @@ public class Disambiguator {
 		}
 
 		if (rc == null) 
-			return new Context(unambigLabels, new RelatednessCache(wikipedia.getConfig().getReccommendedRelatednessDependancies()), maxContextSize) ;
+			return new Context(unambigLabels, new RelatednessCache(comparer), maxContextSize) ;
 		else
 			return new Context(unambigLabels, rc, maxContextSize) ;
 	}

@@ -3,6 +3,7 @@ package org.wikipedia.miner.comparison;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 
 import jsc.correlation.SpearmanCorrelation;
 import jsc.datastructures.PairedData;
@@ -28,7 +29,7 @@ public class LabelComparer {
 	private BinaryPredictor senseSelector ;
 	private DoublePredictor relatednessMeasurer ;
 	
-	public LabelComparer(Wikipedia wikipedia, ArticleComparer articleComparer) {
+	public LabelComparer(Wikipedia wikipedia, ArticleComparer articleComparer) throws Exception {
 		this.wikipedia = wikipedia ;
 		this.articleComparer = articleComparer ;
 		
@@ -37,9 +38,15 @@ public class LabelComparer {
 
 		String[] relatednessMeasuringAttributes = {"bestSenseRelatedness", "maxSenseRelatedness", "avgSenseRelatedness", "weightedAvgSenseRelatedness", "concatenationPriorLinkProbability", "concatenationOccurances"} ;
 		relatednessMeasurer = new DoublePredictor("labelRelatednessMeasurer", relatednessMeasuringAttributes, "labelRelatedness") ;
+		
+		if (wikipedia.getConfig().getLabelDisambiguationModel()!= null)
+			loadDisambiguationClassifier(wikipedia.getConfig().getLabelDisambiguationModel()) ;
+		
+		if (wikipedia.getConfig().getLabelComparisonModel()!= null)
+			loadComparisonClassifier(wikipedia.getConfig().getLabelComparisonModel()) ;
 	}
 	
-	public Double getRelatedness(Label labelA, Label labelB) throws Exception {
+	public ComparisonDetails compare(Label labelA, Label labelB) throws Exception {
 
 		if (!senseSelector.isReady())
 			throw new Exception("You must train+build a new label sense selection classifier or load an existing one first") ;
@@ -47,52 +54,22 @@ public class LabelComparer {
 		if (!relatednessMeasurer.isReady())
 			throw new Exception("You must train+build a new label relatedness measuring classifier or load and existing one first") ;
 
-		if (labelA.getText().equals(labelB.getText()))
-			return 1.0 ; //TODO: make configurable?
-			
-		SensePair bestSensePair = null ;
 		
-		double totalSpRelatedness = 0 ;
-		double maxSpRelatedness = 0 ;
-		double totalWeightedSpRelatedness = 0 ;
-		double totalWeight = 0 ;
-		int spCount = 0 ;
+		return new ComparisonDetails(labelA, labelB) ;
+	}
+	
+	/**
+	 * A convenience function to compare labels without returning details. 
+	 * 
+	 * @param labelA
+	 * @param labelB
+	 * @return the semantic relatedness between the two labels
+	 * @throws Exception
+	 */
+	public Double getRelatedness(Label labelA, Label labelB) throws Exception {
 		
-		//compare every sense of labelA against every sense of label B
-		for (Label.Sense senseA:labelA.getSenses()) {
-			
-			if (senseA.getPriorProbability() < wikipedia.getConfig().getMinSenseProbability())
-				continue ;
-			
-			for (Label.Sense senseB:labelB.getSenses()) {
-				
-				if (senseB.getPriorProbability() < wikipedia.getConfig().getMinSenseProbability())
-					continue ;
-				
-				SensePair sp = new SensePair(senseA, senseB) ;
-				sp.setWeight(senseSelector.getPrediction(getFeaturesForSenseSelection(sp, null))) ;
-					
-				if (sp.getPredictedRelatedness() > maxSpRelatedness)
-					maxSpRelatedness = sp.getPredictedRelatedness() ;
-				
-				totalSpRelatedness += sp.getPredictedRelatedness() ;
-				totalWeightedSpRelatedness += (sp.getAvgPriorProbability() * sp.getPredictedRelatedness()) ;
-				totalWeight += sp.getAvgPriorProbability() ;
-				spCount++ ;
-				
-				if (bestSensePair == null || sp.getWeight() > bestSensePair.getWeight())
-					bestSensePair = sp ;
-			}
-		}
-		
-		if (bestSensePair == null)
-			return null ;
-		
-		double avgSpRelatedness = totalSpRelatedness/spCount ;
-		double weightedAvgSpRelatedness = totalWeightedSpRelatedness/totalWeight ;
-		Label concatenation = new Label(wikipedia.getEnvironment(), labelA.getText() + " " + labelB.getText()) ;
-		
-		return relatednessMeasurer.getPrediction(getFeaturesForRelatednessMeasuring(bestSensePair, maxSpRelatedness, avgSpRelatedness, weightedAvgSpRelatedness, concatenation, null)) ;
+		ComparisonDetails cmp = new ComparisonDetails(labelA, labelB) ;
+		return cmp.getLabelRelatedness() ;
 	}
 	
 	
@@ -112,11 +89,11 @@ public class LabelComparer {
 		relatednessMeasurer.finalizeTrainingData() ;
 	}
 	
-	public void saveSenseSelectionTrainingData(File file) throws IOException, Exception {
+	public void saveDisambiguationTrainingData(File file) throws IOException, Exception {
 		senseSelector.saveTrainingData(file) ;
 	}
 	
-	public void saveRelatednessMeasuringTrainingData(File file) throws IOException, Exception {
+	public void saveComparisonTrainingData(File file) throws IOException, Exception {
 		relatednessMeasurer.saveTrainingData(file) ;
 	}
 	
@@ -154,6 +131,21 @@ public class LabelComparer {
 		return sc ;
 	}
 	
+	public void loadDisambiguationClassifier(File file) throws Exception {
+		senseSelector.loadClassifier(file) ;
+	}
+	
+	public void loadComparisonClassifier(File file) throws Exception {
+		relatednessMeasurer.loadClassifier(file) ;
+	}
+	
+	public void saveDisambiguationClassifier(File file) throws Exception {
+		senseSelector.saveClassifier(file) ;
+	}
+	
+	public void saveComparisonClassifier(File file) throws Exception {
+		relatednessMeasurer.saveClassifier(file) ;
+	}
 	
 	public void buildDefaultClassifiers() throws Exception {
 		Classifier ssClassifier = new Bagging() ;
@@ -164,96 +156,168 @@ public class LabelComparer {
 		relatednessMeasurer.buildClassifier(rmClassifier) ;
 	}
 	
+	
+	
+	
 	private void train(ComparisonDataSet.Item item) throws Exception {
 		
 		Label labelA = new Label(wikipedia.getEnvironment(), item.getTermA()) ;
-		Article artA = new Article(wikipedia.getEnvironment(), item.getIdA()) ;
-		
 		Label labelB = new Label(wikipedia.getEnvironment(), item.getTermB()) ;
-		Article artB =  new Article(wikipedia.getEnvironment(), item.getIdB()) ;
 		
-		SensePair correctSensePair = null ;
+		new ComparisonDetails(labelA, labelB, item.getIdA(), item.getIdB(), item.getRelatedness()) ;
+	}
+	
+			
+	public class ComparisonDetails {
 		
-		double totalSpRelatedness = 0 ;
-		double maxSpRelatedness = 0 ;
-		double totalWeightedSpRelatedness = 0 ;
-		double totalWeight = 0 ;
-		int spCount = 0 ;
+		private Label labelA ;
+		private Label labelB ;
+		private Label concatenation ;
+		
+		private Double labelRelatedness ;
+		private ArrayList<SensePair> plausableInterpretations = new ArrayList<SensePair>() ;
+		
+		private double maxSpRelatedness ;
+		private double avgSpRelatedness ;
+		private double weightedAvgSpRelatedness ;
+		
+		public Label getLabelA() {
+			return labelA;
+		}
 
-		for (Label.Sense senseA:labelA.getSenses()) {
+		public Label getLabelB() {
+			return labelB;
+		}
+
+		public Double getLabelRelatedness() {
+			return labelRelatedness;
+		}
+
+		public ArrayList<SensePair> getPlausableInterpretations() {
+			return plausableInterpretations;
+		}
+		
+		public SensePair getBestInterpretation() {
 			
-			if (senseA.getPriorProbability() < wikipedia.getConfig().getMinSenseProbability())
-				continue ;
+			if (plausableInterpretations.size() > 0)
+				return plausableInterpretations.get(0) ;
+			else
+				return null ;
+		}
+		
+		/**
+		 * Constructs details for item where correct disambiguation and relatedness are already known (training)
+		 * 
+		 * @param labelA
+		 * @param labelB
+		 * @throws Exception 
+		 * @throws Exception 
+		 */
+		private ComparisonDetails(Label labelA, Label labelB, int artA, int artB, double relatedness) throws Exception {
 			
-			for (Label.Sense senseB:labelB.getSenses()) {
+			init(labelA, labelB, artA, artB, relatedness) ;
+			
+			
+			
+		}
+		
+		private ComparisonDetails(Label labelA, Label labelB) throws Exception {
+			
+			init(labelA, labelB, null, null, null) ;
+		}
+		
+		
+
+		private void init(Label labelA, Label labelB, Integer senseIdA, Integer senseIdB, Double relatedness) throws Exception {
+			
+			double totalSpRelatedness = 0 ;
+			double totalWeightedSpRelatedness = 0 ;
+			double totalWeight = 0 ;
+			int spCount = 0 ;
+			
+			this.labelA = labelA ;
+			this.labelB = labelB ;
+			concatenation = new Label(wikipedia.getEnvironment(), labelA.getText() + " " + labelB.getText()) ;
+			
+			for (Label.Sense senseA:labelA.getSenses()) {
 				
-				if (senseB.getPriorProbability() < wikipedia.getConfig().getMinSenseProbability())
+				if (senseA.getPriorProbability() < wikipedia.getConfig().getMinSenseProbability())
 					continue ;
 				
-				SensePair sp = new SensePair(senseA, senseB) ;
-				
-				if (senseA.getId() == artA.getId() && senseB.getId() == artB.getId()) {
-					senseSelector.addTrainingInstance(getFeaturesForSenseSelection(sp, true)) ;
-					correctSensePair = sp ;
-				} else {
-					senseSelector.addTrainingInstance(getFeaturesForSenseSelection(sp, false)) ;
+				for (Label.Sense senseB:labelB.getSenses()) {
+					
+					if (senseB.getPriorProbability() < wikipedia.getConfig().getMinSenseProbability())
+						continue ;
+					
+					SensePair sp ;
+					
+					if (senseIdA != null && senseIdB != null) {
+						//this is a training instance, where correct senses are known
+						if (senseA.getId() == senseIdA && senseB.getId() == senseIdB) {
+							sp = new SensePair(senseA, senseB, true) ;
+							plausableInterpretations.add(sp) ;
+						} else {
+							sp = new SensePair(senseA, senseB, false) ;
+						}
+					} else {
+						//correct senses must be predicted
+						sp = new SensePair(senseA, senseB) ;
+						if (sp.getDisambiguationConfidence() > 0.5)
+							plausableInterpretations.add(sp) ;
+					}
+					
+					if (sp.getSenseRelatedness() > maxSpRelatedness)
+						maxSpRelatedness = sp.getSenseRelatedness() ;
+					
+					totalSpRelatedness += sp.getSenseRelatedness() ;
+					totalWeightedSpRelatedness += (sp.avgPriorProbability * sp.getSenseRelatedness()) ;
+					totalWeight += sp.avgPriorProbability ;
+					spCount++ ;
 				}
-				
-				if (sp.getPredictedRelatedness() > maxSpRelatedness)
-					maxSpRelatedness = sp.getPredictedRelatedness() ;
-				
-				totalSpRelatedness += sp.getPredictedRelatedness() ;
-				totalWeightedSpRelatedness += (sp.getAvgPriorProbability() * sp.getPredictedRelatedness()) ;
-				totalWeight += sp.getAvgPriorProbability() ;
-				spCount++ ;
+			}
+						
+			Collections.sort(plausableInterpretations) ;	
+			
+			if (spCount > 0) {
+				avgSpRelatedness = totalSpRelatedness/spCount ;
+				weightedAvgSpRelatedness = totalWeightedSpRelatedness/totalWeight ;
+			} else {
+				avgSpRelatedness = 0 ;
+				weightedAvgSpRelatedness = 0 ;
+			}
+			
+			if (relatedness != null) {
+				//this is a training instance, where relatedness is known
+				labelRelatedness = relatedness ;
+				relatednessMeasurer.addTrainingInstance(getFeatures()) ;
+			} else {
+				//relatedness must be predicted
+				labelRelatedness = relatednessMeasurer.getPrediction(getFeatures()) ;
 			}
 		}
 		
-		if (correctSensePair == null)
-			return ;
-		
-		double avgSpRelatedness = totalSpRelatedness/spCount ;
-		double weightedAvgSpRelatedness = totalWeightedSpRelatedness/totalWeight ;
-		Label concatenation = new Label(wikipedia.getEnvironment(), labelA.getText() + " " + labelB.getText()) ;
-		
-		relatednessMeasurer.addTrainingInstance(getFeaturesForRelatednessMeasuring(correctSensePair, maxSpRelatedness, avgSpRelatedness, weightedAvgSpRelatedness, concatenation, item.getRelatedness())) ;
-	}
-	
-	
-	
-	
-	private double[] getFeaturesForSenseSelection(SensePair sp, Boolean isValid) {
-		
-		double[] features = new double[5] ;
-
-		features[0] = sp.getPredictedRelatedness() ;
-		features[1] = sp.getAvgPriorProbability() ;
-		features[2] = sp.getMaxPriorProbability() ;
-		features[3] = sp.getMinPriorProbability() ;
-		if (isValid == null)
-			features[4] = Instance.missingValue() ;
-		else 
-			features[4] = BinaryPredictor.booleanToDouble(isValid) ;
-		
-		return features ;
-	}
-	
-	private double[] getFeaturesForRelatednessMeasuring(SensePair bestSensePair, double maxSpRelatedness, double avgSpRelatedness, double weightedAvgSpRelatedness, Label concatenation, Double relatedness){
-		
-		double[] features = new double[7] ;
-	
-		features[0] = bestSensePair.getPredictedRelatedness() ;
-		features[1] = maxSpRelatedness ;
-		features[2] = avgSpRelatedness ;
-		features[3] = weightedAvgSpRelatedness ;
-		features[4] = concatenation.getLinkProbability() ;
-		features[5] = concatenation.getOccCount() ;
-		if (relatedness == null)
-			features[6] = Instance.missingValue() ;
-		else 
-			features[6] = relatedness ;
-		
-		return features ;
+		protected double[] getFeatures() {
+			
+			double[] features = new double[7] ;
+			
+			if (plausableInterpretations.size() > 0)
+				features[0] = plausableInterpretations.get(0).getSenseRelatedness() ;
+			else
+				features[0] = Instance.missingValue() ;
+			
+			features[1] = maxSpRelatedness ;
+			features[2] = avgSpRelatedness ;
+			features[3] = weightedAvgSpRelatedness ;
+			features[4] = concatenation.getLinkProbability() ;
+			features[5] = concatenation.getOccCount() ;
+			
+			if (labelRelatedness == null)
+				features[6] = Instance.missingValue() ;
+			else 
+				features[6] = labelRelatedness ;
+			
+			return features ;
+		}
 	}
 	
 	public class SensePair implements Comparable<SensePair> {
@@ -264,10 +328,21 @@ public class LabelComparer {
 		private double maxPriorProbability ;
 		private double minPriorProbability ;
 		
-		private Double predictedRelatedness ;
-		private Double weight = null ;
+		private Double senseRelatedness ;
 		
-		public SensePair(Label.Sense senseA, Label.Sense senseB) throws Exception {
+		private Boolean isValid = null ;
+		private Double disambiguationConfidence = null ;
+		
+		private SensePair(Label.Sense senseA, Label.Sense senseB, Boolean valid) throws Exception {
+			init(senseA, senseB, valid) ;
+		}
+		
+		private SensePair(Label.Sense senseA, Label.Sense senseB) throws Exception {
+			init(senseA, senseB, null) ;
+		}
+		
+		
+		private void init(Label.Sense senseA, Label.Sense senseB, Boolean valid) throws Exception {
 			
 			this.senseA = senseA ;
 			this.senseB = senseB ;
@@ -276,37 +351,27 @@ public class LabelComparer {
 			minPriorProbability = Math.min(senseA.getPriorProbability(), senseB.getPriorProbability()) ;
 			avgPriorProbability = (maxPriorProbability+minPriorProbability)/2 ;
 			
-			predictedRelatedness = articleComparer.getRelatedness(senseA, senseB) ;
+			senseRelatedness = articleComparer.getRelatedness(senseA, senseB) ;
+			
+			if (valid != null) {
+				isValid = valid ;
+				if (isValid)
+					disambiguationConfidence = 1.0 ;
+				else
+					disambiguationConfidence = 0.0 ;
+				
+				senseSelector.addTrainingInstance(getFeatures()) ;
+				
+			} else {
+				disambiguationConfidence = senseSelector.getPrediction(getFeatures()) ;
+				isValid = (disambiguationConfidence > 0.5) ;
+			}
 		}
 		
-		
 
-		public Double getWeight() {
-			return weight;
+		public Double getDisambiguationConfidence() {
+			return disambiguationConfidence ;
 		}
-
-
-
-		public void setWeight(Double weight) {
-			this.weight = weight;
-		}
-
-		public Double getAvgPriorProbability() {
-			return avgPriorProbability;
-		}
-
-
-
-		public double getMaxPriorProbability() {
-			return maxPriorProbability;
-		}
-
-
-
-		public double getMinPriorProbability() {
-			return minPriorProbability;
-		}
-
 
 
 		public Label.Sense getSenseA() {
@@ -314,15 +379,31 @@ public class LabelComparer {
 		}
 
 
-
 		public Label.Sense getSenseB() {
 			return senseB;
 		}
 
 
+		public Double getSenseRelatedness() {
+			return senseRelatedness;
+		}
+		
+		protected double[] getFeatures() {
+			
+			double[] features = new double[5] ;
 
-		public Double getPredictedRelatedness() {
-			return predictedRelatedness;
+			features[0] = senseRelatedness ;
+			features[1] = avgPriorProbability ;
+			features[2] = maxPriorProbability ;
+			features[3] = minPriorProbability ;
+			
+			if (disambiguationConfidence == null)
+				features[4] = Instance.missingValue() ;
+			else { 
+				features[4] = BinaryPredictor.booleanToDouble(isValid) ;
+			
+			}
+			return features ;
 		}
 
 		@Override
@@ -330,8 +411,8 @@ public class LabelComparer {
 			
 			int cmp = 0 ;
 			
-			if (weight != null && sp.weight != null) {
-				cmp =  sp.weight.compareTo(weight) ;
+			if (disambiguationConfidence != null && sp.disambiguationConfidence != null) {
+				cmp =  sp.disambiguationConfidence.compareTo(disambiguationConfidence) ;
 				if (cmp != 0)
 					return cmp ;
 			}
@@ -347,7 +428,5 @@ public class LabelComparer {
 			cmp = senseB.compareTo(sp.senseB) ;
 			return cmp ;
 		}
-		
-		
 	}
 }

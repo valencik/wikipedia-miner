@@ -39,28 +39,6 @@ import org.wikipedia.miner.util.WikipediaConfiguration;
  */
 public class Article extends Page {
 
-	/**
-	 * Data used to calculate relatedness measures. 
-	 * 
-	 * @see Article#getRelatednessTo(Article, EnumSet)
-	 */
-	public enum RelatednessDependancy{
-
-		/**
-		 * Use links made to articles to measure relatedness. You should cache {@link DatabaseType#pageLinksIn} if using this mode extensively.  
-		 */
-		inLinks, 
-
-		/**
-		 * Use links made from articles to measure relatedness. You should cache {@link DatabaseType#pageLinksOut} and {@link DatabaseType#pageLinkCounts} if using this mode extensively. 
-		 */
-		outLinks,
-		
-		/**
-		 * Use link counts to measure relatedness. You should cache {@link DatabaseType#pageLinkCounts} if using this mode extensively. 
-		 */
-		linkCounts
-	} ;
 
 
 	/**
@@ -231,65 +209,6 @@ public class Article extends Page {
 		else
 			return t.getTranslationsByLangCode() ;
 	}
-
-	/**
-	 * <p>
-	 * Calculates a weight of the semantic relation between this article and the argument one. 
-	 * The stronger the semantic relation, the higher the weight returned. 
-	 * i.e "6678: Cat" has a higher relatedness to "4269567: Dog" than to "27178: Shoe".
-	 * <p>
-	 * The measure is based on the links extending out from and/or in to each of the articles being compared, 
-	 * depending on the given relatedness modes.
-	 * </p>
-	 * 
-	 * <p>
-	 * The details of this measure (and an evaluation) is described in the paper:
-	 * <br/>
-	 * Milne, D and Witten, I.H. (2008) An effective, low-cost measure of semantic relatedness obtained from Wikipedia links. In Proceedings of WIKIAI'08. 
-	 * </p>
-	 * 
-	 * @param article the article to measure relatedness against
-	 * @param modes the set of modes to use to calculate the measure. If more than one mode is specified, then the average will be returned.
-	 * @return the weight of the semantic relation between this article and the argument one.
-	 */
-	public float getRelatednessTo(Article article, EnumSet<RelatednessDependancy> dependancies) {
-
-		if (dependancies == null || dependancies.isEmpty())
-			throw new IllegalArgumentException("You must specify at least one relatedness dependancy") ;
-
-		float total = 0 ;
-		int count = 0 ;
-
-		if (dependancies.contains(RelatednessDependancy.inLinks)) {
-			total += getRelatednessFromInLinks(article) ;
-			count ++ ;
-		}
-
-		if (dependancies.contains(RelatednessDependancy.outLinks)) {
-			total += getRelatednessFromOutLinks(article) ;
-			count ++ ;
-		}
-
-		return total/count ;
-	}
-
-
-	/**
-	 * Measures the semantic relatedness between this article and the argument one, using
-	 * the modes recommended by the current Wikipedia configuration. 
-	 * 
-	 * @see WikipediaConfiguration#getReccommendedRelatednessModes() ;
-	 * 
-	 * @param article the article to measure relatedness against
-	 * @return the weight of the semantic relation between this article and the argument one.
-	 */
-	public float getRelatednessTo(Article article) {
-		EnumSet<RelatednessDependancy> modes = env.getConfiguration().getReccommendedRelatednessDependancies() ;
-
-		return getRelatednessTo(article, modes) ;
-	}
-
-
 
 	/**
 	 * @return the total number of links that are made to this article 

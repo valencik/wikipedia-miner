@@ -20,6 +20,8 @@
 
 package org.wikipedia.miner.annotation.tagging;
 
+import gnu.trove.TIntDoubleHashMap;
+
 import java.util.*;
 import org.wikipedia.miner.annotation.* ;
 import org.wikipedia.miner.annotation.preprocessing.* ;
@@ -120,7 +122,8 @@ public abstract class DocumentTagger {
 
 	private Vector<TopicReference> resolveCollisions(Collection<Topic> topics) {
 
-		HashMap<Integer, Float> topicWeights = new HashMap<Integer, Float>() ;
+		TIntDoubleHashMap topicWeights = new TIntDoubleHashMap() ;
+		
 
 		TreeSet<TopicReference> temp = new TreeSet<TopicReference>() ;
 
@@ -151,6 +154,8 @@ public abstract class DocumentTagger {
 			for (int j=0 ; j<overlappedTopics.size() ; j++) {
 				references.removeElementAt(i+1) ;
 			}
+			
+			//TODO: why is all of this blanked out??
 
 			//double refWeight = 0 ;
 			//Integer refId = reference.getTopicId() ;

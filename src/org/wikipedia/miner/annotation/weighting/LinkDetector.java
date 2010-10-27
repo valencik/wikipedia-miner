@@ -89,8 +89,8 @@ public class LinkDetector extends TopicWeighter{
 		this.header = new Instances("wikification_headerOnly", attributes, 0) ;
 		header.setClassIndex(header.numAttributes() -1) ;
 		
-		if (wikipedia.getConfig().getDetectionModel() != null) {
-			loadClassifier(wikipedia.getConfig().getDetectionModel()) ;
+		if (wikipedia.getConfig().getLinkDetectionModel() != null) {
+			loadClassifier(wikipedia.getConfig().getLinkDetectionModel()) ;
 		}
 	}
 	
@@ -137,7 +137,7 @@ public class LinkDetector extends TopicWeighter{
 			instance.setDataset(header) ;
 			
 			double prob = classifier.distributionForInstance(instance)[0] ;
-			topic.setWeight((float)prob) ;
+			topic.setWeight(prob) ;
 			weightedTopics.add(topic) ;
 		}
 
@@ -369,9 +369,6 @@ public class LinkDetector extends TopicWeighter{
 
 	private Result<Integer> test(Article article, SnippetLength snippetLength, TopicDetector td, RelatednessCache rc) throws Exception{
 		System.out.println(" - testing " + article) ;
-		
-		if (rc == null)
-			rc = new RelatednessCache(article.getEnvironment().getConfiguration().getReccommendedRelatednessDependancies()) ;
 		
 		String text = cleaner.getCleanedContent(article, snippetLength) ;
 		

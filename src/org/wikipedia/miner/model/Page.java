@@ -47,7 +47,7 @@ public class Page implements Comparable<Page> {
 	protected String title ;
 	protected PageType type ;
 	protected int depth ;
-	protected Float weight = null ;
+	protected Double weight = null ;
 
 	protected WEnvironment env ;
 	protected boolean detailsSet ;
@@ -109,14 +109,14 @@ public class Page implements Comparable<Page> {
 	 * 
 	 * @param weight  the weight by which this page will be compared to others.
 	 */
-	public void setWeight(Float weight) {
+	public void setWeight(Double weight) {
 		this.weight = weight ;
 	}
 
 	/**
 	 * @return the weight by which this page is compared to others. (may be null, in which case the page is compared only via id)
 	 */	
-	public Float getWeight() {
+	public Double getWeight() {
 		return weight ;
 	}
 

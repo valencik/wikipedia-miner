@@ -11,9 +11,9 @@ import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 
 import org.w3c.dom.Element;
+import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.model.Article.RelatednessDependancy;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.StringParameter;
 import org.wikipedia.miner.util.Position;
@@ -51,7 +51,7 @@ public class SearchService extends Service {
 
 	@Override
 	public Element buildWrappedResponse(HttpServletRequest request,
-			Element xmlResponse) {
+			Element xmlResponse) throws Exception {
 
 		String query = prmQuery.getValue(request) ;
 		if (query == null) {
@@ -94,12 +94,19 @@ public class SearchService extends Service {
 	}
 
 
-	public Element resolveComplexQuery(String query, HttpServletRequest request, Element xmlResponse) {
+	public Element resolveComplexQuery(String query, HttpServletRequest request, Element xmlResponse) throws Exception {
 
 
 
 		Wikipedia wikipedia = getWikipedia(request) ;
-		ExhaustiveDisambiguator disambiguator = new ExhaustiveDisambiguator(wikipedia) ;
+		
+		ArticleComparer artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
+		if (artComparer == null) {
+			this.buildErrorResponse("article comparisons are not available with this wikipedia instance", xmlResponse) ;
+			return xmlResponse ;
+		}
+		
+		ExhaustiveDisambiguator disambiguator = new ExhaustiveDisambiguator(artComparer) ;
 
 		//resolve query
 		ArrayList<QueryLabel> queryLabels = getReferences(query, wikipedia) ;	
@@ -286,6 +293,8 @@ public class SearchService extends Service {
 
 	private class ExhaustiveDisambiguator {
 
+		//TODO: make this use disambiguator in labelComparer instead.
+		
 		ArrayList<QueryLabel> queryTerms ;
 		RelatednessCache rc ;
 
@@ -295,15 +304,13 @@ public class SearchService extends Service {
 
 		private TIntFloatHashMap bestSenseWeights ;
 		
-		public ExhaustiveDisambiguator(Wikipedia wikipedia) {
+		public ExhaustiveDisambiguator(ArticleComparer comparer) {
 			
-			EnumSet<RelatednessDependancy> modes = wikipedia.getConfig().getReccommendedRelatednessDependancies() ;
-			
-			rc = new RelatednessCache(modes) ;
+			rc = new RelatednessCache(comparer) ;
 			
 		}
 
-		public ArrayList<QueryLabel> disambiguate(ArrayList<QueryLabel> queryTerms) {
+		public ArrayList<QueryLabel> disambiguate(ArrayList<QueryLabel> queryTerms) throws Exception {
 
 			this.queryTerms = queryTerms ;
 
@@ -324,7 +331,7 @@ public class SearchService extends Service {
 			return bestSenseWeights.get(id) ;
 		}
 
-		private void checkSenses(int termIndex) {
+		private void checkSenses(int termIndex) throws Exception {
 
 			if (termIndex == queryTerms.size()) {
 
@@ -346,7 +353,7 @@ public class SearchService extends Service {
 			}
 		}
 
-		private void weightCombo() {
+		private void weightCombo() throws Exception {
 
 			float commoness = 0 ;
 			float relatedness = 0 ;

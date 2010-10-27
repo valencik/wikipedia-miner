@@ -19,7 +19,6 @@
 
 package org.wikipedia.miner.annotation;
 
-import java.sql.SQLException;
 import java.util.* ;
 import java.text.* ;
 
@@ -43,9 +42,9 @@ public class Context {
 	 * @param unambigAnchors a set of unambiguous anchors, the most useful of which will be used to disambiguate other terms
 	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated.
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @throws Exception 
 	 */
-	public Context(Collection<Label> unambigLabels, RelatednessCache relatednessCache, double maxSize) throws SQLException {
+	public Context(Collection<Label> unambigLabels, RelatednessCache relatednessCache, double maxSize) throws Exception {
 		
 		this.relatednessCache = relatednessCache ;
 		
@@ -63,16 +62,16 @@ public class Context {
 		
 		TreeSet<Article> sortedContextArticles = new TreeSet<Article>() ;
 		for (Label.Sense s:senses) {
-			float linkProb = s.getWeight() ;
+			double linkProb = s.getWeight() ;
 			
-			float avgRelatedness = 0 ;
+			double avgRelatedness = 0 ;
 			
 			for (Label.Sense s2: senses) 
 				avgRelatedness += this.relatednessCache.getRelatedness(s, s2) ; 
 				
 			avgRelatedness = avgRelatedness / (senses.size()) ;
 			
-			float weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
+			double weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
 			
 			s.setWeight(weight) ;
 			sortedContextArticles.add(s) ;
@@ -99,9 +98,9 @@ public class Context {
 	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated. 
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
 	 * @param minSenseLimit the minimum prior probability of an anchors sense that will be used as context.  
-	 * @throws SQLException if there is a problem with the wikipedia database
+	 * @throws Exception 
 	 */
-	public Context(Collection<Label> ambigAnchors, RelatednessCache relatednessCache, double maxSize, double minSenseLimit) throws SQLException {
+	public Context(Collection<Label> ambigAnchors, RelatednessCache relatednessCache, double maxSize, double minSenseLimit) throws Exception {
 		
 		this.relatednessCache = relatednessCache ;
 		
@@ -111,7 +110,7 @@ public class Context {
 			
 			for (Label.Sense sense:label.getSenses()) {
 				
-				float pp = sense.getPriorProbability() ;
+				double pp = sense.getPriorProbability() ;
 				
 				if (pp < minSenseLimit) break ;
 				
@@ -125,16 +124,16 @@ public class Context {
 		
 		TreeSet<Article> sortedContextArticles = new TreeSet<Article>() ;
 		for (Label.Sense s:senses) {
-			float linkProb = s.getWeight() ;
+			double linkProb = s.getWeight() ;
 			
-			float avgRelatedness = 0 ;
+			double avgRelatedness = 0 ;
 			
 			for (Label.Sense s2: senses) 
 				avgRelatedness += this.relatednessCache.getRelatedness(s, s2) ; 
 				
 			avgRelatedness = avgRelatedness / (senses.size()) ;
 			
-			float weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
+			double weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
 			
 			s.setWeight(weight) ;
 			sortedContextArticles.add(s) ;
@@ -163,18 +162,18 @@ public class Context {
 	 * 
 	 * @param art the article to be compared
 	 * @return the average relatedness between the article and context anchors
-	 * @throws SQLException
+	 * @throws Exception 
 	 */
-	public float getRelatednessTo(Article art) throws SQLException {
+	public double getRelatednessTo(Article art) throws Exception {
 		
 		if (contextArticles.size() == 0 || totalWeight == 0)
 			return 0 ;
 
-		float relatedness = 0 ;
+		double relatedness = 0 ;
 		
 		for (Article contextArt: contextArticles) { 
 			
-			float r = relatednessCache.getRelatedness(art, contextArt) ;
+			double r = relatednessCache.getRelatedness(art, contextArt) ;
 			r = r * contextArt.getWeight() ;
 			relatedness = relatedness + r ;
 		}

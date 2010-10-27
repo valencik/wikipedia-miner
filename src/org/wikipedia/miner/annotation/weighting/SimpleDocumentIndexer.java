@@ -49,7 +49,7 @@ public class SimpleDocumentIndexer extends TopicWeighter{
 		ArrayList<Topic> weightedTopics = new ArrayList<Topic>() ;
 		for (Topic topic:topics) {
 			
-			float weight = topic.getRelatednessToOtherTopics() * 2 ; 
+			double weight = topic.getRelatednessToOtherTopics() * 2 ; 
 			weight = weight + (float)topic.getOccurances()/maxOccurances ;
 			weight = weight + topic.getSpread() ;
 			weight = weight/3 ;

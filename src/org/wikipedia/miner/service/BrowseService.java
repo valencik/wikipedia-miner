@@ -4,7 +4,9 @@ import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
+import org.w3c.dom.DOMException;
 import org.w3c.dom.Element;
+import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Category;
 import org.wikipedia.miner.model.Page;
@@ -65,10 +67,17 @@ public class BrowseService extends Service {
 	
 
 	@Override
-	public Element buildWrappedResponse(HttpServletRequest request, Element xmlResponse) {
+	public Element buildWrappedResponse(HttpServletRequest request, Element xmlResponse) throws Exception {
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
+		
+		ArticleComparer artComparer = null ;
+		if (prmRelatedness.getValue(request)) {
+			artComparer = getHub().getArticleComparer(this.getWikipediaName(request)) ;
+			if (artComparer == null) 
+				this.buildWarningResponse("Relatedness measures are unavalable for this instance of wikipedia", xmlResponse) ;
+		}
 		
 		Integer id = prmId.getValue(request) ;
 		if (id == null) 
@@ -83,7 +92,7 @@ public class BrowseService extends Service {
 		
 		case article:
 		case disambiguation:
-			return browseArticle((Article)page, request, xmlResponse) ;
+			return browseArticle((Article)page, artComparer, request, xmlResponse) ;
 		case category:
 			return browseCategory((Category)page, request, xmlResponse) ;
 		default:
@@ -92,10 +101,9 @@ public class BrowseService extends Service {
 	}
 
 
-	private Element browseArticle(Article art, HttpServletRequest request, Element xmlResponse) {
+	private Element browseArticle(Article art, ArticleComparer artComparer, HttpServletRequest request, Element xmlResponse) throws DOMException, Exception {
 
 		int max = prmMax.getValue(request) ;
-		boolean getRelatedness = prmRelatedness.getValue(request) ;
 
 		if (prmOutLinks.getValue(request)) {
 
@@ -111,8 +119,8 @@ public class BrowseService extends Service {
 				Element xmlLink = getHub().createElement("OutLink") ;
 				xmlLink.setAttribute("id", String.valueOf(link.getId())) ;
 				xmlLink.setAttribute("title", link.getTitle()) ;
-				if (getRelatedness)
-					xmlLink.setAttribute("relatedness", getHub().format(link.getRelatednessTo(art))) ;
+				if (artComparer != null)
+					xmlLink.setAttribute("relatedness", getHub().format(artComparer.getRelatedness(art, link))) ;
 
 				xmlLinks.appendChild(xmlLink) ;
 			}
@@ -133,8 +141,8 @@ public class BrowseService extends Service {
 				Element xmlLink = getHub().createElement("InLink") ;
 				xmlLink.setAttribute("id", String.valueOf(link.getId())) ;
 				xmlLink.setAttribute("title", link.getTitle()) ;
-				if (getRelatedness)
-					xmlLink.setAttribute("relatedness", getHub().format(link.getRelatednessTo(art))) ;
+				if (artComparer != null)
+					xmlLink.setAttribute("relatedness", getHub().format(artComparer.getRelatedness(art, link))) ;
 
 				xmlLinks.appendChild(xmlLink) ;
 			}
