@@ -23,6 +23,9 @@ public class ComparisonDataSet {
 	public ComparisonDataSet(File file)  throws IOException {
 		items = new ArrayList<Item>() ;
 
+		int articlePairs = 0 ;
+		int termPairs = 0 ;
+
 		BufferedReader input = new BufferedReader(new FileReader(file)) ;
 
 		String line ;
@@ -37,7 +40,7 @@ public class ComparisonDataSet {
 				String[] values = line.split(",") ;
 
 				String termA = values[0] ;
-				
+
 				Integer idA = null ;
 				try {
 					idA = new Integer(values[1]) ;
@@ -47,51 +50,60 @@ public class ComparisonDataSet {
 				try {
 					idB = new Integer(values[3]) ;
 				} catch (Exception e) {} ;
-				
+
 				Double relatedness = new Double(values[4]) ;
-				
+
 				//make between 0 and 1; its what we are used to.
 				relatedness = relatedness/10 ;
-				
+
 				if (idA > 0 && idB > 0)
-					items.add(new Item(termA, idA, termB, idB, relatedness)) ;
+					articlePairs ++ ;
+
+				items.add(new Item(termA, idA, termB, idB, relatedness)) ;
+				termPairs ++ ;
+
 
 			} catch (Exception e) {
 				Logger.getLogger(ComparisonDataSet.class).warn("Could not parse line \"" + line + "\"") ;
 			}
+
+		
 		}
+		
+		System.out.println("Article pairs: " + articlePairs) ;
+		System.out.println("Term pairs: " + termPairs) ;
 	}
-	
+
 	public ComparisonDataSet[][] getFolds() {
-		
+
 		ComparisonDataSet[][] folds = new ComparisonDataSet[10][2] ;
-		
+
 		for (int i=0 ; i<10 ; i++) {
 			folds[i][0] = new ComparisonDataSet() ;
 			folds[i][1] = new ComparisonDataSet() ;
 		}
-		
+
 		int index = 0 ;
 		for (ComparisonDataSet.Item item:items) {
-			
+
 			for (int i=0 ; i < 10 ; i++) {
 				if (index % 10 == i) 
 					folds[i][1].addItem(item.getTermA(), item.getIdA(), item.getTermB(), item.getIdB(), item.getRelatedness()) ;
 				else
 					folds[i][0].addItem(item.getTermA(), item.getIdA(), item.getTermB(), item.getIdB(), item.getRelatedness()) ;
 			}
-			
+
 			index++ ;
 		}
-		
+
 		return folds ;
-		
+
 	}
-	
+
 	public int size() {
 		return items.size();
 	}
-	
+
 	public ArrayList<Item> getItems() {
 		return items ;
 	}

@@ -69,7 +69,7 @@
 		
 		The value must correspond to an org.wikipedia.miner.comparison.ArticleComparer.DataDependency 
 	-->
-	<articleComparisonDependency>pageLinksIn<articleComparisonDependency>
+	<articleComparisonDependency>pageLinksIn</articleComparisonDependency>
 
 	<!-- 
 		A file containing a Weka classifier for generating relatedness measures between articles

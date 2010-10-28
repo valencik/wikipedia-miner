@@ -64,12 +64,12 @@ public class ServiceHub {
 		try {
 			String hubConfigFile = context.getInitParameter("hubConfigFile") ;
 			config = new HubConfiguration(new File(hubConfigFile)) ; 
-					
+			
 			for (String wikiName:config.getWikipediaNames()) {
 				File wikiConfigFile = new File(config.getWikipediaConfig(wikiName)) ;
 				WikipediaConfiguration wikiConfig = new WikipediaConfiguration(wikiConfigFile);
 				
-				Wikipedia wikipedia = new Wikipedia(wikiConfig, true) ;
+				Wikipedia wikipedia = new Wikipedia(wikiConfig, false) ;
 				wikipediasByName.put(wikiName, wikipedia) ;
 				
 				ArticleComparer artCmp = null ;

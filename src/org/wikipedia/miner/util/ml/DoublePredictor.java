@@ -23,11 +23,11 @@ import weka.core.Instances;
 
 public class DoublePredictor {
 
-	protected String name ;
+	private String name ;
 
 	protected FastVector attributes ;
 	protected Instances trainingData ;
-	boolean trainingFinalized = false ;
+	protected boolean trainingFinalized = false ;
 
 	protected Instances header ;
 	protected Classifier classifier ;
@@ -74,6 +74,7 @@ public class DoublePredictor {
 
 		return classifier.classifyInstance(instance) ;
 	}
+	
 
 	public void initializeTrainingData(String datasetName) throws Exception {
 
@@ -185,6 +186,9 @@ public class DoublePredictor {
 		ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file));
 		classifier = (Classifier) ois.readObject();
 		ois.close();
+		
+		if (classifier == null)
+			throw new Exception(file.getPath() +  " does not contain a valid classifier for " + name + " predictor.") ;
 	}
 
 
