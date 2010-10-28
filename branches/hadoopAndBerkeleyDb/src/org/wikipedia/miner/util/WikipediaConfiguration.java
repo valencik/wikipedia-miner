@@ -181,7 +181,7 @@ public class WikipediaConfiguration {
 		return labelComparisonModel;
 	}
 
-	public void LabelComparisonModel(File model) {
+	public void setLabelComparisonModel(File model) {
 		labelComparisonModel = model;
 	}
 	
@@ -189,7 +189,7 @@ public class WikipediaConfiguration {
 		return linkDetectionModel;
 	}
 
-	public void setTopicDetectionModel(File model) {
+	public void setLinkDetectionModel(File model) {
 		linkDetectionModel = model;
 	}
 
@@ -197,7 +197,7 @@ public class WikipediaConfiguration {
 		return topicDisambiguationModel;
 	}
 
-	public void setDisambigModel(File model) {
+	public void setTopicDisambiguationModel(File model) {
 		topicDisambiguationModel = model;
 	}
 	
@@ -301,7 +301,8 @@ public class WikipediaConfiguration {
 				} ;
 			}
 			
-			this.articleComparisonDependencies = EnumSet.copyOf(artCompDependencies) ; ;
+			if (!artCompDependencies.isEmpty())
+				articleComparisonDependencies = EnumSet.copyOf(artCompDependencies) ; ;
 			
 		
 			//TODO: throw fit if mandatory params (langCode, dbDirectory) are missing. 	

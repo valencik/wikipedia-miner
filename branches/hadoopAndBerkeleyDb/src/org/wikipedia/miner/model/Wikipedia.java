@@ -38,6 +38,7 @@ import com.sleepycat.je.EnvironmentLockedException;
  */
 public class Wikipedia {
 
+	private WikipediaConfiguration conf ;
 	private WEnvironment env ;
 
 	/**
@@ -52,7 +53,6 @@ public class Wikipedia {
 	 * @throws EnvironmentLockedException if the underlying database environment is unavailable.
 	 */
 	public Wikipedia(WikipediaConfiguration conf, boolean threadedPreparation) throws EnvironmentLockedException{
-
 		this.env = new WEnvironment(conf, threadedPreparation) ; 
 	}
 

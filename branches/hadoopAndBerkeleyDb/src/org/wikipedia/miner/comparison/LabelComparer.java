@@ -8,7 +8,6 @@ import java.util.Collections;
 import jsc.correlation.SpearmanCorrelation;
 import jsc.datastructures.PairedData;
 
-import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.ProgressTracker;
@@ -39,17 +38,18 @@ public class LabelComparer {
 		String[] relatednessMeasuringAttributes = {"bestSenseRelatedness", "maxSenseRelatedness", "avgSenseRelatedness", "weightedAvgSenseRelatedness", "concatenationPriorLinkProbability", "concatenationOccurances"} ;
 		relatednessMeasurer = new DoublePredictor("labelRelatednessMeasurer", relatednessMeasuringAttributes, "labelRelatedness") ;
 		
-		if (wikipedia.getConfig().getLabelDisambiguationModel()!= null)
+		if (wikipedia.getConfig().getLabelDisambiguationModel() != null) {
 			loadDisambiguationClassifier(wikipedia.getConfig().getLabelDisambiguationModel()) ;
+		}
 		
-		if (wikipedia.getConfig().getLabelComparisonModel()!= null)
+		if (wikipedia.getConfig().getLabelComparisonModel() != null)
 			loadComparisonClassifier(wikipedia.getConfig().getLabelComparisonModel()) ;
 	}
 	
 	public ComparisonDetails compare(Label labelA, Label labelB) throws Exception {
 
-		if (!senseSelector.isReady())
-			throw new Exception("You must train+build a new label sense selection classifier or load an existing one first") ;
+		//if (!senseSelector.isReady())
+		//	throw new Exception("You must train+build a new label sense selection classifier or load an existing one first") ;
 		
 		if (!relatednessMeasurer.isReady())
 			throw new Exception("You must train+build a new label relatedness measuring classifier or load and existing one first") ;
@@ -68,7 +68,7 @@ public class LabelComparer {
 	 */
 	public Double getRelatedness(Label labelA, Label labelB) throws Exception {
 		
-		ComparisonDetails cmp = new ComparisonDetails(labelA, labelB) ;
+		ComparisonDetails cmp = compare(labelA, labelB) ;
 		return cmp.getLabelRelatedness() ;
 	}
 	
@@ -104,7 +104,7 @@ public class LabelComparer {
 		ArrayList<Double> manualMeasures = new ArrayList<Double>() ;
 		ArrayList<Double> autoMeasures = new ArrayList<Double>() ;
 
-		ProgressTracker pt = new ProgressTracker(dataset.getItems().size(), "testing", LabelComparer.class) ;
+		ProgressTracker pt = new ProgressTracker(dataset.getItems().size(), "testing relatedness prediction", LabelComparer.class) ;
 		for (ComparisonDataSet.Item item: dataset.getItems()) {
 
 			Label labelA = new Label(wikipedia.getEnvironment(), item.getTermA()) ;
@@ -131,6 +131,42 @@ public class LabelComparer {
 		return sc ;
 	}
 	
+	public Double testDisambiguationAccuracy(ComparisonDataSet dataset) throws Exception {
+		
+		int totalInterpretations = 0 ;
+		int correctInterpretations = 0 ;
+		
+		ProgressTracker pt = new ProgressTracker(dataset.getItems().size(), "testing disambiguation accuracy", LabelComparer.class) ;
+		for (ComparisonDataSet.Item item: dataset.getItems()) {
+		
+			if (item.getIdA() < 0 || item.getIdB() < 0)
+				continue ;
+			
+			totalInterpretations++ ;
+			
+			Label labelA = new Label(wikipedia.getEnvironment(), item.getTermA()) ;
+			Label labelB = new Label(wikipedia.getEnvironment(), item.getTermB()) ;
+			
+			
+			ComparisonDetails details = this.compare(labelA, labelB) ;
+			
+			SensePair sp = details.getBestInterpretation() ;
+			
+			if (sp != null) {
+				if (sp.getSenseA().getId() == item.getIdA() && sp.getSenseB().getId() == item.getIdB())
+					correctInterpretations ++ ;
+			}
+			
+		}
+		
+		if (totalInterpretations > 0)
+			return (double) correctInterpretations/totalInterpretations ;
+		else
+			return null ;
+		
+	}
+	
+	
 	public void loadDisambiguationClassifier(File file) throws Exception {
 		senseSelector.loadClassifier(file) ;
 	}
@@ -146,6 +182,8 @@ public class LabelComparer {
 	public void saveComparisonClassifier(File file) throws Exception {
 		relatednessMeasurer.saveClassifier(file) ;
 	}
+	
+
 	
 	public void buildDefaultClassifiers() throws Exception {
 		Classifier ssClassifier = new Bagging() ;

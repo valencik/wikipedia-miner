@@ -68,17 +68,16 @@ public class ArticleComparer {
 	int wikipediaArticleCount ;
 	Double m ;
 
-
 	DoublePredictor relatednessMeasurer ;
 
-	public ArticleComparer(Wikipedia wikipeida) throws Exception {
+	public ArticleComparer(Wikipedia wikipedia) throws Exception {
 		
 		WikipediaConfiguration conf = wikipedia.getConfig() ;
 		
 		if (conf.getArticleComparisonDependancies() == null) 
 			throw new Exception("The given wikipedia configuration does not specify default article comparison data dependancies");
 		
-		init(wikipeida, conf.getArticleComparisonDependancies()) ;
+		init(wikipedia, conf.getArticleComparisonDependancies()) ;
 	}
 	
 	public ArticleComparer(Wikipedia wikipedia, EnumSet<DataDependency> dependancies) throws Exception {
@@ -147,6 +146,9 @@ public class ArticleComparer {
 		ProgressTracker pn = new ProgressTracker(dataset.getItems().size(), "training", ArticleComparer.class) ;
 		for (ComparisonDataSet.Item item: dataset.getItems()) {
 
+			if (item.getIdA() < 0 || item.getIdB() < 0)
+				continue ;
+			
 			Article artA = null;
 			try{ 
 				artA = new Article(wikipedia.getEnvironment(), item.getIdA()) ;
@@ -246,6 +248,9 @@ public class ArticleComparer {
 		ProgressTracker pn = new ProgressTracker(dataset.getItems().size(), "testing", ArticleComparer.class) ;
 		for (ComparisonDataSet.Item item: dataset.getItems()) {
 
+			if (item.getIdA() < 0 || item.getIdB() < 0)
+				continue ;
+			
 			Article artA = null;
 			try{ 
 				artA = new Article(wikipedia.getEnvironment(), item.getIdA()) ;
