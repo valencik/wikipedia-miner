@@ -69,6 +69,10 @@ public class ProgressTracker {
 	public void setMinReportInterval(long val) {
 		minReportInterval = val ;
 	}
+	
+	public void setMinReportProgress(double val) {
+		minReportProgress = val ;
+	}
 
 
 	/**
@@ -142,10 +146,11 @@ public class ProgressTracker {
 
 	private void displayProgress() {
 
-		String output = "" ;
-		if (currTask_message != null)
-			output = currTask_message + ": " ;
-
+		StringBuffer output = new StringBuffer() ;
+		if (currTask_message != null) {
+			output.append(currTask_message) ;
+			output.append(": ") ;
+		}
 		long now = new Date().getTime() ;
 
 		if (currTask_partsDone < 1)
@@ -165,11 +170,13 @@ public class ProgressTracker {
 		long timeTotal = (long)(timeElapsed * ((double)currTask_parts/currTask_partsDone)) ; 
 		long timeLeft = timeTotal - timeElapsed ;
 
-		output = output + percentFormat.format(progress) 
-		+ " in " + formatTime(timeElapsed) 
-		+ ", ETA " + formatTime(timeLeft) ;	
+		output.append(percentFormat.format(progress)) ;
+		output.append(" in ") ;
+		output.append(formatTime(timeElapsed)) ;
+		output.append(", ETA ") ;
+		output.append(formatTime(timeLeft)) ;	
 
-		Logger.getLogger(logClass).info(output) ;
+		Logger.getLogger(logClass).info(output.toString()) ;
 
 		lastReportTime = now ;
 		lastReportProgress = progress ;

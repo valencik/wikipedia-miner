@@ -13,6 +13,11 @@ import org.wikipedia.miner.util.text.TextProcessor;
 
 public class CorrectService extends Service {
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 7243235547641000876L;
+	
 	private StringParameter prmTerm ;
 
 	public CorrectService() {

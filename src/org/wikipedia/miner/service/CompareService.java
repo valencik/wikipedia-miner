@@ -3,7 +3,6 @@ package org.wikipedia.miner.service;
 import gnu.trove.TLongHashSet;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.TreeSet;
 
@@ -19,7 +18,6 @@ import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.service.param.BooleanParameter;
-import org.wikipedia.miner.service.param.EnumSetParameter;
 import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.IntListParameter;
 import org.wikipedia.miner.service.param.IntParameter;

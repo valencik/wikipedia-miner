@@ -9,7 +9,12 @@ import org.wikipedia.miner.model.Wikipedia;
 
 public class ProgressService extends Service {
 
-	DecimalFormat df = new DecimalFormat("#.00") ;
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -1217650265475115103L;
+	
+	private DecimalFormat df = new DecimalFormat("#.00") ;
 	
 	
 	public ProgressService() {

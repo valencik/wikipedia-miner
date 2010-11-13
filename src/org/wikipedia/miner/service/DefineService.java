@@ -18,7 +18,6 @@ import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.EnumParameter;
 import org.wikipedia.miner.service.param.IntParameter;
-import org.wikipedia.miner.service.param.StringArrayParameter;
 
 @SuppressWarnings("serial")
 public class DefineService extends Service {

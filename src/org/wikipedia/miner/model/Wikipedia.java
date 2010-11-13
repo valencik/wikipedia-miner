@@ -38,7 +38,6 @@ import com.sleepycat.je.EnvironmentLockedException;
  */
 public class Wikipedia {
 
-	private WikipediaConfiguration conf ;
 	private WEnvironment env ;
 
 	/**
@@ -130,10 +129,13 @@ public class Wikipedia {
 	 * The given title must be matched exactly to return an article. If you want some more lee-way,
 	 * use getMostLikelyArticle() instead. 
 	 *  
-	 * @param title	the title of an Article (or it's redirect).
+	 * @param title	the title of an Article (or its redirect).
 	 * @return the Article referenced by the given title, or null if one does not exist
 	 */
 	public Article getArticleByTitle(String title) {
+		
+		if (title == null || title.length() == 0)
+			return null ;
 
 		title = title.substring(0,1).toUpperCase() + title.substring(1) ;
 
@@ -162,7 +164,7 @@ public class Wikipedia {
 
 		title = title.substring(0,1).toUpperCase() + title.substring(1) ;
 
-		Integer id = env.getDbArticlesByTitle().retrieve(title) ;
+		Integer id = env.getDbCategoriesByTitle().retrieve(title) ;
 
 		if (id == null)
 			return null ;

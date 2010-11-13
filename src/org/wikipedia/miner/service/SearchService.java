@@ -3,7 +3,6 @@ package org.wikipedia.miner.service;
 import gnu.trove.TIntFloatHashMap;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,6 +25,10 @@ import org.wikipedia.miner.util.RelatednessCache;
  * NOTE: this does not support {@link Service.ResponseFormat#DIRECT} 
  */
 public class SearchService extends Service {
+
+
+	private static final long serialVersionUID = 5011451347638265017L;
+
 
 
 	//Pattern topicPattern = Pattern.compile("\\[\\[(\\d+)\\|(.*?)\\]\\]") ;
