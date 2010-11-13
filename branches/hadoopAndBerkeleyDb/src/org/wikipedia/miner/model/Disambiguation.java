@@ -6,7 +6,7 @@ import org.wikipedia.miner.db.struct.DbPage;
 /**
  * Represents disambiguation pages in Wikipedia, which lists possible senses for an ambiguous term
  */
-public class Disambiguation extends Page {
+public class Disambiguation extends Article {
 
 	
 	/**

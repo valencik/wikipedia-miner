@@ -14,10 +14,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import org.wikipedia.miner.db.WDatabase.CachePriority;
-import org.wikipedia.miner.db.WDatabase.DatabaseType;
-import org.wikipedia.miner.util.WikipediaConfiguration;
-import org.wikipedia.miner.util.text.TextProcessor;
 import org.xml.sax.SAXException;
 
 public class HubConfiguration {
@@ -80,7 +76,6 @@ public class HubConfiguration {
 		
 	}
 	
-	@SuppressWarnings("unchecked")
 	private void initFromXml(Element xml) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
 		
 		wikiDescriptions = new HashMap<String,String>() ;

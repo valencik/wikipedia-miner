@@ -22,8 +22,6 @@ package org.wikipedia.miner.model;
 import java.util.* ; 
 
 import org.wikipedia.miner.db.WEnvironment;
-import org.wikipedia.miner.db.WDatabase.DatabaseType ;
-import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.DbIntList;
 import org.wikipedia.miner.db.struct.DbLabelForPage;
 import org.wikipedia.miner.db.struct.DbLabelForPageList;
@@ -32,7 +30,6 @@ import org.wikipedia.miner.db.struct.DbLinkLocationList;
 import org.wikipedia.miner.db.struct.DbPage;
 import org.wikipedia.miner.db.struct.DbPageLinkCounts;
 import org.wikipedia.miner.db.struct.DbTranslations;
-import org.wikipedia.miner.util.WikipediaConfiguration;
 
 /**
  * Represents articles in Wikipedia; the pages that contain descriptive text regarding a particular topic. 
@@ -261,169 +258,6 @@ public class Article extends Page {
 		else
 			return lc.getDistinctLinksOut() ;
 	}
-
-
-	private float getRelatednessFromOutLinks(Article article) {
-
-		if (getId() == article.getId()) 
-			return 1 ;
-
-		int totalArticles = env.retrieveStatistic(StatisticName.articleCount).intValue() ;
-
-		DbLinkLocationList idListA = env.getDbPageLinkOut().retrieve(id) ; 
-		DbLinkLocationList idListB = env.getDbPageLinkOut().retrieve(article.id) ; 
-
-		if (idListA==null || idListB==null) 
-			return 0 ;
-
-		ArrayList<DbLinkLocation> linksA = idListA.getLinkLocations() ;
-		ArrayList<DbLinkLocation> linksB = idListB.getLinkLocations() ;
-
-		if (linksA==null || linksB==null) 
-			return 0 ;
-
-		int indexA = 0 ;
-		int indexB = 0 ;
-
-		ArrayList<Double> vectA = new ArrayList<Double>() ;
-		ArrayList<Double> vectB = new ArrayList<Double>() ;
-
-		while (indexA < linksA.size() || indexB < linksB.size()) {
-
-			DbLinkLocation linkA = null ;
-			DbLinkLocation linkB = null ;		
-
-			if (indexA < linksA.size())
-				linkA = linksA.get(indexA) ;
-
-			if (indexB < linksB.size())
-				linkB = linksB.get(indexB) ;
-
-			if (linkA != null && linkB != null && linkA.getLinkId()==linkB.getLinkId()) {
-
-				int totalLinksIn = new Article(env, linkA.getLinkId()).getTotalLinksInCount() ;
-				double probability = Math.log((double)totalArticles/totalLinksIn) ;
-				vectA.add(probability) ;
-				vectB.add(probability) ;
-
-				indexA ++ ;
-				indexB ++ ;
-			} else {
-
-				if (linkA != null && (linkB == null || linkA.getLinkId() < linkB.getLinkId())) {
-
-					int totalLinksIn = new Article(env, linkA.getLinkId()).getTotalLinksInCount() ;
-					double probability = Math.log((double)totalArticles/totalLinksIn) ;
-					vectA.add(probability) ;
-
-					if (linkA.getLinkId() == article.getId())
-						vectB.add(probability) ;
-					else
-						vectB.add(0.0) ;
-
-					indexA ++ ;
-				} else {
-					int totalLinksIn = new Article(env, linkB.getLinkId()).getTotalLinksInCount() ;
-					double probability = Math.log((double)totalArticles/totalLinksIn) ;					
-					vectB.add(probability) ;
-
-					if (linkB.getLinkId() == id)
-						vectA.add(probability) ;
-					else
-						vectA.add(0.0) ;
-
-					indexB ++ ;
-				}
-			}
-		}
-
-		// calculate angle between vectors
-		double dotProduct = 0 ;
-		double magnitudeA = 0 ;
-		double magnitudeB = 0 ;
-
-		for (int x=0;x<vectA.size();x++) {
-			float valA = vectA.get(x).floatValue() ;
-			float valB = vectB.get(x).floatValue() ;
-
-			dotProduct = dotProduct + (valA * valB) ;
-			magnitudeA = magnitudeA + (valA * valA) ;
-			magnitudeB = magnitudeB + (valB * valB) ;
-		}
-
-		magnitudeA = Math.sqrt(magnitudeA) ;
-		magnitudeB = Math.sqrt(magnitudeB) ;
-
-		Double sr = Math.acos(dotProduct / (magnitudeA * magnitudeB)) ;		
-		sr = (Math.PI/2) - sr ; // reverse, so 0=no relation, PI/2= same
-		sr = sr / (Math.PI/2) ; // normalise, so measure is between 0 and 1 ;				
-
-		return sr.floatValue() ;
-	}
-
-
-	private float getRelatednessFromInLinks(Article article) {
-
-		if (getId() == article.getId()) 
-			return 1 ;
-
-		DbLinkLocationList idListA = env.getDbPageLinkIn().retrieve(id) ; 
-		DbLinkLocationList idListB = env.getDbPageLinkIn().retrieve(article.id) ; 
-
-		if (idListA==null || idListB==null) 
-			return 0 ;
-
-		ArrayList<DbLinkLocation> linksA = idListA.getLinkLocations() ;
-		ArrayList<DbLinkLocation> linksB = idListB.getLinkLocations() ;
-
-		if (linksA==null || linksB==null) 
-			return 0 ;
-
-		int linksBoth = 0 ;
-
-		int indexA = 0 ;
-		int indexB = 0 ;
-
-		while (indexA < linksA.size() && indexB < linksB.size()) {
-
-			int linkA = linksA.get(indexA).getLinkId() ;
-			int linkB = linksB.get(indexB).getLinkId() ;
-
-			if (linkA == linkB) {
-				linksBoth ++ ;
-				indexA ++ ;
-				indexB ++ ;
-			} else {
-
-				if (linkA < linkB) {
-					if (linkA == article.getId()) 
-						linksBoth ++ ;
-
-					indexA ++ ;
-				} else {
-
-					if (linkB == id) 
-						linksBoth ++ ;
-
-					indexB ++ ;
-				}
-			}
-		}
-
-		float a = (float)Math.log(linksA.size()) ;
-		float b = (float)Math.log(linksB.size()) ;
-		float ab = (float)Math.log(linksBoth) ;
-		float m = (float)Math.log(env.retrieveStatistic(StatisticName.articleCount)) ;
-
-		float sr = (Math.max(a, b) -ab) / (m - Math.min(a, b)) ;
-
-		if (Float.isNaN(sr) || Float.isInfinite(sr) || sr > 1)
-			sr = 1 ;
-
-		sr = 1-sr ;
-		return sr ;
-	}
-
 
 	/**
 	 * Returns an array of {@link Label Labels} that have been used to refer to this article.

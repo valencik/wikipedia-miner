@@ -16,6 +16,11 @@ import org.wikipedia.miner.service.param.IntParameter;
 
 public class BrowseService extends Service {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -1138307426429979318L;
+
 	private IntParameter prmId ;
 
 	private BooleanParameter prmInLinks ;

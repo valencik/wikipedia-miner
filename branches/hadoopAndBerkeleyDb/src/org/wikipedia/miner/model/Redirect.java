@@ -34,13 +34,11 @@ public class Redirect extends Page {
 	 */	//TODO: should just resolve double redirects during extraction.
 	public Article getTarget() {
 
-		Article target = null;
-
 		int currId = id ;
 
 		TIntHashSet redirectsFollowed = new TIntHashSet() ;
 
-		while (target == null && !redirectsFollowed.contains(currId)) {
+		while (!redirectsFollowed.contains(currId)) {
 			redirectsFollowed.add(currId) ;
 
 			Integer targetId = env.getDbRedirectTargetBySource().retrieve(currId) ;
@@ -48,15 +46,15 @@ public class Redirect extends Page {
 			if (targetId == null) 
 				return null ;
 			
-			target = (Article)Page.createPage(env, targetId) ;
+			Page target = Page.createPage(env, targetId) ;
 			
 			if (target.getType() == PageType.redirect)
 				currId = targetId ;
 			else
-				return target ;
+				return (Article)target ;
 		}
 
-		return target ;		
+		return null ;		
 	}
 	
 }

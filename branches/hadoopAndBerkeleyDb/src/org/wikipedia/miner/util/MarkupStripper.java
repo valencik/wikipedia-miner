@@ -27,8 +27,6 @@ import java.util.regex.*;
  * This provides tools to strip out markup from wikipedia articles, or anything else that has been written
  * in mediawiki's format. It's all pretty simple, so don't expect perfect parsing. It is particularly bad at 
  * dealing with templates (these are simply removed rather than resolved).  
- * 
- * author David Milne
  */
 public class MarkupStripper {
 
@@ -199,8 +197,8 @@ public class MarkupStripper {
 				if (m.matches()) {
 
 					String prefix = m.group(1) ;
-					String dest = m.group(2) ;
-					String anchor = m.group(3) ;
+					//String dest = m.group(2) ;
+					//String anchor = m.group(3) ;
 
 					if (prefix != null) {
 						// this is not a link to another article, so get rid of it entirely
@@ -317,6 +315,8 @@ public class MarkupStripper {
 		clearedMarkup.insert(0, markup.substring(0, lastPos)) ;	
 		return clearedMarkup.toString() ;
 	}
+	
+	
 	
 	public String stripExcessNewlines(String markup) {
 		
@@ -619,7 +619,7 @@ public class MarkupStripper {
 	 * other regions.
 	 * 
 	 * The resulting region list will be non-overlapping and sorted by end positions.
-	 */
+	 *//*
 	private Vector<int[]> collapseRegionList(Vector<int[]> regions) {
 
 		Vector<int[]> newRegions = new Vector<int[]>() ;
@@ -641,7 +641,7 @@ public class MarkupStripper {
 		}
 
 		return newRegions ;	
-	}
+	}*/
 
 	/**
 	 * Merges two lists of regions into one sorted list. Regions that are contained

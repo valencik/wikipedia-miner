@@ -1,14 +1,9 @@
 package org.wikipedia.miner.service.param;
 
 import java.util.HashMap;
-
 import javax.servlet.http.HttpServletRequest;
-
-import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.wikipedia.miner.service.ServiceHub;
-
-import org.apache.xerces.parsers.DOMParser ;
 
 public class StringArrayParameter extends Parameter<String> {
 

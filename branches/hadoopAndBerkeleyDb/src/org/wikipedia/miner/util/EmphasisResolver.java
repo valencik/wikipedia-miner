@@ -32,8 +32,7 @@ import java.util.regex.Pattern;
  */
 public class EmphasisResolver {
 	
-	private enum EmphasisType{ITALIC, BOLD, BOTH} ;
-
+	
 	private static final int ITALIC = 2 ;
 	private static final int BOLD = 3 ;
 	private static final int BOLD_ITALIC = 5 ;

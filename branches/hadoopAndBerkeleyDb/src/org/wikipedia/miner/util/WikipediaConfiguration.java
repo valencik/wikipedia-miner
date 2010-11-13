@@ -60,7 +60,7 @@ public class WikipediaConfiguration {
 	}
 
 	public WikipediaConfiguration(File configFile) throws ParserConfigurationException, SAXException, IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-
+		
 		DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
 		DocumentBuilder db = dbf.newDocumentBuilder();
 		Document doc = db.parse(configFile);
@@ -335,9 +335,13 @@ public class WikipediaConfiguration {
 		}
 	}
 	
-	public static void main(String args[]) throws Exception {
+	public static void main(String args[]) throws ParserConfigurationException, SAXException, IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+		WikipediaConfiguration conf = new WikipediaConfiguration(new File("/Users/dmilne/Research/workspace/wm_hadoopAndBerkeleyDb/configs/en.xml")) ;
 		
-		WikipediaConfiguration conf = new WikipediaConfiguration(new File("/home/dmilne/workspaces/Eclipse/wikipediaMiner_hadoopAndBerkeleyDB/configs/en.xml")) ;
+		System.out.println(conf.getLangCode()) ;
+		
+		System.out.println(conf.getArticleComparisonDependancies()) ;
 		
 	}
+	
 }

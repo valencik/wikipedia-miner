@@ -20,12 +20,10 @@
 package org.wikipedia.miner.util;
 
 import java.io.*;
-import java.sql.*;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.regex.*;
 
-import org.apache.log4j.Logger;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.model.Page.PageType;
@@ -37,7 +35,7 @@ import org.wikipedia.miner.model.Page.PageType;
  * Can either be generated randomly from Wikipedia, or loaded from file.
  */
 public class ArticleSet {
-	private TreeSet<Integer> articleIds = new TreeSet<Integer>() ;
+	private ArrayList<Integer> articleIds = new ArrayList<Integer>() ;
 	private MarkupStripper stripper = new MarkupStripper() ;
 	
 	/**
@@ -49,7 +47,7 @@ public class ArticleSet {
 	 */
 	public ArticleSet(File file) throws IOException{
 		
-		articleIds = new TreeSet<Integer>() ;
+		articleIds = new ArrayList<Integer>() ;
 
 		BufferedReader reader = new BufferedReader(new FileReader(file)) ;
 		String line  ;
@@ -83,16 +81,15 @@ public class ArticleSet {
 	 * @param minWordCount  the minimum number of words allowed in an article
 	 * @param maxWordCount the maximum number of words allowed in an article
 	 * @param maxListProportion the maximum proportion of list items (over total line count) that an article may contain. 
-	 * @throws SQLException if there is a problem with the wikipedia database.
 	 */
-	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion) throws SQLException{
+	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion) {
 		
 		DecimalFormat df = new DecimalFormat("#0.00 %") ;
 		
 		Vector<Article> roughCandidates = getRoughCandidates(wikipedia, minInLinks, minOutLinks) ;
 		int totalRoughCandidates = roughCandidates.size() ;
 				
-		articleIds = new TreeSet<Integer>() ;
+		articleIds = new ArrayList<Integer>() ;
 		
 		ProgressTracker pn = new ProgressTracker(totalRoughCandidates, "Refining candidates (ETA is worst case)", ArticleSet.class) ;
 		
@@ -133,7 +130,7 @@ public class ArticleSet {
 	/**
 	 * @return the set of article ids, in ascending order.
 	 */
-	public TreeSet<Integer> getArticleIds() {
+	public ArrayList<Integer> getArticleIds() {
 		return articleIds ;
 	}
 	
@@ -153,7 +150,7 @@ public class ArticleSet {
 		writer.close() ;
 	}
 		
-	private Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks) throws SQLException {
+	private Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks)  {
 		
 		Vector<Article> articles = new Vector<Article>() ;
 		int totalArticles = wikipedia.getEnvironment().retrieveStatistic(StatisticName.articleCount).intValue() ;
@@ -178,7 +175,7 @@ public class ArticleSet {
 		return articles ;
 	}
 		
-	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) throws SQLException{
+	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) {
 				
 		//we don't want any disambiguations
 		if (art.getType() == PageType.disambiguation) 
