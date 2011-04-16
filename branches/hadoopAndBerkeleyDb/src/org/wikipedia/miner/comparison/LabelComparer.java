@@ -11,8 +11,7 @@ import jsc.datastructures.PairedData;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.ProgressTracker;
-import org.wikipedia.miner.util.ml.BinaryPredictor;
-import org.wikipedia.miner.util.ml.DoublePredictor;
+import org.wikipedia.miner.util.ml.*;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.GaussianProcesses;
@@ -25,18 +24,30 @@ public class LabelComparer {
 	private Wikipedia wikipedia ;
 	private ArticleComparer articleComparer ;
 	
-	private BinaryPredictor senseSelector ;
-	private DoublePredictor relatednessMeasurer ;
+	private enum SenseAttr {
+		predictedRelatedness, avgPriorProbability, maxPriorProbability, minPriorProbability
+	}
+	
+	private enum RelatednessAttr {
+		bestSenseRelatedness, maxSenseRelatedness, avgSenseRelatedness, weightedAvgSenseRelatedness, concatenationPriorLinkProbability, concatenationOccurances
+	}
+	
+	private Decider<SenseAttr,Boolean> senseSelector ;
+	private Decider<RelatednessAttr, Double> relatednessMeasurer ;
 	
 	public LabelComparer(Wikipedia wikipedia, ArticleComparer articleComparer) throws Exception {
 		this.wikipedia = wikipedia ;
 		this.articleComparer = articleComparer ;
 		
-		String[] senseSelectionAttributes = {"predictedRelatedness", "avgPriorProbability", "maxPriorProbability", "minPriorProbability"} ;
-		senseSelector = new BinaryPredictor("labelSenseSelector", senseSelectionAttributes, "isValidSensePair") ;
-
-		String[] relatednessMeasuringAttributes = {"bestSenseRelatedness", "maxSenseRelatedness", "avgSenseRelatedness", "weightedAvgSenseRelatedness", "concatenationPriorLinkProbability", "concatenationOccurances"} ;
-		relatednessMeasurer = new DoublePredictor("labelRelatednessMeasurer", relatednessMeasuringAttributes, "labelRelatedness") ;
+		senseSelector = new DeciderBuilder<SenseAttr>("labelSenseSelector", SenseAttr.class)
+			.setDefaultAttributeTypeNumeric()
+			.setClassAttributeTypeBoolean("isValid")
+			.build();
+		
+		relatednessMeasurer = new DeciderBuilder<RelatednessAttr>("labelRelatednessMeasurer", RelatednessAttr.class)
+			.setDefaultAttributeTypeNumeric()
+			.setClassAttributeTypeNumeric("relatedness")
+			.build();
 		
 		if (wikipedia.getConfig().getLabelDisambiguationModel() != null) {
 			loadDisambiguationClassifier(wikipedia.getConfig().getLabelDisambiguationModel()) ;
@@ -48,8 +59,8 @@ public class LabelComparer {
 	
 	public ComparisonDetails compare(Label labelA, Label labelB) throws Exception {
 
-		//if (!senseSelector.isReady())
-		//	throw new Exception("You must train+build a new label sense selection classifier or load an existing one first") ;
+		if (!senseSelector.isReady())
+			throw new Exception("You must train+build a new label sense selection classifier or load an existing one first") ;
 		
 		if (!relatednessMeasurer.isReady())
 			throw new Exception("You must train+build a new label relatedness measuring classifier or load and existing one first") ;
@@ -75,9 +86,6 @@ public class LabelComparer {
 	
 	public void train(ComparisonDataSet dataset, String datasetName) throws Exception {
 
-		senseSelector.initializeTrainingData(datasetName) ;
-		relatednessMeasurer.initializeTrainingData(datasetName) ;
-
 		ProgressTracker pn = new ProgressTracker(dataset.getItems().size(), "training", LabelComparer.class) ;
 		for (ComparisonDataSet.Item item: dataset.getItems()) {
 
@@ -85,8 +93,7 @@ public class LabelComparer {
 			pn.update() ;
 		}
 		
-		senseSelector.finalizeTrainingData() ;
-		relatednessMeasurer.finalizeTrainingData() ;
+		//TODO: filter to resolve skewness?
 	}
 	
 	public void saveDisambiguationTrainingData(File file) throws IOException, Exception {
@@ -327,34 +334,32 @@ public class LabelComparer {
 			if (relatedness != null) {
 				//this is a training instance, where relatedness is known
 				labelRelatedness = relatedness ;
-				relatednessMeasurer.addTrainingInstance(getFeatures()) ;
+				relatednessMeasurer.addTrainingInstance(getInstance()) ;
 			} else {
 				//relatedness must be predicted
-				labelRelatedness = relatednessMeasurer.getPrediction(getFeatures()) ;
+				labelRelatedness = relatednessMeasurer.getDecision(getInstance()) ;
 			}
 		}
 		
-		protected double[] getFeatures() {
+		protected Instance getInstance() throws ClassMissingException, AttributeMissingException {
 			
-			double[] features = new double[7] ;
+			InstanceBuilder<RelatednessAttr,Double> ib = relatednessMeasurer.getInstanceBuilder() ;
 			
 			if (plausableInterpretations.size() > 0)
-				features[0] = plausableInterpretations.get(0).getSenseRelatedness() ;
+				ib.setAttribute(RelatednessAttr.bestSenseRelatedness, plausableInterpretations.get(0).getSenseRelatedness()) ;
 			else
-				features[0] = Instance.missingValue() ;
+				ib.setAttribute(RelatednessAttr.bestSenseRelatedness, Instance.missingValue()) ;
 			
-			features[1] = maxSpRelatedness ;
-			features[2] = avgSpRelatedness ;
-			features[3] = weightedAvgSpRelatedness ;
-			features[4] = concatenation.getLinkProbability() ;
-			features[5] = concatenation.getOccCount() ;
+			ib.setAttribute(RelatednessAttr.maxSenseRelatedness, maxSpRelatedness) ;
+			ib.setAttribute(RelatednessAttr.avgSenseRelatedness, avgSpRelatedness) ;
+			ib.setAttribute(RelatednessAttr.weightedAvgSenseRelatedness, weightedAvgSpRelatedness) ;
+			ib.setAttribute(RelatednessAttr.concatenationPriorLinkProbability, concatenation.getLinkProbability()) ;
+			ib.setAttribute(RelatednessAttr.concatenationOccurances, Math.log(concatenation.getOccCount()+1)) ;
 			
-			if (labelRelatedness == null)
-				features[6] = Instance.missingValue() ;
-			else 
-				features[6] = labelRelatedness ;
+			if (labelRelatedness != null)
+				ib.setClassAttribute(labelRelatedness) ;
 			
-			return features ;
+			return ib.build() ;
 		}
 	}
 	
@@ -398,10 +403,10 @@ public class LabelComparer {
 				else
 					disambiguationConfidence = 0.0 ;
 				
-				senseSelector.addTrainingInstance(getFeatures()) ;
+				senseSelector.addTrainingInstance(getInstance()) ;
 				
 			} else {
-				disambiguationConfidence = senseSelector.getPrediction(getFeatures()) ;
+				disambiguationConfidence = senseSelector.getDecisionDistribution(getInstance()).get(true) ;
 				isValid = (disambiguationConfidence > 0.5) ;
 			}
 		}
@@ -426,22 +431,19 @@ public class LabelComparer {
 			return senseRelatedness;
 		}
 		
-		protected double[] getFeatures() {
+		protected Instance getInstance() throws ClassMissingException, AttributeMissingException {
 			
-			double[] features = new double[5] ;
-
-			features[0] = senseRelatedness ;
-			features[1] = avgPriorProbability ;
-			features[2] = maxPriorProbability ;
-			features[3] = minPriorProbability ;
+			InstanceBuilder<SenseAttr,Boolean> ib = senseSelector.getInstanceBuilder() ;
 			
-			if (disambiguationConfidence == null)
-				features[4] = Instance.missingValue() ;
-			else { 
-				features[4] = BinaryPredictor.booleanToDouble(isValid) ;
+			ib.setAttribute(SenseAttr.predictedRelatedness, senseRelatedness) ;
+			ib.setAttribute(SenseAttr.avgPriorProbability, avgPriorProbability) ;
+			ib.setAttribute(SenseAttr.maxPriorProbability, maxPriorProbability) ;
+			ib.setAttribute(SenseAttr.minPriorProbability, minPriorProbability) ;
 			
-			}
-			return features ;
+			if (disambiguationConfidence != null)
+				ib.setClassAttribute(isValid) ;
+			
+			return ib.build() ;
 		}
 
 		@Override
