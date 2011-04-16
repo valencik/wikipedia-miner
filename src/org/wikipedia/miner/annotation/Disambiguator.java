@@ -32,12 +32,14 @@ import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
+import org.wikipedia.miner.util.ml.Decider;
+import org.wikipedia.miner.util.ml.DeciderBuilder;
 import org.wikipedia.miner.util.text.*;
 import org.wikipedia.miner.model.Label.Sense;
 
 import weka.classifiers.*;
-import weka.classifiers.meta.* ;
 import weka.core.* ;
+import weka.filters.supervised.instance.Resample ;
 
 /**
  *	A machine-learned disambiguator. Given a term and a sense, it can identify how valid that sense is.
@@ -51,21 +53,16 @@ public class Disambiguator {
 
 	private Wikipedia wikipedia ;
 	private ArticleCleaner cleaner ;
-	//private SentenceSplitter ss; 
 	private TextProcessor tp ;
 	private ArticleComparer comparer ;
-
-	private FastVector attributes ;
-	private Instances trainingData ;
-	private Instances header ;
-	private Classifier classifier ;
 
 	private double minSenseProbability ; 
 	private int maxLabelLength = 20 ;
 	private double minLinkProbability ;
 	private int maxContextSize ;
-
 	
+	private enum Attributes {commonness, relatedness, contextQuality} ;
+	private Decider<Attributes, Boolean> decider ;
 	
 	public Disambiguator(Wikipedia wikipedia) throws IOException, Exception {
 		
@@ -75,6 +72,7 @@ public class Disambiguator {
 		
 		init(wikipedia, comparer, conf.getDefaultTextProcessor(), conf.getMinSenseProbability(), conf.getMinLinkProbability(), 50) ;
 
+		
 		
 		if (conf.getTopicDisambiguationModel() != null)
 			loadClassifier(conf.getTopicDisambiguationModel()) ;
@@ -90,13 +88,14 @@ public class Disambiguator {
 	 * @param minSenseProbability the lowest probability (as a destination for the ambiguous Label term) for which senses will be considered. 
 	 * @param minLinkProbability the lowest probability (as a link in Wikipedia) for which terms will be mined from surrounding text
 	 * @param maxContextSize the maximum number of concepts that are used as context.
+	 * @throws Exception 
 	 */
-	public Disambiguator(Wikipedia wikipedia,  ArticleComparer comparer, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) {
+	public Disambiguator(Wikipedia wikipedia,  ArticleComparer comparer, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) throws Exception {
 		init(wikipedia, comparer, textProcessor, minSenseProbability, minLinkProbability, maxContextSize) ;
 	}
 
 
-	private void init(Wikipedia wikipedia, ArticleComparer comparer, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) {
+	private void init(Wikipedia wikipedia, ArticleComparer comparer, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) throws Exception {
 		this.wikipedia = wikipedia ;
 		this.comparer = comparer ;
 		this.cleaner = new ArticleCleaner() ;
@@ -105,7 +104,13 @@ public class Disambiguator {
 		this.minSenseProbability = minSenseProbability ;
 		this.minLinkProbability = minLinkProbability ;
 		this.maxContextSize = maxContextSize ; 
-
+		
+		decider = new DeciderBuilder<Attributes>("LinkDisambiguator", Attributes.class)
+			.setDefaultAttributeTypeNumeric()
+			.setClassAttributeTypeBoolean("isCorrectSense")
+			.build();
+		
+		/*
 		attributes = new FastVector() ;
 
 		attributes.addElement(new Attribute("commoness")) ;
@@ -119,6 +124,9 @@ public class Disambiguator {
 
 		this.header = new Instances("disambiguation_headerOnly", attributes, 0) ;
 		header.setClassIndex(header.numAttributes() -1) ;
+		*/
+		
+		
 		
 		if (wikipedia.getConfig().getCachePriority(DatabaseType.label) == null)
 			Logger.getLogger(Disambiguator.class).warn("'label' database has not been cached, so this will run significantly slower than it needs to.") ;
@@ -139,21 +147,13 @@ public class Disambiguator {
 	 */
 	public double getProbabilityOfSense(double commonness, double relatedness, Context context) throws Exception {
 
-		double[] values = new double[attributes.size()];
-
-		values[0] = commonness ;
-		values[1] = relatedness ;
-		values[2] = context.getQuality() ;
-		//values[2] = context.getSize() ;
-		//values[3] = context.getTotalRelatedness() ;
-		//values[4] = context.getTotalLinkLikelyhood() ;
-
-		values[3] = Instance.missingValue() ;
-
-		Instance i = new Instance(1.0, values) ;
-		i.setDataset(header) ;
-
-		return classifier.distributionForInstance(i)[0] ;		
+		Instance i = decider.getInstanceBuilder()
+			.setAttribute(Attributes.commonness, commonness)
+			.setAttribute(Attributes.relatedness, relatedness)
+			.setAttribute(Attributes.contextQuality, (double)context.getQuality())
+			.build() ;
+		
+		return decider.getDecisionDistribution(i).get(true) ;
 	}
 
 	/**
@@ -167,8 +167,6 @@ public class Disambiguator {
 	 * @throws Exception 
 	 */
 	public void train(ArticleSet articles, SnippetLength snippetLength, String datasetName, RelatednessCache rc) throws Exception{
-
-		initializeTrainingData(datasetName) ;
 
 		ProgressTracker pn = new ProgressTracker(articles.getArticleIds().size(), "training", Disambiguator.class) ;
 		for (int id: articles.getArticleIds()) {
@@ -186,6 +184,12 @@ public class Disambiguator {
 			
 			pn.update() ;
 		}
+		
+		//training data is very likely to be skewed. So lets resample to even out class values
+		Resample resampleFilter = new Resample() ;
+		resampleFilter.setBiasToUniformClass(1) ;
+		
+		decider.applyFilter(resampleFilter) ;
 	}
 
 	/**
@@ -201,12 +205,7 @@ public class Disambiguator {
 	public void saveTrainingData(File file) throws IOException, Exception {
 		Logger.getLogger(Disambiguator.class).info("saving training data") ;
 		
-		if (trainingData == null)
-			throw new Exception("You need to train the disambiguator first!") ;
-
-		BufferedWriter writer = new BufferedWriter(new FileWriter(file)) ;
-		writer.write(trainingData.toString()) ;
-		writer.close();
+		decider.saveTrainingData(file) ;
 	}
 	
 	/**
@@ -214,18 +213,12 @@ public class Disambiguator {
 	 * You will still need to build a classifier in order to use the trained disambiguator. 
 	 * 
 	 * @param file the file to load 
-	 * @throws IOException if the file cannot be read
+	 * @throws Exception 
 	 */
-	public void loadTrainingData(File file) throws IOException{
+	public void loadTrainingData(File file) throws Exception{
 		Logger.getLogger(Disambiguator.class).info("loading training data") ;
-
-		trainingData = new Instances(new BufferedReader(new FileReader(file)));
-		trainingData.setClassIndex(trainingData.numAttributes() - 1);
-	}
-
-	private void initializeTrainingData(String datasetName) {
-		trainingData = new Instances(datasetName, attributes, 0) ;
-		trainingData.setClassIndex(trainingData.numAttributes() -1) ;
+		
+		decider.loadTrainingData(file) ;
 	}
 
 	/**
@@ -238,13 +231,7 @@ public class Disambiguator {
 	public void saveClassifier(File file) throws IOException, Exception {
 		Logger.getLogger(Disambiguator.class).info("saving classifier") ;
 		
-		if (classifier == null)
-			throw new Exception("You must train the disambiguator and build a classifier first!") ;
-
-		ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file));
-		oos.writeObject(classifier);
-		oos.flush();
-		oos.close();
+		decider.saveClassifier(file) ;
 	}
 
 	/**
@@ -257,9 +244,7 @@ public class Disambiguator {
 	public void loadClassifier(File file) throws IOException, Exception {
 		Logger.getLogger(Disambiguator.class).info("loading classifier") ;
 
-		ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file));
-		classifier = (Classifier) ois.readObject();
-		ois.close();
+		decider.loadClassifier(file) ;
 	}
 
 	
@@ -273,14 +258,7 @@ public class Disambiguator {
 	public void buildClassifier(Classifier classifier) throws Exception {
 		Logger.getLogger(Disambiguator.class).info("building classifier") ;
 
-		weightTrainingInstances() ;
-
-		if (trainingData == null) {
-			throw new WekaException("You must load training data or train on a set of articles before builing classifier.") ;
-		} else {
-			this.classifier = classifier ;
-			classifier.buildClassifier(trainingData) ;
-		}
+		decider.buildClassifier(classifier) ;
 	}
 	
 	public ArticleComparer getArticleComparer() {
@@ -345,56 +323,16 @@ public class Disambiguator {
 
 				if (sense.getPriorProbability() < minSenseProbability) break ;
 
-				double[] values = new double[attributes.size()];
-
-				values[0] = sense.getPriorProbability() ;
-				values[1] = context.getRelatednessTo(sense) ;
-				values[2] = context.getQuality() ;
-
-				if (sense.getId() == ref.getTopicId()) 
-					values[3] = 0.0 ;
-				else
-					values[3] = 1.0 ;
-
-				trainingData.add(new Instance(1.0, values));
+				Instance i = decider.getInstanceBuilder()
+				.setAttribute(Attributes.commonness, sense.getPriorProbability())
+				.setAttribute(Attributes.relatedness, context.getRelatednessTo(sense))
+				.setAttribute(Attributes.contextQuality, (double)context.getQuality())
+				.setClassAttribute(sense.getId() ==ref.getTopicId())
+				.build() ;
+				
+				decider.addTrainingInstance(i) ;
 			}
 		}
-	}
-
-	@SuppressWarnings("unchecked")
-	private void weightTrainingInstances() {
-
-		double positiveInstances = 0 ;
-		double negativeInstances = 0 ; 
-
-		Enumeration<Instance> e = trainingData.enumerateInstances() ;
-
-		while (e.hasMoreElements()) {
-			Instance i = (Instance) e.nextElement() ;
-
-			double isValidSense = i.value(3) ;
-
-			if (isValidSense == 0) 
-				positiveInstances ++ ;
-			else
-				negativeInstances ++ ;
-		}
-
-		double p = (double) positiveInstances / (positiveInstances + negativeInstances) ;
-
-		e = trainingData.enumerateInstances() ;
-
-		while (e.hasMoreElements()) {
-			Instance i = (Instance) e.nextElement() ;
-
-			double isValidSense = i.value(3) ;
-
-			if (isValidSense == 0) 
-				i.setWeight(0.5 * (1.0/p)) ;
-			else
-				i.setWeight(0.5 * (1.0/(1-p))) ;
-		}
-
 	}
 
 	/**
@@ -414,7 +352,7 @@ public class Disambiguator {
 		if (wikipedia2 == null)
 			wikipedia2 = wikipedia ;
 		
-		if (classifier == null) 
+		if (!decider.isReady()) 
 			throw new WekaException("You must build (or load) classifier first.") ;
 
 		Result<Integer> r = new Result<Integer>() ;
@@ -523,18 +461,13 @@ public class Disambiguator {
 
 				if (sense.getPriorProbability() < minSenseProbability) break ;
 
-				double[] values = new double[attributes.size()];
-
-
-				values[0] = sense.getPriorProbability() ;
-				values[1] = context.getRelatednessTo(sense) ;
-				values[2] = context.getQuality() ;
-				values[3] = Instance.missingValue() ;
-
-				Instance i = new Instance(1.0, values) ;
-				i.setDataset(header) ;
-
-				double prob = classifier.distributionForInstance(i)[0] ;
+				Instance i = decider.getInstanceBuilder()
+					.setAttribute(Attributes.commonness, sense.getPriorProbability())
+					.setAttribute(Attributes.relatedness, context.getRelatednessTo(sense))
+					.setAttribute(Attributes.contextQuality, (double)context.getQuality())
+					.build() ;
+				
+				double prob = decider.getDecisionDistribution(i).get(true) ;
 
 				if (prob>0.5) {
 					Article art = new Article(wikipedia.getEnvironment(), sense.getId()) ;

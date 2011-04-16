@@ -28,7 +28,7 @@ import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
-import org.wikipedia.miner.util.ml.DoublePredictor;
+import org.wikipedia.miner.util.ml.*;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.GaussianProcesses;
@@ -41,7 +41,6 @@ public class ArticleComparer {
 	 * 
 	 */
 	public enum DataDependency {
-		
 		
 		/**
 		 * Use links made to articles to measure relatedness. You should cache {@link DatabaseType#pageLinksIn} if using this mode extensively.  
@@ -67,8 +66,22 @@ public class ArticleComparer {
 
 	int wikipediaArticleCount ;
 	Double m ;
+	
+	enum Attributes {
+		inLinkGoogleMeasure, 
+		inLinkUnion, 
+		inLinkIntersection, 
+		inLinkVectorMeasure,
+		outLinkGoogleMeasure, 
+		outLinkUnion, 
+		outLinkIntersection, 
+		outLinkVectorMeasure,
+	}
+	
+	Decider<Attributes,Double> relatednessMeasurer ;
+	
 
-	DoublePredictor relatednessMeasurer ;
+	//DoublePredictorOld relatednessMeasurer ;
 
 	public ArticleComparer(Wikipedia wikipedia) throws Exception {
 		
@@ -94,7 +107,15 @@ public class ArticleComparer {
 
 		wikipediaArticleCount = new Long(wikipedia.getEnvironment().retrieveStatistic(StatisticName.articleCount)).intValue() ;
 		m = Math.log(wikipediaArticleCount) ;
+		
+		
+		relatednessMeasurer = new DeciderBuilder<Attributes>("articleComparer", Attributes.class) 
+			.setDefaultAttributeTypeNumeric()
+			.setClassAttributeTypeNumeric("relatedness")
+			.build();
 
+		
+		/*
 		ArrayList<String> attrNames = new ArrayList<String>();
 
 		if (dependancies.contains(DataDependency.pageLinksIn)) {
@@ -117,8 +138,8 @@ public class ArticleComparer {
 				attrNames.add("outLinkVectorMeasure") ;
 		}
 
-		relatednessMeasurer = new DoublePredictor("articleRelatednessMeasurer", attrNames.toArray(new String[attrNames.size()]), "articleRelatedness") ;
-		
+		relatednessMeasurer = new DoublePredictorOld("articleRelatednessMeasurer", attrNames.toArray(new String[attrNames.size()]), "articleRelatedness") ;
+		*/
 		
 		if (wikipedia.getConfig().getArticleComparisonModel() != null) 
 			this.loadClassifier(wikipedia.getConfig().getArticleComparisonModel()) ;
@@ -136,12 +157,10 @@ public class ArticleComparer {
 		if (cmp == null)
 			return null ;
 
-		return relatednessMeasurer.getPrediction(getFeatures(cmp, null)) ;
+		return relatednessMeasurer.getDecision(getInstance(cmp, null)) ;
 	}
 
-	public void train(ComparisonDataSet dataset, String datasetName) throws Exception {
-
-		relatednessMeasurer.initializeTrainingData(datasetName) ;
+	public void train(ComparisonDataSet dataset) throws Exception {
 
 		ProgressTracker pn = new ProgressTracker(dataset.getItems().size(), "training", ArticleComparer.class) ;
 		for (ComparisonDataSet.Item item: dataset.getItems()) {
@@ -283,16 +302,13 @@ public class ArticleComparer {
 		return sc ;
 	}
 
-
-
-
 	private void train(Article artA, Article artB, double relatedness) throws Exception {
 
 		ArticleComparison cmp = getComparison(artA, artB) ;
 
 		if (cmp == null) return ;
 
-		relatednessMeasurer.addTrainingInstance(getFeatures(cmp, relatedness)) ;
+		relatednessMeasurer.addTrainingInstance(getInstance(cmp, relatedness)) ;
 	}
 
 	private ArticleComparison getComparison(Article artA, Article artB) {
@@ -557,33 +573,34 @@ public class ArticleComparer {
 			return val.doubleValue() ;
 	}
 
-	private double[] getFeatures(ArticleComparison cmp, Double relatedness) {
+	private Instance getInstance(ArticleComparison cmp, Double relatedness) throws ClassMissingException, AttributeMissingException {
 
-		TDoubleArrayList features = new TDoubleArrayList() ;
-
+		InstanceBuilder<Attributes, Double> ib = relatednessMeasurer.getInstanceBuilder() ;
+		
 		if (dependancies.contains(DataDependency.pageLinksIn)) {
-
-			features.add(wrapMissingValue(cmp.getInLinkGoogleMeasure())) ;
-			features.add(wrapMissingValue(cmp.getInLinkUnion()));
-			features.add(wrapMissingValue(cmp.getInLinkIntersectionProportion())) ;
-
+			
+			ib.setAttribute(Attributes.inLinkGoogleMeasure, wrapMissingValue(cmp.getInLinkGoogleMeasure())) ;
+			ib.setAttribute(Attributes.inLinkUnion, wrapMissingValue(cmp.getInLinkUnion())) ;
+			ib.setAttribute(Attributes.inLinkIntersection, wrapMissingValue(cmp.getInLinkIntersectionProportion())) ;
+			
 			if (dependancies.contains(DataDependency.linkCounts)) 
-				features.add(wrapMissingValue(cmp.getInLinkVectorMeasure())) ;
+				ib.setAttribute(Attributes.inLinkVectorMeasure, wrapMissingValue(cmp.getInLinkVectorMeasure())) ;
 		}
-
+		
 		if (dependancies.contains(DataDependency.pageLinksOut)) {
-
-			features.add(wrapMissingValue(cmp.getOutLinkGoogleMeasure())) ;
-			features.add(wrapMissingValue(cmp.getOutLinkUnion()));
-			features.add(wrapMissingValue(cmp.getOutLinkIntersectionProportion())) ;
-
+			
+			ib.setAttribute(Attributes.outLinkGoogleMeasure, wrapMissingValue(cmp.getOutLinkGoogleMeasure())) ;
+			ib.setAttribute(Attributes.outLinkUnion, wrapMissingValue(cmp.getOutLinkUnion())) ;
+			ib.setAttribute(Attributes.outLinkIntersection, wrapMissingValue(cmp.getOutLinkIntersectionProportion())) ;
+			
 			if (dependancies.contains(DataDependency.linkCounts)) 
-				features.add(wrapMissingValue(cmp.getOutLinkVectorMeasure())) ;
+				ib.setAttribute(Attributes.outLinkVectorMeasure, wrapMissingValue(cmp.getOutLinkVectorMeasure())) ;
 		}
+		
+		if (relatedness != null)
+			ib.setClassAttribute(relatedness) ;
 
-		features.add(wrapMissingValue(relatedness)) ;
-
-		return  features.toNativeArray() ;
+		return ib.build() ;
 	}
 
 }
