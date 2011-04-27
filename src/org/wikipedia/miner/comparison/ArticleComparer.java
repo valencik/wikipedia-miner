@@ -1,20 +1,10 @@
 package org.wikipedia.miner.comparison;
 
-import gnu.trove.TDoubleArrayList;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.Enumeration;
 
 import jsc.correlation.SpearmanCorrelation;
 import jsc.datastructures.PairedData;
@@ -79,7 +69,7 @@ public class ArticleComparer {
 	}
 	
 	Decider<Attributes,Double> relatednessMeasurer ;
-	
+	Dataset<Attributes,Double> trainingDataset ;
 
 	//DoublePredictorOld relatednessMeasurer ;
 
@@ -97,6 +87,7 @@ public class ArticleComparer {
 		init(wikipedia, dependancies) ;
 	}
 	
+	@SuppressWarnings("unchecked")
 	private void init(Wikipedia wikipedia, EnumSet<DataDependency> dependancies) throws Exception {
 		
 		if (!dependancies.contains(DataDependency.pageLinksIn) && !dependancies.contains(DataDependency.pageLinksOut))
@@ -108,21 +99,20 @@ public class ArticleComparer {
 		wikipediaArticleCount = new Long(wikipedia.getEnvironment().retrieveStatistic(StatisticName.articleCount)).intValue() ;
 		m = Math.log(wikipediaArticleCount) ;
 		
-		
-		relatednessMeasurer = new DeciderBuilder<Attributes>("articleComparer", Attributes.class) 
+		relatednessMeasurer = (Decider<Attributes, Double>) new DeciderBuilder<Attributes>("articleComparer", Attributes.class) 
 			.setDefaultAttributeTypeNumeric()
 			.setClassAttributeTypeNumeric("relatedness")
 			.build();
 
-		
 		/*
 		ArrayList<String> attrNames = new ArrayList<String>();
 
 		if (dependancies.contains(DataDependency.pageLinksIn)) {
 
 			attrNames.add("inLinkGoogleMeasure") ;
-			attrNames.add("inLinkUnion") ;
-			attrNames.add("inLinkIntersection") ;
+			attrNames.add("inLinkGoogleSentenceMeasure") ;
+			//attrNames.add("inLinkUnion") ;
+			//attrNames.add("inLinkIntersection") ;
 
 			if (dependancies.contains(DataDependency.linkCounts)) 
 				attrNames.add("inLinkVectorMeasure") ;
@@ -131,8 +121,9 @@ public class ArticleComparer {
 		if (dependancies.contains(DataDependency.pageLinksOut)) {
 
 			attrNames.add("outLinkGoogleMeasure") ;
-			attrNames.add("outLinkUnion") ;
-			attrNames.add("outLinkIntersection") ;
+			attrNames.add("outLinkGoogleSentenceMeasure") ;
+			//attrNames.add("outLinkUnion") ;
+			//attrNames.add("outLinkIntersection") ;
 
 			if (dependancies.contains(DataDependency.linkCounts)) 
 				attrNames.add("outLinkVectorMeasure") ;
@@ -155,13 +146,18 @@ public class ArticleComparer {
 
 		ArticleComparison cmp = getComparison(artA, artB) ;
 		if (cmp == null)
-			return null ;
-
+			return 0.0 ;
+		if (cmp.getInLinkGoogleSentenceMeasure() == 1)
+			return 0.0 ;
+		
+		//return 1-cmp.getInLinkGoogleMeasure() ;
 		return relatednessMeasurer.getDecision(getInstance(cmp, null)) ;
 	}
 
 	public void train(ComparisonDataSet dataset) throws Exception {
 
+		trainingDataset = relatednessMeasurer.createNewDataset() ;
+		
 		ProgressTracker pn = new ProgressTracker(dataset.getItems().size(), "training", ArticleComparer.class) ;
 		for (ComparisonDataSet.Item item: dataset.getItems()) {
 
@@ -197,9 +193,8 @@ public class ArticleComparer {
 	 * @param file the file to save the training data to
 	 * @throws IOException if the file cannot be written to
 	 */
-	@SuppressWarnings("unchecked")
 	public void saveTrainingData(File file) throws IOException, Exception {
-		relatednessMeasurer.saveTrainingData(file) ;
+		trainingDataset.save(file) ;
 	}
 
 	/**
@@ -211,7 +206,7 @@ public class ArticleComparer {
 	 * @throws Exception if the file does not contain valid training data.
 	 */
 	public void loadTrainingData(File file) throws IOException, Exception{
-		relatednessMeasurer.loadTrainingData(file) ;
+		trainingDataset.load(file) ;
 	}
 
 	/**
@@ -221,7 +216,7 @@ public class ArticleComparer {
 	 * @throws IOException if the file cannot be read
 	 */
 	public void saveClassifier(File file) throws IOException {
-		relatednessMeasurer.saveClassifier(file) ;
+		relatednessMeasurer.save(file) ;
 	}
 
 	/**
@@ -231,7 +226,7 @@ public class ArticleComparer {
 	 * @throws Exception 
 	 */
 	public void loadClassifier(File file) throws Exception {
-		relatednessMeasurer.loadClassifier(file) ;
+		relatednessMeasurer.load(file) ;
 	}
 
 
@@ -243,7 +238,7 @@ public class ArticleComparer {
 	 */
 	public void buildClassifier(Classifier classifier) throws Exception {
 
-		relatednessMeasurer.buildClassifier(classifier) ;
+		relatednessMeasurer.train(classifier, trainingDataset) ;
 	}
 
 	/**
@@ -255,7 +250,7 @@ public class ArticleComparer {
 	public void buildDefaultClassifier() throws Exception {
 
 		Classifier classifier = new GaussianProcesses() ;
-		relatednessMeasurer.buildClassifier(classifier) ;
+		relatednessMeasurer.train(classifier, trainingDataset) ;
 	}
 
 
@@ -308,7 +303,7 @@ public class ArticleComparer {
 
 		if (cmp == null) return ;
 
-		relatednessMeasurer.addTrainingInstance(getInstance(cmp, relatedness)) ;
+		trainingDataset.add(getInstance(cmp, relatedness)) ;
 	}
 
 	private ArticleComparison getComparison(Article artA, Article artB) {
@@ -338,6 +333,7 @@ public class ArticleComparer {
 		ArrayList<DbLinkLocation>linksB = getLinkLocations(cmp.getArticleB().getId(), dir) ;
 
 		int intersection = 0 ;
+		int sentenceIntersection = 0 ;
 		int union = 0 ;
 
 		int indexA = 0 ;
@@ -382,9 +378,10 @@ public class ArticleComparer {
 				useB = true ;
 				linkArt = new Article(wikipedia.getEnvironment(), linkA.getLinkId()) ;
 				intersection ++ ;
+				
+				if (hasSentenceIntersection(linkA.getSentenceIndexes(), linkB.getSentenceIndexes()))
+					sentenceIntersection++ ;
 			} else {
-
-
 				if (linkA != null && (linkB == null || linkA.getLinkId() < linkB.getLinkId())) {
 					useA = true ;
 					linkArt = new Article(wikipedia.getEnvironment(), linkA.getLinkId()) ;
@@ -451,19 +448,33 @@ public class ArticleComparer {
 
 		//calculate google distance inspired measure
 		Double googleMeasure = null ;
+		Double googleSentenceMeasure = null ;
 
 		if (intersection == 0) {
 			googleMeasure = 1.0 ;
+			googleSentenceMeasure = 1.0 ;
 		} else {
 			double a = Math.log(linksA.size()) ;
 			double b = Math.log(linksB.size()) ;
 			double ab = Math.log(intersection) ;
 
 			googleMeasure = (Math.max(a, b) -ab) / (m - Math.min(a, b)) ;
-
+		
 			//do rough normalization
 			if (googleMeasure > 1)
 				googleMeasure = 1.0 ;
+
+			//calculate sentence based measure
+			if (sentenceIntersection == 0)
+				googleSentenceMeasure = 1.0 ;
+			else {
+				double abs = Math.log(sentenceIntersection) ;
+				googleSentenceMeasure = (Math.max(a, b) -abs) / (m - Math.min(a, b)) ;
+				
+				if (googleSentenceMeasure > 1)
+					googleSentenceMeasure = 1.0 ;
+			}
+			
 		}
 
 		//calculate vector (tfidf) inspired measure
@@ -528,14 +539,35 @@ public class ArticleComparer {
 		//System.out.println();
 
 		if (dir == LinkDirection.Out)
-			cmp.setOutLinkFeatures(googleMeasure, vectorMeasure, union, intersectionProportion) ;
+			cmp.setOutLinkFeatures(googleMeasure, googleSentenceMeasure, vectorMeasure, union, intersectionProportion) ;
 		else
-			cmp.setInLinkFeatures(googleMeasure, vectorMeasure, union, intersectionProportion) ;
+			cmp.setInLinkFeatures(googleMeasure, googleSentenceMeasure, vectorMeasure, union, intersectionProportion) ;
 
 		return cmp ;
 	}
 
+	private boolean hasSentenceIntersection(ArrayList<Integer> sentenceIndexesA, ArrayList<Integer>sentenceIndexesB) {
+		
+		int indexA = 0 ;
+		int indexB = 0 ;
 
+		while (indexA < sentenceIndexesA.size() && indexB < sentenceIndexesB.size())  {
+
+			int sentenceA = sentenceIndexesA.get(indexA) ;
+			int sentenceB = sentenceIndexesB.get(indexB) ;
+
+			if (sentenceA == sentenceB) {
+				return true ;
+			} else {
+				if ((sentenceA < sentenceB && sentenceA > 0)|| sentenceB < 0) {
+					indexA ++ ;
+				} else {
+					indexB ++ ;
+				}
+			}
+		}
+		return false ;
+	}
 
 	private ArrayList<DbLinkLocation> getLinkLocations(int artId, LinkDirection dir) {
 
@@ -587,12 +619,11 @@ public class ArticleComparer {
 				ib.setAttribute(Attributes.inLinkVectorMeasure, wrapMissingValue(cmp.getInLinkVectorMeasure())) ;
 		}
 		
-		if (dependancies.contains(DataDependency.pageLinksOut)) {
-			
+		if (dependancies.contains(DataDependency.pageLinksOut)) {			
 			ib.setAttribute(Attributes.outLinkGoogleMeasure, wrapMissingValue(cmp.getOutLinkGoogleMeasure())) ;
 			ib.setAttribute(Attributes.outLinkUnion, wrapMissingValue(cmp.getOutLinkUnion())) ;
 			ib.setAttribute(Attributes.outLinkIntersection, wrapMissingValue(cmp.getOutLinkIntersectionProportion())) ;
-			
+
 			if (dependancies.contains(DataDependency.linkCounts)) 
 				ib.setAttribute(Attributes.outLinkVectorMeasure, wrapMissingValue(cmp.getOutLinkVectorMeasure())) ;
 		}

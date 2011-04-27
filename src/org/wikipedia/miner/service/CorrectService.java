@@ -21,7 +21,9 @@ public class CorrectService extends Service {
 	private StringParameter prmTerm ;
 
 	public CorrectService() {
-		super("");
+		super("Provides alternatives for misspelt words",
+				"<p></p>",
+				true, false);
 		
 		prmTerm = new StringParameter("term", "The term or phrase to find spelling corrections for", null) ;
 		addGlobalParameter(prmTerm) ;

@@ -32,8 +32,7 @@ import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
-import org.wikipedia.miner.util.ml.Decider;
-import org.wikipedia.miner.util.ml.DeciderBuilder;
+import org.wikipedia.miner.util.ml.*;
 import org.wikipedia.miner.util.text.*;
 import org.wikipedia.miner.model.Label.Sense;
 
@@ -62,7 +61,9 @@ public class Disambiguator {
 	private int maxContextSize ;
 	
 	private enum Attributes {commonness, relatedness, contextQuality} ;
+	
 	private Decider<Attributes, Boolean> decider ;
+	private Dataset<Attributes, Boolean> dataset ;
 	
 	public Disambiguator(Wikipedia wikipedia) throws IOException, Exception {
 		
@@ -72,8 +73,6 @@ public class Disambiguator {
 		
 		init(wikipedia, comparer, conf.getDefaultTextProcessor(), conf.getMinSenseProbability(), conf.getMinLinkProbability(), 50) ;
 
-		
-		
 		if (conf.getTopicDisambiguationModel() != null)
 			loadClassifier(conf.getTopicDisambiguationModel()) ;
 	}
@@ -105,7 +104,7 @@ public class Disambiguator {
 		this.minLinkProbability = minLinkProbability ;
 		this.maxContextSize = maxContextSize ; 
 		
-		decider = new DeciderBuilder<Attributes>("LinkDisambiguator", Attributes.class)
+		decider = (Decider<Attributes, Boolean>) new DeciderBuilder<Attributes>("LinkDisambiguator", Attributes.class)
 			.setDefaultAttributeTypeNumeric()
 			.setClassAttributeTypeBoolean("isCorrectSense")
 			.build();
@@ -186,10 +185,10 @@ public class Disambiguator {
 		}
 		
 		//training data is very likely to be skewed. So lets resample to even out class values
-		Resample resampleFilter = new Resample() ;
-		resampleFilter.setBiasToUniformClass(1) ;
+		//Resample resampleFilter = new Resample() ;
+		//resampleFilter.setBiasToUniformClass(1) ;
 		
-		decider.applyFilter(resampleFilter) ;
+		//decider.applyFilter(resampleFilter) ;
 	}
 
 	/**
@@ -205,7 +204,7 @@ public class Disambiguator {
 	public void saveTrainingData(File file) throws IOException, Exception {
 		Logger.getLogger(Disambiguator.class).info("saving training data") ;
 		
-		decider.saveTrainingData(file) ;
+		dataset.save(file) ;
 	}
 	
 	/**
@@ -218,7 +217,7 @@ public class Disambiguator {
 	public void loadTrainingData(File file) throws Exception{
 		Logger.getLogger(Disambiguator.class).info("loading training data") ;
 		
-		decider.loadTrainingData(file) ;
+		dataset.load(file) ;
 	}
 
 	/**
@@ -231,7 +230,7 @@ public class Disambiguator {
 	public void saveClassifier(File file) throws IOException, Exception {
 		Logger.getLogger(Disambiguator.class).info("saving classifier") ;
 		
-		decider.saveClassifier(file) ;
+		decider.save(file) ;
 	}
 
 	/**
@@ -244,7 +243,7 @@ public class Disambiguator {
 	public void loadClassifier(File file) throws IOException, Exception {
 		Logger.getLogger(Disambiguator.class).info("loading classifier") ;
 
-		decider.loadClassifier(file) ;
+		decider.load(file) ;
 	}
 
 	
@@ -258,7 +257,7 @@ public class Disambiguator {
 	public void buildClassifier(Classifier classifier) throws Exception {
 		Logger.getLogger(Disambiguator.class).info("building classifier") ;
 
-		decider.buildClassifier(classifier) ;
+		decider.train(classifier, dataset) ;
 	}
 	
 	public ArticleComparer getArticleComparer() {
@@ -279,8 +278,6 @@ public class Disambiguator {
 		while (linkMatcher.find()) {			
 			String linkText = content.substring(linkMatcher.start()+2, linkMatcher.end()-2) ;
 			
-			
-
 			String labelText = linkText ;
 			String destText = linkText ;
 
@@ -330,7 +327,7 @@ public class Disambiguator {
 				.setClassAttribute(sense.getId() ==ref.getTopicId())
 				.build() ;
 				
-				decider.addTrainingInstance(i) ;
+				dataset.add(i) ;
 			}
 		}
 	}

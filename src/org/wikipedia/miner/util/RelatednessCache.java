@@ -58,13 +58,17 @@ public class RelatednessCache {
 		long min = Math.min(art1.getId(), art2.getId()) ;
 		long max = Math.max(art1.getId(), art2.getId()) ;
 		long key = min + (max << 30) ;
+		
+		double relatedness ;
 				
 		if (!cachedRelatedness.containsKey(key)) {		
-			double rel = comparer.getRelatedness(art1, art2) ;		
-			cachedRelatedness.put(key, rel) ;
-			return rel ;
-		} else {			
-			return cachedRelatedness.get(key) ;
+			relatedness = comparer.getRelatedness(art1, art2) ;		
+			cachedRelatedness.put(key, relatedness) ;
+		} else {
+			relatedness = cachedRelatedness.get(key) ;
 		}
+		
+		System.out.println(art1 + " vs. " + art2 + ", " + relatedness) ;
+		return relatedness ;
 	}	
 }

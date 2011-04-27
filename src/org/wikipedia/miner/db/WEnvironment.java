@@ -296,6 +296,14 @@ public class WEnvironment  {
 
 		this.conf = conf ;
 		
+		
+		EnvironmentConfig envConf = new EnvironmentConfig() ;
+		envConf.setAllowCreate(false) ;
+		envConf.setReadOnly(false) ;
+		envConf.setCachePercent(20) ;
+		
+		env = new Environment(conf.getDatabaseDirectory(), envConf) ;
+		
 		initDatabases() ;
 				
 		prepThread = new PreparationThread(conf) ;
@@ -303,7 +311,11 @@ public class WEnvironment  {
 			prepThread.start() ;
 		else
 			prepThread.doPreparation() ;
+		
+		
 	}
+	
+	
 	
 	private WEnvironment(WikipediaConfiguration conf) {
 		
@@ -559,7 +571,7 @@ public class WEnvironment  {
 
 		public void doPreparation() {
 			
-			boolean mustGatherIds = (conf.getMinLinksIn() > 0 && !conf.getDatabasesToCache().isEmpty()) ;
+			boolean mustGatherIds = (conf.getMinLinksIn() > 0 && !conf.getDatabasesToCache().isEmpty() && conf.getArticlesOfInterest() != null) ;
 			
 			
 			int taskCount = conf.getDatabasesToCache().size() + 1;
@@ -571,12 +583,6 @@ public class WEnvironment  {
 			try {
 				tracker.startTask(1, "Connecting to database") ;
 				
-				EnvironmentConfig envConf = new EnvironmentConfig() ;
-				envConf.setAllowCreate(false) ;
-				envConf.setReadOnly(false) ;
-				envConf.setCachePercent(20) ;
-				
-				env = new Environment(conf.getDatabaseDirectory(), envConf) ;
 				
 				dbStatistics.cache(conf, null, null) ;
 				
@@ -585,6 +591,9 @@ public class WEnvironment  {
 				TIntHashSet ids = null ;
 				if (mustGatherIds)
 					ids = getValidArticleIds(3, tracker) ;
+				
+				if (conf.getArticlesOfInterest() != null)
+					ids = conf.getArticlesOfInterest() ;
 				
 				for(DatabaseType dbName:conf.getDatabasesToCache()) {
 					

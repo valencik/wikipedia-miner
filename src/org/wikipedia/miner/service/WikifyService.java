@@ -49,10 +49,12 @@ public class WikifyService extends Service {
 	
 	
 	public WikifyService() {
-		super("<p>This service automatically detects the topics mentioned in the given document, and provides links to the appropriate Wikipedia articles. </p>" 
+		super("Augments textual documents with links to the appropriate Wikipedia articles",
+				"<p>This service automatically detects the topics mentioned in the given document, and provides links to the appropriate Wikipedia articles. </p>" 
 				+ "<p> It doesn't just use Wikipedia as a source of information to link to, but also as training data for how best to do it. In other words, it has been trained to make the same decisions as the people who edit Wikipedia. </p>"
-				+ "<p> It may not work very well if the document does not fit the model of what it has been trained on. Documents should not be too short, and should be dedicated to a particular topic.</p>");
-
+				+ "<p> It may not work very well if the document does not fit the model of what it has been trained on. Documents should not be too short, and should be dedicated to a particular topic.</p>",
+				true, true
+			);
 	}
 	
 	
@@ -60,7 +62,7 @@ public class WikifyService extends Service {
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
 	
-		prmSource = new StringParameter("source", "The document to be wikified (either it's content or a web-accessible URL)", null) ;
+		prmSource = new StringParameter("source", "The document to be wikified (either its content or a web-accessible URL)", null) ;
 		addGlobalParameter(prmSource) ;
 		
 		String[] descSourceMode = {"detect automatically", "web-accessable url", "snippet of html markup", "snippet of mediawiki markup"} ;
@@ -81,7 +83,7 @@ public class WikifyService extends Service {
 		prmLinkStyle = new StringParameter("linkStyle", "the css style of links. This is only valid if processing a URL" , "") ;
 		addGlobalParameter(prmLinkStyle) ;
 		
-		prmTooltips = new BooleanParameter("tooltips", "<b>true</b> if javascript for adding tooltips should be included, otherwise <b>false<b>. This is only valid if processing a URL.", false) ;
+		prmTooltips = new BooleanParameter("tooltips", "<b>true</b> if javascript for adding tooltips should be included, otherwise <b>false</b>. This is only valid if processing a URL.", false) ;
 		addGlobalParameter(prmTooltips) ;
 		
 		for (String wikiName:getHub().getWikipediaNames()) {
@@ -103,6 +105,29 @@ public class WikifyService extends Service {
 				throw new ServletException(e) ;
 			} ;
 		}
+		
+		addExample(
+				new ExampleBuilder("Wikify a small snippet of text, and view details of the detected topics").
+				addParam(prmSource, "At around the size of a domestic chicken, kiwi are by far the smallest living ratites and lay the largest egg in relation to their body size of any species of bird in the world.").
+				build()
+		) ;
+		
+		addExample(
+				new ExampleBuilder("Wikify a small snippet of text, and view result as html without additional details").
+				addParam(prmSource, "At around the size of a domestic chicken, kiwi are by far the smallest living ratites and lay the largest egg in relation to their body size of any species of bird in the world.").
+				addParam(prmResponseFormat, ResponseFormat.DIRECT).
+				addParam(prmSourceMode, SourceMode.HTML).
+				build()
+		) ;
+		
+		addExample(
+				new ExampleBuilder("Wikify a web page, and view result as html with added tooltips").
+				addParam(prmSource, "http://www.kcc.org.nz/kiwi").
+				addParam(prmResponseFormat, ResponseFormat.DIRECT).
+				addParam(prmTooltips, true).
+				build()
+		) ;
+		
 	}
 	
 
@@ -123,7 +148,7 @@ public class WikifyService extends Service {
 		for (Topic t:detectedTopics)
 			docScore = docScore + t.getRelatednessToOtherTopics() ;
 		
-		Element xmlWikifiedDoc = getHub().createElement("WikifiedDocument", wikifiedDoc) ;
+		Element xmlWikifiedDoc = getHub().createCDATAElement("WikifiedDocument", wikifiedDoc) ;
 		xmlWikifiedDoc.setAttribute("documentScore", getHub().format(docScore)) ;
 		xmlResponse.appendChild(xmlWikifiedDoc) ;
 		

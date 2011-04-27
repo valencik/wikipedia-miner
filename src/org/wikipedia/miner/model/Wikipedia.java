@@ -145,6 +145,8 @@ public class Wikipedia {
 			return null ;
 
 		Page page = Page.createPage(env, id) ;
+		if (!page.exists())
+			return null ;
 
 		if (page.getType() == PageType.redirect)
 			return ((Redirect)page).getTarget() ;

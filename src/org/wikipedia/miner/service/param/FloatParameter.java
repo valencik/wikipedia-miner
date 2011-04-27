@@ -6,7 +6,7 @@ public class FloatParameter extends Parameter<Float> {
 
 	public FloatParameter(String name, String description,
 			Float defaultValue) {
-		super(name, description, defaultValue);
+		super(name, description, defaultValue, "float");
 	}
 
 	@Override

@@ -13,7 +13,9 @@ import org.w3c.dom.Element;
 import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
+import org.wikipedia.miner.service.Service.ExampleBuilder;
 import org.wikipedia.miner.service.param.BooleanParameter;
+import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.StringParameter;
 import org.wikipedia.miner.util.Position;
 import org.wikipedia.miner.util.RelatednessCache;
@@ -38,16 +40,43 @@ public class SearchService extends Service {
 
 	private StringParameter prmQuery ;
 	private BooleanParameter prmComplex ;
+	private FloatParameter prmMinPriorProb ;
+	
 
 
 	public SearchService() {
-		super("<p></p>");
+		super("Lists the senses (wikipedia articles) of terms and phrases",
+				"<p>This service takes a term or phrase, and returns the different Wikipedia articles that these could refer to.</p>" +
+				"<p>By default, it will treat the entire query as one term, but it can be made to break it down into its components " +
+				"(to recognize, for example, that <i>hiking new zealand</i> contains two terms: <i>hiking</i> and <i>new zealand</i>)</p>" +
+				"<p>For each component term, the service will list the different articles (or concepts) that it could refer to, in order of prior probability " +
+				"so that the most obvious senses are listed first.</p>" +
+				"<p>For queries that contain multiple terms, the senses of each term will be compared against each other to disambiguate them. This " +
+				"provides the weight attribute, which is larger for senses that are likely to be the correct interpretation of the query.</p>",
+				true, false);
 		// TODO Auto-generated constructor stub
 
 		prmQuery = new StringParameter("query", "Your query", null) ;
 		addGlobalParameter(prmQuery) ;
 
 		prmComplex = new BooleanParameter("complex", "<b>true</b> if your query might reference multiple topics, otherwise <b>false</b>", false) ;
+		addGlobalParameter(prmComplex) ;
+		
+		prmMinPriorProb = new FloatParameter("minPriorProbability", "the minimum prior probability that a sense must have for it to be returned", 0.01F) ;
+		addGlobalParameter(prmMinPriorProb) ;
+		
+		addExample(
+				new ExampleBuilder("List senses of an ambiguous term").
+				addParam(prmQuery, "kiwi").
+				build()
+		) ;
+		
+		addExample(
+				new ExampleBuilder("Break a complex multi-topic query into its component terms, and list thier senses").
+				addParam(prmQuery, "hiking new zealand").
+				addParam(prmComplex, true).
+				build()
+		) ;
 	}
 
 
@@ -83,23 +112,24 @@ public class SearchService extends Service {
 		Label label = new Label(wikipedia.getEnvironment(), query, wikipedia.getConfig().getDefaultTextProcessor()) ;
 		Element xmlLabel = createXML(label) ;
 
-
+		float minPriorProb = prmMinPriorProb.getValue(request) ;
 		for (Label.Sense sense:label.getSenses()) {
+			
+			if (sense.getPriorProbability() < minPriorProb) 
+				break ;
+
 			Element xmlSense = createXML(sense) ;
 			xmlLabel.appendChild(xmlSense) ;
+
 		}
 
 		xmlResponse.appendChild(xmlLabel) ;
 
 		return xmlResponse ;
-
-
 	}
 
 
 	public Element resolveComplexQuery(String query, HttpServletRequest request, Element xmlResponse) throws Exception {
-
-
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
@@ -111,10 +141,12 @@ public class SearchService extends Service {
 		
 		ExhaustiveDisambiguator disambiguator = new ExhaustiveDisambiguator(artComparer) ;
 
+		float minPriorProb = prmMinPriorProb.getValue(request) ;
+		
 		//resolve query
 		ArrayList<QueryLabel> queryLabels = getReferences(query, wikipedia) ;	
 		queryLabels = resolveCollisions(queryLabels) ;
-		queryLabels = disambiguator.disambiguate(queryLabels) ;
+		queryLabels = disambiguator.disambiguate(queryLabels, minPriorProb) ;
 
 		for (QueryLabel queryLabel:queryLabels) {
 
@@ -125,6 +157,9 @@ public class SearchService extends Service {
 
 			for (Label.Sense sense:queryLabel.getSenses()) {
 
+				if (sense.getPriorProbability() < minPriorProb) 
+					break ;
+				
 				Element xmlSense = createXML(sense);
 				xmlSense.setAttribute("weight", getHub().format(disambiguator.getSenseWeight(sense.getId()))) ;
 				xmlLabel.appendChild(xmlSense) ;
@@ -293,6 +328,9 @@ public class SearchService extends Service {
 	}
 
 
+	
+	
+	
 
 	private class ExhaustiveDisambiguator {
 
@@ -313,7 +351,7 @@ public class SearchService extends Service {
 			
 		}
 
-		public ArrayList<QueryLabel> disambiguate(ArrayList<QueryLabel> queryTerms) throws Exception {
+		public ArrayList<QueryLabel> disambiguate(ArrayList<QueryLabel> queryTerms, float minPriorProb) throws Exception {
 
 			this.queryTerms = queryTerms ;
 
@@ -325,7 +363,7 @@ public class SearchService extends Service {
 			bestSenseWeights = new TIntFloatHashMap() ;
 
 			//recursively check and weight every possible combination of senses 
-			checkSenses(0) ;
+			checkSenses(0, minPriorProb) ;
 
 			return queryTerms ;
 		}
@@ -334,23 +372,27 @@ public class SearchService extends Service {
 			return bestSenseWeights.get(id) ;
 		}
 
-		private void checkSenses(int termIndex) throws Exception {
+		private void checkSenses(int termIndex, float minPriorProb) throws Exception {
 
 			if (termIndex == queryTerms.size()) {
 
 				//this is a complete (and unique) combination of senses, so lets weight it
 				weightCombo() ;				
 			} else {
-				// this is not a complete combination of senses, so lets continue recursion 
+				// this is not a complete combination of senses, so continue recursion 
 				QueryLabel qt = queryTerms.get(termIndex) ;
 
 				if (qt.isStopword || qt.getSenses().length == 0) {
-					checkSenses(termIndex + 1) ;
+					checkSenses(termIndex + 1, minPriorProb) ;
 				} else {
 
 					for(Label.Sense s:qt.getSenses()) {
+						
+						if (s.getPriorProbability() < minPriorProb)
+							break ;
+						
 						currCombo[termIndex] = s ;
-						checkSenses(termIndex + 1) ;
+						checkSenses(termIndex + 1, minPriorProb) ;
 					}
 				}
 			}

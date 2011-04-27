@@ -37,7 +37,7 @@ public class ServiceHub {
 	private HashMap<String, LabelComparer> labelComparersByWikiName ;
 	
 	
-	public HashSet<Service> registeredServices ;
+	private HashMap<String,Service> registeredServices ;
 	
 	
 	private MarkupFormatter formatter = new MarkupFormatter() ;
@@ -47,10 +47,6 @@ public class ServiceHub {
 	
 	private DecimalFormat decimalFormat = (DecimalFormat) NumberFormat.getInstance(Locale.US);
 	
-	//WikiModel wikiModel = new WikiModel("http://www.mywiki.com/wiki/${image}", "http://www.mywiki.com/wiki/${title}");
-
-
-	
 	// Protect the constructor, so no other class can call it
 	private ServiceHub(ServletContext context) throws ServletException {
 
@@ -59,7 +55,7 @@ public class ServiceHub {
 		labelComparersByWikiName = new HashMap<String, LabelComparer>()  ;
 		
 		
-		registeredServices = new HashSet<Service>() ;
+		registeredServices = new HashMap<String,Service>() ;
 				
 		try {
 			String hubConfigFile = context.getInitParameter("hubConfigFile") ;
@@ -69,7 +65,7 @@ public class ServiceHub {
 				File wikiConfigFile = new File(config.getWikipediaConfig(wikiName)) ;
 				WikipediaConfiguration wikiConfig = new WikipediaConfiguration(wikiConfigFile);
 				
-				Wikipedia wikipedia = new Wikipedia(wikiConfig, false) ;
+				Wikipedia wikipedia = new Wikipedia(wikiConfig, true) ;
 				wikipediasByName.put(wikiName, wikipedia) ;
 				
 				ArticleComparer artCmp = null ;
@@ -102,11 +98,11 @@ public class ServiceHub {
 	}
 	
 	public void registerService(Service service) {
-		registeredServices.add(service) ;
+		registeredServices.put(service.getServletName(), service) ;
 	}
 	
 	public void dropService(Service service) {
-		registeredServices.remove(service) ;
+		registeredServices.remove(service.getServletName()) ;
 		
 		
 		if (registeredServices.isEmpty()) {
@@ -114,6 +110,14 @@ public class ServiceHub {
 			for (Wikipedia w:wikipediasByName.values()) 
 				w.close() ;
 		}
+	}
+	
+	public Set<String> getServiceNames() {
+		return registeredServices.keySet() ;
+	}
+	
+	public Service getService(String serviceName) {
+		return registeredServices.get(serviceName) ;
 	}
 	
 	public String getDefaultWikipediaName() {
@@ -149,11 +153,6 @@ public class ServiceHub {
 	public WebContentRetriever getRetriever() {
 		return retriever ;
 	}
-		
-	/*
-	public Document getResponseDocument() {
-		return doc ;
-	}*/
 	
 	public DOMParser getParser() {
 		return parser ;
@@ -169,21 +168,10 @@ public class ServiceHub {
 		return doc.createTextNode(data) ;
 	}
 	
-	public Element createElement(String tagName, String xmlContent)  {
-
-		try {
-			//try to parse the xml content
-			parser.parse(new InputSource(new StringReader("<" + tagName + ">" + xmlContent.replaceAll("&", "&amp;") + "</" + tagName + ">"))) ;	
-
-			Element e = parser.getDocument().getDocumentElement() ;		
-			return (Element) doc.importNode(e, true) ;
-		} catch (Exception exception) {
-			//if that fails, just dump the xml content as a text node within the element. All special characters will be escaped.
-
-			Element e = doc.createElement(tagName) ;
-			e.appendChild(doc.createTextNode(xmlContent)) ;
-			return e ;			
-		}
+	public Element createCDATAElement(String tagName, String data) {
+		Element e = doc.createElement(tagName) ;
+		e.appendChild(doc.createCDATASection(data)) ;
+		return e ;			
 	}
 	
 	public String format(double number) {

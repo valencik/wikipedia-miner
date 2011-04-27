@@ -16,7 +16,7 @@ public class IntParameter extends Parameter<Integer> {
 	 * @param defaultValue the value to use when requests do not specify a value for this parameter (may be null)
 	 */
 	public IntParameter(String name, String description, Integer defaultValue) {
-		super(name, description, defaultValue);
+		super(name, description, defaultValue, "integer");
 	}
 
 	@Override

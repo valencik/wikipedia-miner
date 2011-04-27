@@ -29,7 +29,7 @@ public class EnumParameter<T extends Enum<T>> extends Parameter<T> {
 	 * @param valueDescriptions an array of short descriptions for each possible value 
 	 */
 	public EnumParameter(String name, String description, T defaultValue, T[] allValues, String[] valueDescriptions) {
-		super(name, description, defaultValue);
+		super(name, description, defaultValue, "enum");
 		
 		if (allValues.length != valueDescriptions.length) 
 			throw new IllegalArgumentException("the number of values and valueDescriptions does not match!") ;
@@ -72,6 +72,8 @@ public class EnumParameter<T extends Enum<T>> extends Parameter<T> {
 			throw new IllegalArgumentException("Invalid value for " + getName() + " parameter") ;
 		
 		return val ;
+		
+		
 		
 	}
 
