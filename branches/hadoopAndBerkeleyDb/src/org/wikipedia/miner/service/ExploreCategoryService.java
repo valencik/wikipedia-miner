@@ -74,10 +74,10 @@ public class ExploreCategoryService extends Service{
 		addGlobalParameter(prmChildArticles) ;
 		
 		prmChildArticleMax = new IntParameter("childArticleMax", "the maximum number of child articles that should be returned. A max of <b>0</b> will result in all child articles being returned", 250) ;
-		addGlobalParameter(prmChildCategoryMax) ;
+		addGlobalParameter(prmChildArticleMax) ;
 		
 		prmChildArticleStart = new IntParameter("childArticleStart", "the index of the first child article to return. Combined with <b>childArticleMax</b>, this parameter allows the user to page through large lists of child articles", 0) ;
-		addGlobalParameter(prmChildCategoryStart) ;
+		addGlobalParameter(prmChildArticleStart) ;
 		
 	}
 	

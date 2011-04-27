@@ -16,7 +16,6 @@ import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Category;
 import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.DefineService.Length;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.EnumParameter;
 import org.wikipedia.miner.service.param.IntParameter;
