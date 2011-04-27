@@ -54,6 +54,7 @@ public class SearchService extends Service {
 				"<p>For queries that contain multiple terms, the senses of each term will be compared against each other to disambiguate them. This " +
 				"provides the weight attribute, which is larger for senses that are likely to be the correct interpretation of the query.</p>",
 				true, false);
+		
 		// TODO Auto-generated constructor stub
 
 		prmQuery = new StringParameter("query", "Your query", null) ;
