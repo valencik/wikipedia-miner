@@ -15,7 +15,7 @@ public class StringParameter extends Parameter<String> {
 	 * @param defaultValue the value to use when requests do not specify a value for this parameter (may be null)
 	 */
 	public StringParameter(String name, String description, String defaultValue) {
-		super(name, description, defaultValue);
+		super(name, description, defaultValue, "string");
 	}
 
 	@Override

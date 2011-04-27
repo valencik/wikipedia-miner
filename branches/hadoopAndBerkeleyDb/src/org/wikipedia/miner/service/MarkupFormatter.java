@@ -32,10 +32,10 @@ public class MarkupFormatter {
 	
 	public MarkupFormatter() {
 		String[] descEmphasisFormat = {"all emphasis discarded","as mediawiki markup", "as html markup"} ;
-		prmEmphasisFormat = new EnumParameter<EmphasisFormat>("emphasisFormat", "The format of bold and italic markup", EmphasisFormat.HTML, EmphasisFormat.values(), descEmphasisFormat) ;
+		prmEmphasisFormat = new EnumParameter<EmphasisFormat>("emphasisFormat", "The format of bold and italic markup within returned snippets", EmphasisFormat.HTML, EmphasisFormat.values(), descEmphasisFormat) ;
 
 		String[] descLinkFormat = {"all links discarded", "as html links to wikipedia", "as mediawiki markup", "as modified mediawiki markup [[id|anchor]]"} ;
-		prmLinkFormat = new EnumParameter<LinkFormat>("linkFormat", "The format of links", LinkFormat.HTML, LinkFormat.values(), descLinkFormat) ;
+		prmLinkFormat = new EnumParameter<LinkFormat>("linkFormat", "The format of link markup within returned snippets", LinkFormat.HTML, LinkFormat.values(), descLinkFormat) ;
 	}
 	
 	public EnumParameter<EmphasisFormat> getEmphasisFormatParam() {

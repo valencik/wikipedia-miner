@@ -16,9 +16,9 @@ public class StatsService extends Service{
 	DateFormat df ;
 
 	public StatsService() {
-		super(
-				"<p>Retrieves statistics (article counts, last edit date, etc.) for a wikipedia dump.</p>" +
-				"<p>Note: this does not support responseFormat=direct</p>" 
+		super("Provides statistics of a specific wikipedia version",
+				"<p>Retrieves statistics (article counts, last edit date, etc.) for a wikipedia dump.</p>",
+				true, false
 				);
 		
 		TimeZone tz = TimeZone.getTimeZone("GMT:00");
@@ -31,8 +31,8 @@ public class StatsService extends Service{
 	public Element buildWrappedResponse(HttpServletRequest request,
 			Element response) throws Exception {
 		
-		
-
+		Element xmlStats = getHub().createElement("Statistics") ;
+		xmlStats.setAttribute("forWikipedia", getWikipediaName(request)) ;
 		
 		Wikipedia w = getWikipedia(request) ;
 		
@@ -52,8 +52,9 @@ public class StatsService extends Service{
 				xmlStat.appendChild(getHub().createTextNode(String.valueOf(stat))) ;
 			}
 			
-			response.appendChild(xmlStat) ;
+			xmlStats.appendChild(xmlStat) ;
 		}
+		response.appendChild(xmlStats) ;
 		
 		return response;
 	}

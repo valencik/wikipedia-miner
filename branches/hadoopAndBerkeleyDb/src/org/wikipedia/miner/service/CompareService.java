@@ -17,6 +17,7 @@ import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Page.PageType;
+import org.wikipedia.miner.service.Service.ExampleBuilder;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.IntListParameter;
@@ -63,13 +64,14 @@ public class CompareService extends Service{
 	private BooleanParameter prmInterpretations ;
 	private BooleanParameter prmConnections ;
 	private BooleanParameter prmSnippets ;
+	private BooleanParameter prmTitles ;
 	
 	private IntParameter prmMaxConsConsidered ;
 	private IntParameter prmMaxConsReturned ;
 	private IntParameter prmMaxConsForSnippets ;
 	private IntParameter prmMaxSnippets ;
 	
-	private BooleanParameter prmEscape ;
+	//private BooleanParameter prmEscape ;
 	
 	private FloatParameter prmMinRelatedness ;	
 	
@@ -81,39 +83,40 @@ public class CompareService extends Service{
 	 */
 	public CompareService() {
 		
-		super(
-				"<p></p>" + 
-				"<p></p>"
+		super("Measures and explains the connections between Wikipedia articles ",
+				"<p>This service measures the semantic relatedness between pairs of terms, pairs of article ids, or sets of article ids.</p>" + 
+				"<p>The relatedness measures are calculated from the links going into and out of each page. Links that are common to both pages are used as evidence that they are related, while links that are unique to one or the other indicate the opposite.</p>",
+				true, true 
 		);
 	}
 	
-
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
 		
-		grpTerms = new ParameterGroup(GroupName.termPair.name()) ;
+		grpTerms = new ParameterGroup(GroupName.termPair.name(), "To compare two (potentially ambiguous) terms") ;
 		prmTerm1 = new StringParameter("term1", "The first of two terms (or phrases) to compare", null) ;
 		grpTerms.addParameter(prmTerm1) ;
 		prmTerm2 = new StringParameter("term2", "The second of two terms (or phrases) to compare", null) ;
 		grpTerms.addParameter(prmTerm2) ;		
 		prmInterpretations = new BooleanParameter("interpretations", "if <b>true</b>, then the service will list different interpretations (combinations of senses for ambiguous terms) that were considered.", false) ;
 		grpTerms.addParameter(prmInterpretations) ;
-		
 		addParameterGroup(grpTerms) ;
 		
-		grpIds = new ParameterGroup(GroupName.idPair.name()) ;
+		grpIds = new ParameterGroup(GroupName.idPair.name(), "To compare two (unambiguous) article ids") ;
 		prmId1 = new IntParameter("id1", "The first of two article ids to compare", null) ;
 		grpIds.addParameter(prmId1) ;
 		prmId2 = new IntParameter("id2", "The second of two article ids to compare", null) ;
 		grpIds.addParameter(prmId2) ;
 		addParameterGroup(grpIds) ;
 		
-		grpIdLists = new ParameterGroup(GroupName.idLists.name()) ;
+		grpIdLists = new ParameterGroup(GroupName.idLists.name(), "To compare multiple article ids") ;
 		prmIdList1 = new IntListParameter("ids1", "A list of page ids to compare", null) ;
 		grpIdLists.addParameter(prmIdList1) ;
-		prmIdList2 = new IntListParameter("ids2", "A second list of page ids to compare. If this is specified, then each article in <em>ids1</em> will be compared against every article in <em>ids2</em>. Otherwise, every article in <em>ids1</em> will be compared against every other article in <em>ids1</em>", new ArrayList<Integer>()) ; 
+		prmIdList2 = new IntListParameter("ids2", "A second list of page ids to compare. If this is specified, then each article in <em>ids1</em> will be compared against every article in <em>ids2</em>. Otherwise, every article in <em>ids1</em> will be compared against every other article in <em>ids1</em>", new Integer[0]) ; 
 		grpIdLists.addParameter(prmIdList2) ;
+		prmMinRelatedness = new FloatParameter("minRelatedness", "The minimum relatedness a term pair must have before it will be returned.", 0F) ;
+		grpIdLists.addParameter(prmMinRelatedness) ;
 		addParameterGroup(grpIdLists) ;
 		
 		prmConnections = new BooleanParameter("connections", "if <b>true</b>, then the service will list articles that refer to both topics being compared. This parameter is ignored if comparing lists of ids.", false) ;
@@ -125,9 +128,6 @@ public class CompareService extends Service{
 		prmMaxConsReturned = new IntParameter("maxConnectionsReturned", "The maximum number of connections that will be returned. These will be the highest weighted connections. This parameter is ignored if comparing lists of ids.", 250) ;
 		addGlobalParameter(prmMaxConsReturned) ;
 		
-		prmInterpretations = new BooleanParameter("interpretations", "if <b>true</b>, then the service will list sentences that either mention both of the articles being compared, or come from one of the articles and mention the other. This parameter is ignored if comparing lists of ids.", false) ;
-		addGlobalParameter(prmInterpretations) ;
-		
 		prmSnippets = new BooleanParameter("snippets", "if <b>true</b>, then the service will list sentences that either mention both of the articles being compared, or come from one of the articles and mention the other. This parameter is ignored if comparing lists of ids.", false) ;
 		addGlobalParameter(prmSnippets) ;
 		
@@ -137,14 +137,44 @@ public class CompareService extends Service{
 		prmMaxSnippets = new IntParameter("maxSnippets", "The maximum number of connections that will be used to gather snippets from. This parameter is ignored if comparing lists of ids.", 10) ;
 		addGlobalParameter(prmMaxSnippets) ;
 		
+		prmTitles = new BooleanParameter("titles", "if <b>true</b>, then the corresponding titles for article ids will be returned. This parameter is ignored if comparing terms", false) ;
+		addGlobalParameter(prmTitles) ;
+		
 		addGlobalParameter(getHub().getFormatter().getEmphasisFormatParam()) ;
 		addGlobalParameter(getHub().getFormatter().getLinkFormatParam()) ;
 		
-		prmMinRelatedness = new FloatParameter("minRelatedness", "The minimum relatedness a term pair must have before it will be returned. This parameter is ignored unless comparing sets of ids.", 0F) ;
-		addGlobalParameter(prmMinRelatedness) ;
-				
-		prmEscape = new BooleanParameter("escapeDefinition", "<true> if sentence snippets should be escaped, <em>false</em> if they are to be encoded directly", false) ;
-		addGlobalParameter(prmEscape) ;
+		addExample(
+				new ExampleBuilder("To measure the relatedness between <i>kiwi</i> and <i>takahe</i>").
+				addParam(prmTerm1, "kiwi").
+				addParam(prmTerm2, "takahe").
+				build()
+		) ;
+		
+		addExample(
+				new ExampleBuilder("To see full details of the same comparison").
+				addParam(prmTerm1, "kiwi").
+				addParam(prmTerm2, "takahe").
+				addParam(prmInterpretations, true).
+				addParam(prmConnections, true).
+				addParam(prmSnippets, true).
+				build()
+		) ;
+		
+		Integer[] kiwi = {17362} ;
+		Integer[] otherBirds = {711147,89074,89073} ;
+		
+		addExample(
+				new ExampleBuilder("To compare <i>kiwi</i> to <i>takahe</i>, <i>kakapo</i> and <i>kea</i>").
+				addParam(prmIdList1, kiwi).
+				addParam(prmIdList2, otherBirds).
+				addParam(prmTitles, true).
+				build()
+		) ;
+		
+		
+		
+		//prmEscape = new BooleanParameter("escapeDefinition", "<true> if sentence snippets should be escaped, <em>false</em> if they are to be encoded directly", false) ;
+		//addGlobalParameter(prmEscape) ;
 	}
 
 	@Override
@@ -226,6 +256,11 @@ public class CompareService extends Service{
 			
 			xmlResponse.setAttribute("relatedness", getHub().format(artComparer.getRelatedness(art1, art2))) ;
 			
+			if (prmTitles.getValue(request)) {
+				xmlResponse.setAttribute("title1", art1.getTitle()) ;
+				xmlResponse.setAttribute("title2", art2.getTitle()) ;
+			}
+			
 			addMutualLinksOrSnippets(xmlResponse, art1, art2, request, wikipedia) ;
 			break ;
 		case idLists :
@@ -280,14 +315,25 @@ public class CompareService extends Service{
 			Element xmlMeasures = getHub().createElement("Measures") ;
 			
 			float minRelatedness = prmMinRelatedness.getValue(request) ;
+			boolean showTitles = prmTitles.getValue(request) ;
 			
 			for (Article a1:articles1) {
 				for (Article a2:articles2) {
 					
 					//relatedness is symmetric, so create a unique key for this pair of ids were order doesnt matter 
-					long min = Math.min(a1.getId(), a2.getId()) ;
-					long max = Math.max(a1.getId(), a2.getId()) ;
-					long key = min + (max << 30) ;
+					Article min, max ;
+					
+					if (a1.getId() < a2.getId()) {
+						min = a1 ;
+						max = a2 ;
+					} else {
+						min = a2 ;
+						max = a1 ;
+					}
+					
+					//long min = Math.min(a1.getId(), a2.getId()) ;
+					//long max = Math.max(a1.getId(), a2.getId()) ;
+					long key = ((long)min.getId()) + (((long)max.getId()) << 30) ;
 					
 					if(doneKeys.contains(key))
 						continue ;
@@ -297,8 +343,14 @@ public class CompareService extends Service{
 					if (relatedness >= minRelatedness) {
 					
 						Element xmlMeasure = getHub().createElement("Measure") ;
-						xmlMeasure.setAttribute("lowId", String.valueOf(min)) ;
-						xmlMeasure.setAttribute("highId", String.valueOf(max)) ;
+						xmlMeasure.setAttribute("lowId", String.valueOf(min.getId())) ;
+						xmlMeasure.setAttribute("highId", String.valueOf(max.getId())) ;
+						
+						if (showTitles) {
+							xmlMeasure.setAttribute("lowTitle", min.getTitle()) ;
+							xmlMeasure.setAttribute("highTitle", max.getTitle()) ;
+						}
+						
 						xmlMeasure.appendChild(getHub().createTextNode(getHub().format(relatedness))) ;
 						
 						xmlMeasures.appendChild(xmlMeasure) ;
@@ -489,7 +541,7 @@ public class CompareService extends Service{
 		sentence = getHub().getFormatter().highlightTopics(sentence, topicIds, wikipedia) ;
 		sentence = getHub().getFormatter().format(sentence, request, wikipedia) ;
 
-		Element xmlSnippet = getHub().createElement("Snippet", sentence);
+		Element xmlSnippet = getHub().createCDATAElement("Snippet", sentence);
 		xmlSnippet.setAttribute("sourceId", String.valueOf(source.getId())) ;
 		xmlSnippet.setAttribute("sourceTitle", source.getTitle()) ;
 		return xmlSnippet ;

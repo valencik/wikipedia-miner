@@ -18,7 +18,10 @@ public class ProgressService extends Service {
 	
 	
 	public ProgressService() {
-		super("<p></p>");
+		super("Monitors progress of service initialization",
+				"<p>Wikipedia Miner can take a while to get started. This service allows polling to see how much progress has been made loading up a particular edition of Wikipedia</p>",
+				true, false
+		);
 		// TODO Auto-generated constructor stub
 	}
 	

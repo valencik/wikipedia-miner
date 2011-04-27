@@ -1,5 +1,7 @@
 package org.wikipedia.miner.util;
 
+import gnu.trove.TIntHashSet;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -52,7 +54,7 @@ public class WikipediaConfiguration {
 	private float minSenseProbability = 0 ;
 	
 	
-	
+	private TIntHashSet articlesOfInterest ;
 	
 	
 	public WikipediaConfiguration(Element xml) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
@@ -134,6 +136,14 @@ public class WikipediaConfiguration {
 		this.minSenseProbability = minSenseProbability;
 	}
 
+	public TIntHashSet getArticlesOfInterest() {
+		return this.articlesOfInterest ;
+	}
+	
+	public void setArticlesOfInterest(TIntHashSet articlesOfInterest) {
+		this.articlesOfInterest = articlesOfInterest;
+	}
+	
 	public boolean isStopword(String stopword) {
 
 		return stopwords.contains(stopword.trim()) ;

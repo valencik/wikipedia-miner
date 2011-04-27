@@ -21,7 +21,7 @@ public class BooleanParameter extends Parameter<Boolean> {
 	 */
 	public BooleanParameter(String name, String description,
 			Boolean defaultValue) {
-		super(name, description, defaultValue);
+		super(name, description, defaultValue, "boolean");
 	}
 
 	@Override

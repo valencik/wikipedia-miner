@@ -13,7 +13,7 @@ public class StringArrayParameter extends Parameter<String> {
 	private HashMap<String, String> valuesByNormalizedValue ;
 	
 	public StringArrayParameter(String name, String description, String defaultValue, String[] allValues, String[] valueDescriptions) {
-		super(name, description, defaultValue);
+		super(name, description, defaultValue, "enum");
 		
 		valuesByNormalizedValue = new HashMap<String, String>() ;
 		for (String val:allValues) {

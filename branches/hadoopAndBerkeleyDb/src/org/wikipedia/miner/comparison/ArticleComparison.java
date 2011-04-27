@@ -9,6 +9,7 @@ public class ArticleComparison {
 	
 	private boolean inLinkFeaturesSet= false ;
 	private Double inLinkGoogleMeasure ;
+	private Double inLinkGoogleSentenceMeasure ;
 	private Double inLinkVectorMeasure ;
 	private Integer inLinkUnion ;
 	private Double inLinkIntersectionProportion ;
@@ -16,6 +17,7 @@ public class ArticleComparison {
 	
 	private boolean outLinkFeaturesSet = false;
 	private Double outLinkGoogleMeasure ;
+	private Double outLinkGoogleSentenceMeasure ;
 	private Double outLinkVectorMeasure ;
 	private Integer outLinkUnion ;
 	private Double outLinkIntersectionProportion ;
@@ -47,6 +49,10 @@ public class ArticleComparison {
 		return inLinkGoogleMeasure;
 	}
 	
+	public Double getInLinkGoogleSentenceMeasure() {
+		return inLinkGoogleSentenceMeasure;
+	}
+	
 	public Double getInLinkVectorMeasure() {
 		return inLinkVectorMeasure ;
 	}
@@ -71,6 +77,10 @@ public class ArticleComparison {
 		return outLinkGoogleMeasure;
 	}
 	
+	public Double getOutLinkGoogleSentenceMeasure() {
+		return outLinkGoogleSentenceMeasure;
+	}
+	
 	public Double getOutLinkVectorMeasure() {
 		return outLinkVectorMeasure ;
 	}
@@ -89,19 +99,21 @@ public class ArticleComparison {
 
 
 
-	public void setInLinkFeatures(Double googleMeasure, Double vectorMeasure, Integer union, Double intersectionProportion) {
+	public void setInLinkFeatures(Double googleMeasure, Double googleSentenceMeasure, Double vectorMeasure, Integer union, Double intersectionProportion) {
 		
 		inLinkFeaturesSet = true ;
 		inLinkGoogleMeasure = googleMeasure ;
+		inLinkGoogleSentenceMeasure = googleSentenceMeasure ;
 		inLinkVectorMeasure = vectorMeasure ;
 		inLinkUnion = union ;
 		inLinkIntersectionProportion = intersectionProportion ;
 	}
 	
-	public void setOutLinkFeatures(Double googleMeasure, Double vectorMeasure, Integer union, Double intersectionProportion) {
+	public void setOutLinkFeatures(Double googleMeasure, Double googleSentenceMeasure, Double vectorMeasure, Integer union, Double intersectionProportion) {
 		
 		outLinkFeaturesSet = true ;
 		outLinkGoogleMeasure = googleMeasure ;
+		outLinkGoogleSentenceMeasure = googleSentenceMeasure ;
 		outLinkVectorMeasure = vectorMeasure ;
 		outLinkUnion = union ;
 		outLinkIntersectionProportion = intersectionProportion ;

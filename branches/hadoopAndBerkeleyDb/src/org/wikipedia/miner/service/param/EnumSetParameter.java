@@ -29,7 +29,7 @@ public class EnumSetParameter<T extends Enum<T>> extends Parameter<EnumSet<T>> {
 			T[] allValues, 
 			String[] valueDescriptions
 	) {
-		super(name, description, defaultValue);
+		super(name, description, defaultValue, "enum list");
 		
 		valuesByName = new HashMap<String, T>() ;
 		for (T val:allValues) {

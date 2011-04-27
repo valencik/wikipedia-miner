@@ -20,7 +20,7 @@ public abstract class Parameter<T> {
 	private String description ;
 	private T defaultValue ;
 	
-	
+	private String dataTypeName ;
 	
 	/**
 	 * Returns the name of the parameter
@@ -60,16 +60,21 @@ public abstract class Parameter<T> {
 	public Element getXmlDescription(ServiceHub hub) {
 		Element xmlParam = hub.createElement("Parameter") ;
 		xmlParam.setAttribute("name", name) ;
-		xmlParam.appendChild(hub.createElement("Description", description)) ;
+		xmlParam.setAttribute("dataType", dataTypeName) ;
+		xmlParam.appendChild(hub.createCDATAElement("Description", description)) ;
 		
 		if (defaultValue != null) {
 			xmlParam.setAttribute("optional", "true") ;
-			xmlParam.setAttribute("default", String.valueOf(defaultValue)) ; 
+			xmlParam.setAttribute("default", getValueForDescription(defaultValue)) ; 
 		} else {
 			xmlParam.setAttribute("optional", "false") ;
 		}
 		
 		return xmlParam ;
+	}
+	
+	public String getValueForDescription(T val) {
+		return val.toString() ;
 	}
 	
 	/**
@@ -79,10 +84,11 @@ public abstract class Parameter<T> {
 	 * @param description a short description of what this parameter does
 	 * @param defaultValue the value to use when requests do not specify a value for this parameter (may be null)
 	 */
-	public Parameter(String name, String description, T defaultValue) {
+	public Parameter(String name, String description, T defaultValue, String dataTypeName) {
 		this.name = name ;
 		this.description = description ;
 		this.defaultValue = defaultValue ;
+		this.dataTypeName = dataTypeName ;
 	}
 	
 	/**

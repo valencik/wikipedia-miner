@@ -140,7 +140,7 @@ public abstract class Decider<A extends Enum<A>,C> {
 	/**
 	 * Trains the decider using the given classifier and training data. 
 	 */
-	public void train(Classifier classifier, Dataset trainingData) throws Exception {
+	public void train(Classifier classifier, Dataset<A,C> trainingData) throws Exception {
 		
 		//TODO: this should apply filters to dataset
 		
@@ -151,7 +151,7 @@ public abstract class Decider<A extends Enum<A>,C> {
 		classifier.buildClassifier(trainingData) ;
 	} 
 	
-	public void test(Dataset data) {
+	public void test(Dataset<A,C> data) {
 		
 		
 	}

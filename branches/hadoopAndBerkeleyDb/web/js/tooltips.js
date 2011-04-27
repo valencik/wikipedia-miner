@@ -3,7 +3,14 @@ var wm_requestedId = null ;
 
 var wm_tooltipXmlCache = new Array() ;
 
-function wm_addTooltipsToAllLinks(container, className) {
+
+var wm_host = "" ;
+
+function wm_setHost(hostName) {
+	wm_host = hostName ;
+}
+
+function wm_addDefinitionTooltipsToAllLinks(container, className) {
         
         if (container == null) 
 		container = $("body") ;
@@ -19,7 +26,7 @@ function wm_addTooltipsToAllLinks(container, className) {
                 
                 var link = $(links[i]);
                 var dest = link.attr("href");
-		var pageId = link.attr("pageId");
+				var pageId = link.attr("pageId");
                 var linkProb = link.attr("linkProb") ;
                 
                 
@@ -29,7 +36,7 @@ function wm_addTooltipsToAllLinks(container, className) {
                                 object: link,
                                 linkProb: linkProb
                         }, function(event){
-                                wm_showTooltip(event.data.id, event.data.object, event.data.linkProb);
+                                wm_showDefinitionTooltip(event.data.id, event.data.object, event.data.linkProb);
                         });
                         
                         link.bind("mouseout", function(event){
@@ -40,10 +47,32 @@ function wm_addTooltipsToAllLinks(container, className) {
         }       
 }
 
+function wm_showMessageTooltip(message, object) {
+	
+	if(wm_tooltip == null) {
+		wm_tooltip = $("<div id='wm_tooltip' class='ui-corner-all'></div>") ;
+		$("body").append(wm_tooltip) ;
+	}
+	
+    var top = object.offset().top + object.height() ;
+    var left = object.offset().left ;
+    
+    // if this is too far right to fit on page, move it to be against right side of page
+    if (left + wm_tooltip.width() > $(window).width())
+            left = $(window).width() - wm_tooltip.width() - 30 ;
+                    
+    wm_tooltip.css("top", top + "px") ;
+    wm_tooltip.css("left", left + "px") ;
+    
+    wm_tooltip.html(message) ;
+    wm_tooltip.show() ;
+	
+}
 
-function wm_showTooltip(topicId, object, linkProb) {
+
+function wm_showDefinitionTooltip(topicId, object, linkProb) {
                 
-        if(wm_tooltip == null) {
+    if(wm_tooltip == null) {
 		wm_tooltip = $("<div id='wm_tooltip' class='ui-corner-all'></div>") ;
 		$("body").append(wm_tooltip) ;
 	}
@@ -68,12 +97,12 @@ function wm_showTooltip(topicId, object, linkProb) {
                 wm_setTooltipContent(topicId, xml, linkProb) ;
 	} else {
 
-		$.get(wm_host+"/define", {
+		$.get(wm_host+"/exploreArticle", {
 			id: topicId,
+			definition: true,
 			emphasisFormat: "HTML",
 			linkFormat: "PLAIN",
-			getImages: true,
-			escapeDefinition: true,
+			images: true,
 			maxImageWidth: 100,
 			maxImageHeight: 100
        		}, function(response){

@@ -33,18 +33,21 @@ public class LabelComparer {
 	}
 	
 	private Decider<SenseAttr,Boolean> senseSelector ;
+	private Dataset<SenseAttr,Boolean> senseDataset ;
+	
 	private Decider<RelatednessAttr, Double> relatednessMeasurer ;
+	private Dataset<RelatednessAttr,Double> relatednessDataset ;
 	
 	public LabelComparer(Wikipedia wikipedia, ArticleComparer articleComparer) throws Exception {
 		this.wikipedia = wikipedia ;
 		this.articleComparer = articleComparer ;
 		
-		senseSelector = new DeciderBuilder<SenseAttr>("labelSenseSelector", SenseAttr.class)
+		senseSelector = (Decider<SenseAttr, Boolean>) new DeciderBuilder<SenseAttr>("labelSenseSelector", SenseAttr.class)
 			.setDefaultAttributeTypeNumeric()
 			.setClassAttributeTypeBoolean("isValid")
 			.build();
 		
-		relatednessMeasurer = new DeciderBuilder<RelatednessAttr>("labelRelatednessMeasurer", RelatednessAttr.class)
+		relatednessMeasurer = (Decider<RelatednessAttr, Double>) new DeciderBuilder<RelatednessAttr>("labelRelatednessMeasurer", RelatednessAttr.class)
 			.setDefaultAttributeTypeNumeric()
 			.setClassAttributeTypeNumeric("relatedness")
 			.build();
@@ -97,11 +100,11 @@ public class LabelComparer {
 	}
 	
 	public void saveDisambiguationTrainingData(File file) throws IOException, Exception {
-		senseSelector.saveTrainingData(file) ;
+		senseDataset.save(file) ;
 	}
 	
 	public void saveComparisonTrainingData(File file) throws IOException, Exception {
-		relatednessMeasurer.saveTrainingData(file) ;
+		relatednessDataset.save(file) ;
 	}
 	
 	
@@ -175,19 +178,19 @@ public class LabelComparer {
 	
 	
 	public void loadDisambiguationClassifier(File file) throws Exception {
-		senseSelector.loadClassifier(file) ;
+		senseSelector.load(file) ;
 	}
 	
 	public void loadComparisonClassifier(File file) throws Exception {
-		relatednessMeasurer.loadClassifier(file) ;
+		relatednessMeasurer.load(file) ;
 	}
 	
 	public void saveDisambiguationClassifier(File file) throws Exception {
-		senseSelector.saveClassifier(file) ;
+		senseSelector.save(file) ;
 	}
 	
 	public void saveComparisonClassifier(File file) throws Exception {
-		relatednessMeasurer.saveClassifier(file) ;
+		relatednessMeasurer.save(file) ;
 	}
 	
 
@@ -195,10 +198,10 @@ public class LabelComparer {
 	public void buildDefaultClassifiers() throws Exception {
 		Classifier ssClassifier = new Bagging() ;
 		ssClassifier.setOptions(Utils.splitOptions("-P 10 -S 1 -I 10 -W weka.classifiers.trees.J48 -- -U -M 2")) ;
-		senseSelector.buildClassifier(ssClassifier) ;
+		senseSelector.train(ssClassifier, senseDataset) ;
 		
 		Classifier rmClassifier = new GaussianProcesses() ;
-		relatednessMeasurer.buildClassifier(rmClassifier) ;
+		relatednessMeasurer.train(rmClassifier, relatednessDataset) ;
 	}
 	
 	
@@ -334,7 +337,7 @@ public class LabelComparer {
 			if (relatedness != null) {
 				//this is a training instance, where relatedness is known
 				labelRelatedness = relatedness ;
-				relatednessMeasurer.addTrainingInstance(getInstance()) ;
+				relatednessDataset.add(getInstance()) ;
 			} else {
 				//relatedness must be predicted
 				labelRelatedness = relatednessMeasurer.getDecision(getInstance()) ;
@@ -403,7 +406,7 @@ public class LabelComparer {
 				else
 					disambiguationConfidence = 0.0 ;
 				
-				senseSelector.addTrainingInstance(getInstance()) ;
+				senseDataset.add(getInstance()) ;
 				
 			} else {
 				disambiguationConfidence = senseSelector.getDecisionDistribution(getInstance()).get(true) ;

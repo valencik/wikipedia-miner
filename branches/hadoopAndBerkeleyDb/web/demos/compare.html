@@ -1,0 +1,398 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+		<title>WikipediaMiner - compare demo</title>
+		
+		<link rel="stylesheet" href="../css/wikipediaMiner.css" type="text/css">
+		<link rel="stylesheet" href="../css/tooltips.css" type="text/css">
+		<link type="text/css" href="../css/custom-theme/jquery-ui-1.8.10.custom.css" rel="stylesheet" />
+		
+		<script type="text/javascript" src="../js/jquery-1.5.1.min.js"></script> 
+		<script type="text/javascript" src="../js/jquery-ui-1.8.10.custom.min.js"></script>
+		<script type="text/javascript" src="../js/jquery.qtip-1.0.0-rc3.min.js"></script>
+		<script type="text/javascript" src="../js/tooltips.js"></script> 
+		
+		<style>
+			
+			#term1, #term2 {
+				
+				padding: 5px ;
+				
+				font-size: 20px ;
+				width: 200px ;
+				margin-right: 5px ;
+				
+			}
+			
+			#hint {
+				color: rgb(150,150,150) ;
+			}
+			
+			
+			#relationWeight {
+				font-size: 20px ;
+				font-weight: bold ;
+			}
+			
+			#cmdCompare {
+				font-size: 20px ;
+				padding: 5px ;
+				display: none ;
+			}
+			
+			#relation{
+				margin-right: 5px ;
+			}
+			
+			.help {
+				cursor: help ;
+				font-size: 0.8em ;
+				color: #3366bd;
+				
+			}
+			
+			#error{
+				display: none ;
+				
+			}
+			
+			#byTerm1, #byTerm2 {
+				font-weight: bold ;
+			}
+			
+			
+			#senses {
+				width: 100% ;
+			}
+			
+			
+			#senses td {
+				text-align: center ;
+				padding: 5px ;
+				width: 50% ;
+			}
+			
+			#sense1, #sense2 {
+				
+				font-size: 20px ;
+			}
+			
+			.horizontal li {
+				display: block;
+				float: left ;
+				list-style-type: none;
+				
+				padding: 5px 10px ;
+			
+				
+				line-height: 20px ;
+			}
+			
+			#snippets {
+				margin-left: 0px ;
+				padding-left: 0px ;
+			}
+			
+			.snippet {
+				margin: 5px 0px ;
+				
+				padding-bottom: 5px ;
+			}
+			
+			.snippet p {
+				padding: 0px ;
+			}
+			
+			.snippet .source {
+				text-align: right ;
+				padding-top: 0px ;
+			}
+			
+			
+			br {
+				clear: both ;
+			}
+			
+		</style>
+		
+		<script>
+			$.fn.qtip.styles.wmstyle = { // Last part is the name of the style
+			   color: 'black',
+			   background: '#f1fafc' ,
+			   border: {
+			   	 width: 5,
+		         radius: 10,
+				 color: '#bfe2fa'
+		       },
+               padding: 10, 
+               textAlign: 'center',
+               tip: true, 
+			   name: 'cream' // Inherit the rest of the attributes from the preset dark style
+			}
+			
+			
+			var urlParams = {};
+			(function () {
+			    var e,
+			        a = /\+/g,  // Regex for replacing addition symbol with a space
+			        r = /([^&=]+)=?([^&]*)/g,
+			        d = function (s) { return decodeURIComponent(s.replace(a, " ")); },
+			        q = window.location.search.substring(1);
+			
+			    while (e = r.exec(q))
+			       urlParams[d(e[1])] = d(e[2]);
+			})();
+			
+			
+			function doEventBindings() {
+				$("form").submit(function() {
+					var ok = true;
+					
+					if ($('#term1').val() == "") {
+						$('#term1').addClass("ui-state-error") ;
+						ok = false ;
+					}
+					
+					if ($('#term2').val() == "") {
+						$('#term2').addClass("ui-state-error") ;
+						ok = false ;
+					}
+					
+					return ok ;
+			    });
+				
+				$('#cmdCompare').button() ;
+				
+				$('#term1').bind('focus', function() {
+					$('#relation').hide('slow') ;
+					$('#cmdCompare').show('slow') ;
+				}) ;
+				
+				$('#term2').bind('focus', function() {
+					$('#relation').hide('slow') ;
+					$('#cmdCompare').show('slow') ;
+				}) ;
+				
+				
+				
+			}
+			
+			function doTooltipBindings() {
+				
+				$('#disambiguationHelp').qtip({
+				      content: "Words are often ambiguous, and can represent multiple topics. This section explains how one topic is chosen automatically to represent each term.",
+					  style: { name: 'wmstyle' }
+			    }) ;
+				
+				$('#connectionHelp').qtip({
+				      content: "This section lists articles that talk about both of the concepts being compared. These are a useful by-product of how Wikipedia Miner calculates relatedness.",
+					  style: { name: 'wmstyle' }
+			    }) ;
+				
+				$('#snippetHelp').qtip({
+				      content: "This section lists sentences that talk about both of the concepts being compared. These are a useful by-product of how Wikipedia Miner calculates relatedness.",
+					  style: { name: 'wmstyle' }
+			    }) ;
+			}
+
+			
+			$(document).ready(function() {
+				//requestServiceList() ;
+				
+				//sort out button bindings
+				
+				doEventBindings() ;
+				doTooltipBindings() ;
+				
+				
+				var term1 = urlParams["term1"];
+				var term2 = urlParams["term2"];
+				
+				if (term1 != undefined && term2 != undefined) {
+					
+					$('#term1').val(term1) ;
+					$('#term2').val(term2) ;
+					
+					$.get(
+						"../compare", 
+						{
+							term1: $('#term1').val(), 
+							term2: $('#term2').val(),
+							interpretations: true,
+							connections: true,
+							maxConnectionsReturned: 25,
+							snippets: true
+						},
+						function(data){
+							processRelatednessResponse($(data).find("Response")) ;
+						}
+					);
+					
+				} else {
+					$('#relation').hide() ;
+					$('#cmdCompare').show() ;
+				}
+				
+			}) ;
+			
+			
+			function getFontSize(weight) {
+				
+				var minSize = 12 ;
+				var maxSize = 20 ;
+				
+				var size = minSize + ((maxSize-minSize) * weight) ;
+				
+				return size ;
+			}
+			
+			function processRelatednessResponse(response) {
+				
+				
+				$('#relationWeight').html(Math.round(response.attr("relatedness")*100) + "% related") ;
+				
+				$('#byTerm1').html(urlParams["term1"]) ;
+				$('#byTerm2').html(urlParams["term2"]) ;
+				
+				var xmlInterpretation = $(response.children("Interpretations").children("Interpretation")[0]) ;
+				
+				
+				
+				$('#sense1').html("<a pageId='" + xmlInterpretation.attr('id1') + "' href='search.html??artId=" + xmlInterpretation.attr('id1') + "'>" + xmlInterpretation.attr('title1') + "</a>") ;
+				$('#sense2').html("<a pageId='" + xmlInterpretation.attr('id2') + "' href='search.html?artId=" + xmlInterpretation.attr('id2') + "'>" + xmlInterpretation.attr('title2') + "</a>") ;
+				
+				wm_addDefinitionTooltipsToAllLinks($('#sense1')) ;
+				wm_addDefinitionTooltipsToAllLinks($('#sense2')) ;
+				
+				var sortedConnections = $(response).find("Connection").get().sort(function(a,b) {
+					var valA = $(a).attr("title") ;
+					var valB = $(b).attr("title") ;
+					
+					return valA < valB ? -1 : valA == valB? 0 : 1 ;
+				}) ;
+				
+				$.each(sortedConnections, function() {
+					var xmlConnection = $(this) ;
+					
+					
+					var connection = $("<li><a pageId='" + xmlConnection.attr('id') + "' href='search.html?artId=" + xmlConnection.attr('id') + "'>" + xmlConnection.attr('title') + "</a></li>") ;
+				
+					var weight = (Number(xmlConnection.attr('relatedness1')) + Number(xmlConnection.attr('relatedness2'))) / 2 ;
+				
+					connection.css('font-size', getFontSize(weight) + "px") ;
+					
+					//connection.append(weight) ; 
+					$('#connections').append(connection) ;
+					
+				}) ;
+				
+				wm_addDefinitionTooltipsToAllLinks($('#connections')) ;
+				
+				
+				
+				$.each(response.find("Snippet"), function() {
+					
+					var xmlSnippet = $(this) ;
+					
+					var snippet = $("<ul class='snippet'><p>" + xmlSnippet.text() + " </p> <p class='source'>from <a pageId='" + xmlSnippet.attr('sourceId') + "' href='search.html?artId=" + xmlSnippet.attr('sourceId') + "'>" + xmlSnippet.attr('sourceTitle') + "</a></ul>") ;
+					
+					$("#snippets").append(snippet) ;
+					
+				}) ;
+				
+				wm_addDefinitionTooltipsToAllLinks($('#snippets')) ;
+			}
+			
+		</script>
+		
+	</head>
+	<body>
+		
+		<div id="title">
+			
+		</div>		
+		<div id="content">
+
+			<div id="navigation">
+				<a href="http://wikipedia-miner.sf.net/index.htm">Home</a>
+				<em>Services</em>
+				<a href="http://wikipedia-miner.sf.net/details.htm">Details</a>
+
+				<a href="http://wikipedia-miner.sf.net/publications.htm">Publications</a>
+				<a href="http://www.cs.waikato.ac.nz/~dnk2">Contact</a>
+			</div>
+			
+			<h1><em>compare</em> demo</h1>
+			
+			<form method='get'>
+				<input type='text' id='term1' name='term1' class='ui-widget ui-corner-all'> </input>
+				
+				<span id='relation'>
+					is
+					<span id='relationWeight'>
+						<img src="../images/loading.gif"></img>
+					</span>
+					 to
+				</span>
+				
+				<input type='text' id='term2' name='term2' class='ui-widget ui-corner-all'></input>
+				
+				<input type='submit' id='cmdCompare' class='ui-widget ui-corner-all' value='Compare'></input>
+				
+			</form>
+			
+			
+			
+			
+			<div id='error'>
+				<h2>Sorry!</h2>
+				
+				I have no idea what <span id='missingTerm'></span> means.
+			</div>
+		
+			<div id='details'>
+				
+				<h2>Disambiguation <span id='disambiguationHelp' class='help'>?</span></h2>
+				
+				<table id='senses'>
+					<tr>
+						<td>By <span id='byTerm1'>Blah</span> we assume you mean</td>
+						<td>By <span id='byTerm2'>Blah</span> we assume you mean</td>
+					</tr>
+					
+					<tr>
+						<td id='sense1'></td>
+						<td id='sense2'></td>
+					</tr>
+				</table>
+				
+				<h2>Connections <span id='connectionHelp' class='help'>?</span></h2>				
+
+				<ul id='connections' class='horizontal'>
+					
+				</ul>
+				
+				<br/>
+
+				<h2>Snippets <span id='snippetHelp' class='help'>?</span></h2>
+
+				<ul id='snippets'>
+					
+				</ul>
+			</div>	
+			
+			<div id='help'>
+				sadfd
+				
+			</div>
+		
+		
+			<div id="content_tl"></div>
+			<div id="content_tr"></div>
+			<div id="content_bl"></div>
+			<div id="content_br"></div> 
+		</div>
+		
+	</body>
+</html>

@@ -140,11 +140,16 @@ public class Page implements Comparable<Page> {
 
 		if (p.id == id)
 			return 0 ;
-
+		
+		int cmp = 0 ;
+		
 		if (p.weight != null && weight != null && p.weight != weight)
-			return -1 * weight.compareTo(p.weight) ;
-
-		return (new Integer(id)).compareTo(p.id) ;
+			cmp =  p.weight.compareTo(weight) ; 
+		
+		if (cmp == 0)
+			cmp = new Integer(id).compareTo(p.id) ;
+			
+		return cmp ;
 		
 	}
 

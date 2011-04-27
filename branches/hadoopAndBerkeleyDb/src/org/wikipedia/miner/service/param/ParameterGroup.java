@@ -14,6 +14,8 @@ import org.wikipedia.miner.service.ServiceHub;
 public class ParameterGroup {
 	
 	String name ;
+	String descriptionMarkup ;
+	
 	Vector<Parameter> parameters ;
 	
 	/**
@@ -21,8 +23,9 @@ public class ParameterGroup {
 	 * 
 	 * @param name the name of this parameter group
 	 */
-	public ParameterGroup(String name) {
+	public ParameterGroup(String name, String descriptionMarkup) {
 		this.name = name ;
+		this.descriptionMarkup = descriptionMarkup ;
 		this.parameters = new Vector<Parameter>() ;
 	}
 	
@@ -65,6 +68,9 @@ public class ParameterGroup {
 		
 		Element xml = hub.createElement("ParameterGroup") ;
 		xml.setAttribute("name", name) ;
+		
+		Element xmlDescription = hub.createCDATAElement("Description", descriptionMarkup) ;
+		xml.appendChild(xmlDescription) ;
 			
 		for (Parameter param:parameters) 
 			xml.appendChild(param.getXmlDescription(hub)) ;

@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.text.DecimalFormat;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Vector;
 
@@ -25,25 +27,36 @@ import org.w3c.dom.Element;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.EnumParameter;
+import org.wikipedia.miner.service.param.IntListParameter;
+import org.wikipedia.miner.service.param.IntParameter;
 import org.wikipedia.miner.service.param.Parameter;
 import org.wikipedia.miner.service.param.ParameterGroup;
 import org.wikipedia.miner.service.param.StringArrayParameter;
+import org.wikipedia.miner.service.param.StringParameter;
+
 
 public abstract class Service extends HttpServlet {
 
 	public enum ResponseFormat {XML,DIRECT} ; 
 
 	private ServiceHub hub ;
-	private String description ;
+	private String shortDescription ;
+	private String detailsMarkup ;
 
 	private Vector<ParameterGroup> parameterGroups ;
 	@SuppressWarnings("unchecked")
 	private Vector<Parameter> globalParameters ;
+	@SuppressWarnings("unchecked")
+	private Vector<Parameter> baseParameters ;
+	private Vector<Example> examples = new Vector<Example>() ;
 
 
-	private EnumParameter<ResponseFormat> prmResponseFormat ;
-	private BooleanParameter prmHelp ;
-	private StringArrayParameter prmWikipedia ;
+	boolean wikipediaSpecific ;
+	boolean supportsDirectResponse ;
+	
+	protected EnumParameter<ResponseFormat> prmResponseFormat ;
+	protected BooleanParameter prmHelp ;
+	protected StringArrayParameter prmWikipedia ;
 
 	private Transformer serializer ;
 
@@ -51,14 +64,17 @@ public abstract class Service extends HttpServlet {
 	private DecimalFormat progressFormat = new DecimalFormat("#0%") ;
 
 	@SuppressWarnings("unchecked")
-	public Service(String description) {
+	public Service(String shortDescription, String detailsMarkup, boolean wikipediaSpecific, boolean supportsDirectResponse) {
 
 		//this.name = name ;
-		this.description = description ;
+		this.shortDescription = shortDescription ;
+		this.detailsMarkup = detailsMarkup ;
 		this.parameterGroups = new Vector<ParameterGroup>() ;
 		this.globalParameters = new Vector<Parameter>() ;
+		this.baseParameters = new Vector<Parameter>() ;
 
-
+		this.wikipediaSpecific = wikipediaSpecific ;
+		this.supportsDirectResponse = supportsDirectResponse ;
 
 
 		try {
@@ -76,6 +92,7 @@ public abstract class Service extends HttpServlet {
 			e.printStackTrace();
 		}
 
+		
 	}
 
 	public void init(ServletConfig config) throws ServletException {
@@ -83,25 +100,35 @@ public abstract class Service extends HttpServlet {
 
 		hub = ServiceHub.getInstance(config.getServletContext()) ;
 
-		String[] descResponseFormat = {"in XML format", "directly, without any additional information such as request parameters. This format will not be valid for some services."} ;
-		prmResponseFormat = new EnumParameter<ResponseFormat>("responseFormat", "the format in which the response should be returned", ResponseFormat.XML, ResponseFormat.values(), descResponseFormat) ;
-		addGlobalParameter(prmResponseFormat) ;
+		if (supportsDirectResponse) {
+			String[] descResponseFormat = {"in XML format", "directly, without any additional information such as request parameters. This format will not be valid for some services."} ;
+			prmResponseFormat = new EnumParameter<ResponseFormat>("responseFormat", "the format in which the response should be returned", ResponseFormat.XML, ResponseFormat.values(), descResponseFormat) ;
+			baseParameters.add(prmResponseFormat) ;
+		}
 
-		prmHelp = new BooleanParameter("help", "If <b>true</b>, this will return a description of the service and the parameters available", false) ;
-		addGlobalParameter(prmHelp) ;
 		
-		String[] valsWikipedia = getHub().getWikipediaNames() ;
-		String[] dscsWikipedia = new String[valsWikipedia.length] ;
-		
-		for (int i=0 ; i<valsWikipedia.length ; i++) {
-			dscsWikipedia[i] = getHub().getWikipediaDescription(valsWikipedia[i]) ;
+		if (wikipediaSpecific) {
+			String[] valsWikipedia = getHub().getWikipediaNames() ;
+			String[] dscsWikipedia = new String[valsWikipedia.length] ;
 			
-			if (dscsWikipedia[i] == null)
-				dscsWikipedia[i] = "No description available" ;
+			for (int i=0 ; i<valsWikipedia.length ; i++) {
+				dscsWikipedia[i] = getHub().getWikipediaDescription(valsWikipedia[i]) ;
+				
+				if (dscsWikipedia[i] == null)
+					dscsWikipedia[i] = "No description available" ;
+			}
+			prmWikipedia = new StringArrayParameter("wikipedia", "Which edition of Wikipedia to retrieve information from", getHub().getDefaultWikipediaName(), valsWikipedia, dscsWikipedia) ;
+			baseParameters.add(prmWikipedia) ;
 		}
 		
-		prmWikipedia = new StringArrayParameter("wikipedia", "Which version of Wikipedia to use", getHub().getDefaultWikipediaName(), valsWikipedia, dscsWikipedia) ;
-		addGlobalParameter(prmWikipedia) ;
+		prmHelp = new BooleanParameter("help", "If <b>true</b>, this will return a description of the service and the parameters available", false) ;
+		baseParameters.add(prmHelp) ;
+		
+		hub.registerService(this) ;
+	}
+	
+	public void addExample(Example example) {
+		this.examples.add(example) ;
 	}
 
 	public ServiceHub getHub() {
@@ -141,24 +168,34 @@ public abstract class Service extends HttpServlet {
 				return ;
 			}
 
-
-			Wikipedia wikipedia = getWikipedia(request) ;
-			double loadProgress = wikipedia.getEnvironment().getProgress() ;
-
-			ResponseFormat responseFormat = prmResponseFormat.getValue(request) ;
-
-			if (responseFormat == ResponseFormat.DIRECT) { 
-
-				if (requiresWikipedia() && loadProgress < 1)
-					throw new ServletException("Wikipedia is not yet ready. Current progress is " + progressFormat.format(loadProgress)) ;
-
-				try {
-					buildUnwrappedResponse(request, response) ;
-				} catch (Exception e) {
-					throw new ServletException(e) ;
+			
+			
+			double loadProgress ;
+			
+			if (wikipediaSpecific) {
+				Wikipedia wikipedia = getWikipedia(request) ;
+				loadProgress= wikipedia.getEnvironment().getProgress() ;
+			} else {
+				loadProgress = 1 ;
+			}
+			
+			
+			if (supportsDirectResponse) {
+				ResponseFormat responseFormat = prmResponseFormat.getValue(request) ;
+	
+				if (responseFormat == ResponseFormat.DIRECT) { 
+	
+					if (requiresWikipedia() && loadProgress < 1)
+						throw new ServletException("Wikipedia is not yet ready. Current progress is " + progressFormat.format(loadProgress)) ;
+	
+					try {
+						buildUnwrappedResponse(request, response) ;
+					} catch (Exception e) {
+						throw new ServletException(e) ;
+					}
+	
+					return ;
 				}
-
-				return ;
 			}
 
 			Element xmlRoot = getHub().createElement("WikipediaMiner") ;
@@ -203,7 +240,7 @@ public abstract class Service extends HttpServlet {
 	}
 
 	public boolean requiresWikipedia() {
-		return true ;
+		return wikipediaSpecific ;
 	}
 
 	public Element buildErrorResponse(String message, Element response) {
@@ -232,19 +269,44 @@ public abstract class Service extends HttpServlet {
 
 		return path.toString() ;
 	}
+	
+	public String getShortDescription() {
+		return shortDescription ;
+	}
 
+	@SuppressWarnings("unchecked")
 	public Element getXmlDescription() {
 
-		Element xml = hub.createElement("Response") ;
-		xml.appendChild(hub.createElement("Details", description)) ;
+		Element xmlResponse = hub.createElement("Response") ;
+		
+		Element xmlDescription = hub.createElement("ServiceDescription") ;
+		xmlDescription.setAttribute("serviceName", getServletName()) ;
+		xmlDescription.setAttribute("description", shortDescription) ;
+		
+		
+		xmlDescription.appendChild(hub.createCDATAElement("Details", detailsMarkup)) ;
+		
 
 		for(ParameterGroup paramGroup:parameterGroups) 
-			xml.appendChild(paramGroup.getXmlDescription(hub)) ;
+			xmlDescription.appendChild(paramGroup.getXmlDescription(hub)) ;
 
 		for (Parameter param:globalParameters) 
-			xml.appendChild(param.getXmlDescription(hub)) ;
+			xmlDescription.appendChild(param.getXmlDescription(hub)) ;
+		
+		Element xmlBaseParams = hub.createElement("BaseParameters") ;
+		for (Parameter param:baseParameters)
+			xmlBaseParams.appendChild(param.getXmlDescription(hub)) ;
+		xmlDescription.appendChild(xmlBaseParams) ;
 
-		return xml ;
+		Element xmlExamples = hub.createElement("Examples") ;
+		for (Example example:examples) {
+			xmlExamples.appendChild(example.getXML()) ;
+		}
+		xmlDescription.appendChild(xmlExamples) ;
+		
+		
+		xmlResponse.appendChild(xmlDescription) ;
+		return xmlResponse ;
 	}
 
 
@@ -280,6 +342,75 @@ public abstract class Service extends HttpServlet {
 		return xmlRequest ;
 	}
 
-
+	private class Example {
+		
+		private String description ;
+		private LinkedHashMap params ;
+		
+		public Example(String description, LinkedHashMap<String,String>params) {
+			this.description = description ;
+			this.params = params ;
+		}
+		
+		private String getUrl() {
+			StringBuffer sb = new StringBuffer() ;
+			sb.append(getServletName()) ;
+			
+			int index = 0 ;
+			for (Object o:params.entrySet())  {
+				Map.Entry<String, String> e = (Map.Entry<String, String>)o ;
+				
+				if (index == 0)
+					sb.append("?") ;
+				else
+					sb.append("&") ;
+				
+				sb.append(e.getKey()) ;
+				sb.append("=") ;
+				sb.append(e.getValue()) ;
+				
+				index++ ;
+			}
+			return sb.toString() ;
+		}
+		
+		private Element getXML() {
+			Element xml = getHub().createCDATAElement("Example", description) ;
+			xml.setAttribute("url", getUrl()) ;
+			
+			Element xmlParams = getHub().createElement("Parameters") ;
+			for (Object o:params.entrySet())  {
+				Map.Entry<String, String> e = (Map.Entry<String, String>)o ;
+				Element xmlParam = getHub().createElement("Parameter") ;
+				xmlParam.setAttribute("name", e.getKey()) ;
+				xmlParam.setAttribute("value", e.getValue()) ;
+				xmlParams.appendChild(xmlParam) ;
+			}
+			xml.appendChild(xmlParams) ;
+			
+			return xml ;
+		}
+	}
+	
+	public class ExampleBuilder {
+		
+		private String description ;
+		private LinkedHashMap<String,String> params = new LinkedHashMap<String,String>() ;
+		
+		public ExampleBuilder(String description) {
+			this.description = description ;
+		}
+		
+		public <T> ExampleBuilder addParam(Parameter<T> param, T value) {
+			
+			params.put(param.getName(), param.getValueForDescription(value)) ;
+			return this ;
+		}
+		
+		public Example build() {
+			return new Example(description, params) ;
+		}
+	
+	}
 
 }
