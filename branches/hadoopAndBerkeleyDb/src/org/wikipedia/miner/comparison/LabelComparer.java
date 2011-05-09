@@ -89,6 +89,9 @@ public class LabelComparer {
 	
 	public void train(ComparisonDataSet dataset, String datasetName) throws Exception {
 
+		senseDataset = senseSelector.createNewDataset() ;
+		relatednessDataset = relatednessMeasurer.createNewDataset() ;
+		
 		ProgressTracker pn = new ProgressTracker(dataset.getItems().size(), "training", LabelComparer.class) ;
 		for (ComparisonDataSet.Item item: dataset.getItems()) {
 
