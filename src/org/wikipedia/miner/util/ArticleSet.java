@@ -24,6 +24,7 @@ import java.text.DecimalFormat;
 import java.util.*;
 import java.util.regex.*;
 
+import org.apache.log4j.Logger;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.model.Page.PageType;
@@ -34,9 +35,13 @@ import org.wikipedia.miner.model.Page.PageType;
  *	A set of Wikipedia articles that can be used to train and test disambiguators, linkDetectors, etc. 
  * Can either be generated randomly from Wikipedia, or loaded from file.
  */
-public class ArticleSet {
-	private ArrayList<Integer> articleIds = new ArrayList<Integer>() ;
+public class ArticleSet extends TreeSet<Article> {
+	//private TreeSet<Integer> articleIds = new TreeSet<Integer>() ;
 	private MarkupStripper stripper = new MarkupStripper() ;
+	
+	public ArticleSet() {
+		super() ;
+	}
 	
 	/**
 	 * Loads this article set from file. The file must contain a list of article ids, separated by newlines. 
@@ -45,9 +50,9 @@ public class ArticleSet {
 	 * @param file the file containing article ids.
 	 * @throws IOException if the file cannot be read.
 	 */
-	public ArticleSet(File file) throws IOException{
+	public ArticleSet(File file, Wikipedia wikipedia) throws IOException{
 		
-		articleIds = new ArrayList<Integer>() ;
+		//articleIds = new TreeSet<Integer>() ;
 
 		BufferedReader reader = new BufferedReader(new FileReader(file)) ;
 		String line  ;
@@ -55,7 +60,7 @@ public class ArticleSet {
 		while ((line = reader.readLine()) != null) {
 			String[] values = line.split("\t") ;
 			int id = new Integer(values[0].trim()) ;
-			articleIds.add(id) ;
+			add((Article)wikipedia.getPageById(id)) ;
 		}
 
 		reader.close();		
@@ -82,16 +87,26 @@ public class ArticleSet {
 	 * @param maxWordCount the maximum number of words allowed in an article
 	 * @param maxListProportion the maximum proportion of list items (over total line count) that an article may contain. 
 	 */
-	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion) {
+	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion, ArticleSet exclude) {
+		
+		Vector<Article> roughCandidates = getRoughCandidates(wikipedia, minInLinks, minOutLinks) ;
+		
+		
+		buildFromRoughCandidates(wikipedia, roughCandidates, size, minInLinks, minOutLinks, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, exclude) ;
+		//articleIds = new TreeSet<Integer>() ;
+		
+
+	}
+	
+	protected void buildFromRoughCandidates(Wikipedia wikipedia, Vector<Article> roughCandidates, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion, ArticleSet exclude) {
 		
 		DecimalFormat df = new DecimalFormat("#0.00 %") ;
 		
-		Vector<Article> roughCandidates = getRoughCandidates(wikipedia, minInLinks, minOutLinks) ;
-		int totalRoughCandidates = roughCandidates.size() ;
-				
-		articleIds = new ArrayList<Integer>() ;
+		int totalRoughCandidates = roughCandidates.size();
 		
 		ProgressTracker pn = new ProgressTracker(totalRoughCandidates, "Refining candidates (ETA is worst case)", ArticleSet.class) ;
+		
+		
 		
 		double lastWarningProgress = 0 ;
 		
@@ -99,7 +114,7 @@ public class ArticleSet {
 			
 			pn.update() ;
 			
-			if (articleIds.size() == size)
+			if (size() == size)
 				break ; //we have enough ids
 			
 			//pop a random id
@@ -107,14 +122,14 @@ public class ArticleSet {
 			Article art = roughCandidates.elementAt(index) ;
 			roughCandidates.removeElementAt(index) ;
 									
-			if (isArticleValid(art, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion)) 
-				articleIds.add(art.getId()) ;
+			if (isArticleValid(art, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, exclude)) 
+				add(art) ;
 			
 			
 			// warn user if it looks like we wont find enough valid articles
 			double roughProgress = 1-((double) roughCandidates.size()/totalRoughCandidates) ;
 			if (roughProgress >= lastWarningProgress + 0.01) {
-				double fineProgress = (double)articleIds.size()/size ;
+				double fineProgress = (double)size()/size ;
 			
 				if (roughProgress > fineProgress) {
 					System.err.println("ArticleSet | Warning : we have exhausted " + df.format(roughProgress) + " of the available pages and only gathered " + df.format(fineProgress*100) + " of the articles needed.") ;
@@ -123,16 +138,17 @@ public class ArticleSet {
 			}
 		}
 		
-		if (articleIds.size() < size)
-			System.err.println("ArticleSet | Warning: we could only find " + articleIds.size() + " suitable articles.") ;
+		if (size() < size)
+			System.err.println("ArticleSet | Warning: we could only find " + size() + " suitable articles.") ;
+		
 	}
 
 	/**
 	 * @return the set of article ids, in ascending order.
-	 */
+	 *//*
 	public ArrayList<Integer> getArticleIds() {
 		return articleIds ;
-	}
+	}*/
 	
 	/**
 	 * Saves this list of article ids in a text file, separated by newlines. 
@@ -144,13 +160,13 @@ public class ArticleSet {
 	public void save(File file) throws IOException{
 		BufferedWriter writer = new BufferedWriter(new FileWriter(file)) ;
 		
-		for (Integer id: articleIds) 
-			writer.write(id + "\n") ;
+		for (Article art: this) 
+			writer.write(art.getId() + "\n") ;
 		
 		writer.close() ;
 	}
 		
-	private Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks)  {
+	private static Vector<Article> getRoughCandidates(Wikipedia wikipedia, int minInLinks, int minOutLinks)  {
 		
 		Vector<Article> articles = new Vector<Article>() ;
 		int totalArticles = wikipedia.getEnvironment().retrieveStatistic(StatisticName.articleCount).intValue() ;
@@ -175,11 +191,23 @@ public class ArticleSet {
 		return articles ;
 	}
 		
-	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion) {
-				
+	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion, ArticleSet exclude) {
+			
+		Logger.getLogger(ArticleSet.class).debug("Evaluating " + art) ;
+		
+		
+		
 		//we don't want any disambiguations
-		if (art.getType() == PageType.disambiguation) 
+		if (art.getType() == PageType.disambiguation) {
+			Logger.getLogger(ArticleSet.class).debug(" - rejected for disambiguation page") ;
 			return false ;	
+			
+		}
+		
+		if (this.contains(art)) {
+			Logger.getLogger(ArticleSet.class).debug(" - rejected for being in exclusion list") ;
+			return false ;	
+		}
 		
 		//TODO: check that list identification works
 		//if (art.getType() == PageType.list) 
@@ -223,8 +251,10 @@ public class ArticleSet {
 			}
 			
 			float listProportion = ((float)listCount) / lineCount ;
-			if (listProportion > 0.50)
+			if (listProportion > maxListProportion) {
+				Logger.getLogger(ArticleSet.class).debug(" - rejected for max list proportion " + (listProportion)) ;
 				return false ;
+			}
 		}
 		
 				
@@ -239,18 +269,50 @@ public class ArticleSet {
 			while (wordMatcher.find()) 			
 				wordCount++ ;
 		
-			if (wordCount < minWordCount && minWordCount != -1) 
+			if (wordCount < minWordCount && minWordCount != -1) {
+				Logger.getLogger(ArticleSet.class).debug(" - rejected for min wordcount " + (wordCount)) ;
 				return false ;
+				
+			}
 			
-			if (wordCount > maxWordCount && maxWordCount != -1) 
+			if (wordCount > maxWordCount && maxWordCount != -1) {
+				Logger.getLogger(ArticleSet.class).debug(" - rejected for max wordcount " + (wordCount)) ;
 				return false ;
+			}
 			
 			int linkCount = art.getLinksOut().length ;
 			float linkProportion = (float)linkCount/wordCount ;
-			if (linkProportion < minLinkProportion || linkProportion > maxLinkProportion)
+			
+			if (minLinkProportion != -1 && linkProportion < minLinkProportion) {
+				Logger.getLogger(ArticleSet.class).debug(" - rejected for min link proportion " + (linkProportion)) ;
 				return false ;
+			}
+			
+			if (maxLinkProportion != -1 && linkProportion > maxLinkProportion) {
+				Logger.getLogger(ArticleSet.class).debug(" - rejected for max link proportion " + (linkProportion)) ;
+				return false ;
+			}
 		}
 		
 		return true ;
+	}
+	
+	public static ArticleSet[] buildExclusiveArticleSets(int[] sizes, Wikipedia wikipedia, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion) {
+		
+		ArticleSet sets[] = new ArticleSet[sizes.length] ;
+		
+		ArticleSet gatheredSoFar = new ArticleSet() ;
+		
+		Vector<Article> roughCandidates = getRoughCandidates(wikipedia, minInLinks, minOutLinks) ;
+		
+		for (int i=0 ; i<sizes.length ; i++) {
+			sets[i] = new ArticleSet() ;
+			
+			sets[i].buildFromRoughCandidates(wikipedia, roughCandidates, sizes[i], minInLinks, minOutLinks, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, gatheredSoFar) ;
+			
+			gatheredSoFar.addAll(sets[i]) ;
+		}
+		
+		return sets ;
 	}
 }
