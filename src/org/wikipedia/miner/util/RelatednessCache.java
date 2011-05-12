@@ -68,7 +68,7 @@ public class RelatednessCache {
 			relatedness = cachedRelatedness.get(key) ;
 		}
 		
-		System.out.println(art1 + " vs. " + art2 + ", " + relatedness) ;
+		//System.out.println(art1 + " vs. " + art2 + ", " + relatedness) ;
 		return relatedness ;
 	}	
 }

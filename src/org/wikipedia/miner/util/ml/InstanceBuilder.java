@@ -68,9 +68,28 @@ public abstract class InstanceBuilder<A extends Enum,C> {
 		if (!attr.getClassType().equals(Double.class))
 			throw new IllegalArgumentException("'" + a + "' is not a numeric attribute") ;
 		
-		_instance.setValue(attr, v) ;
+		if (v == null)
+			_instance.setValue(attr, Instance.missingValue()) ;
+		else
+			_instance.setValue(attr, v) ;
 		
 		return this ;
+	}
+	
+	public InstanceBuilder<A,C> setAttribute(A a, Float v) {
+		
+		TypedAttribute attr = _attributes[a.ordinal()] ;
+		
+		if (!attr.getClassType().equals(Double.class))
+			throw new IllegalArgumentException("'" + a + "' is not a numeric attribute") ;
+		
+		if (v == null)
+			_instance.setValue(attr, Instance.missingValue()) ;
+		else
+			_instance.setValue(attr, v) ;
+		
+		return this ;
+		
 	}
 	
 	public InstanceBuilder<A,C> setAttribute(A a, Integer v) {
@@ -80,7 +99,10 @@ public abstract class InstanceBuilder<A extends Enum,C> {
 		if (!attr.getClassType().equals(Double.class))
 			throw new IllegalArgumentException("'" + a + "' is not a numeric attribute") ;
 		
-		_instance.setValue(attr, v) ;
+		if (v == null)
+			_instance.setValue(attr, Instance.missingValue()) ;
+		else
+			_instance.setValue(attr, v) ;
 		
 		return this ;
 	}
@@ -92,7 +114,9 @@ public abstract class InstanceBuilder<A extends Enum,C> {
 		if (!attr.getClassType().equals(Boolean.class))
 			throw new IllegalArgumentException("'" + a + "' is not a Boolean attribute") ;
 		
-		if (v)
+		if (v == null)
+			_instance.setValue(attr, Instance.missingValue()) ;
+		else if (v)
 			_instance.setValue(attr, 0) ;
 		else
 			_instance.setValue(attr, 1) ;
@@ -107,9 +131,12 @@ public abstract class InstanceBuilder<A extends Enum,C> {
 		if (!attr.getClassType().equals(v.getClass()))
 			throw new IllegalArgumentException("'" + a + "' is not a " + v.getClass() + " attribute") ;
 		
-		int index = attr.addStringValue(v) ;	
-		_instance.setValue(attr, index) ;
-		
+		if (v == null) {
+			_instance.setValue(attr, Instance.missingValue()) ;
+		} else {
+			int index = attr.addStringValue(v) ;	
+			_instance.setValue(attr, index) ;
+		}
 		return this ;
 	}
 	
