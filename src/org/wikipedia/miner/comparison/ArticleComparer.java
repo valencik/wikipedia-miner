@@ -150,8 +150,9 @@ public class ArticleComparer {
 		if (cmp.getInLinkGoogleSentenceMeasure() == 1)
 			return 0.0 ;
 		
-		//return 1-cmp.getInLinkGoogleMeasure() ;
-		return relatednessMeasurer.getDecision(getInstance(cmp, null)) ;
+		
+		return 1-cmp.getInLinkGoogleMeasure() ;
+		//return relatednessMeasurer.getDecision(getInstance(cmp, null)) ;
 	}
 
 	public void train(ComparisonDataSet dataset) throws Exception {
@@ -332,119 +333,11 @@ public class ArticleComparer {
 		ArrayList<DbLinkLocation>linksA = getLinkLocations(cmp.getArticleA().getId(), dir) ;
 		ArrayList<DbLinkLocation>linksB = getLinkLocations(cmp.getArticleB().getId(), dir) ;
 
-		int intersection = 0 ;
-		int sentenceIntersection = 0 ;
-		int union = 0 ;
+		int[] tmp = identifyIntersectionStuff(cmp, dir, useLinkCounts, linksA, linksB) ;
 
-		int indexA = 0 ;
-		int indexB = 0 ;
-
-		ArrayList<Double> vectA = new ArrayList<Double>() ;
-		ArrayList<Double> vectB = new ArrayList<Double>() ;
-
-		//get denominators for link frequency
-		Integer linksFromSourceA = 0 ;
-		Integer linksFromSourceB = 0 ;
-		if (useLinkCounts) {
-			if (dir == LinkDirection.Out) {
-				linksFromSourceA = cmp.getArticleA().getTotalLinksOutCount() ;
-				linksFromSourceB = cmp.getArticleB().getTotalLinksOutCount() ;
-			} else {
-				linksFromSourceA = cmp.getArticleA().getTotalLinksInCount() ;
-				linksFromSourceB = cmp.getArticleB().getTotalLinksInCount() ;
-			}
-		}
-
-		while (indexA < linksA.size() || indexB < linksB.size()) {
-
-			//identify which links to use (A, B, or both)
-
-			boolean useA = false;
-			boolean useB = false;
-			boolean mutual = false ;
-
-			DbLinkLocation linkA = null ;
-			DbLinkLocation linkB = null ;		
-			Article linkArt ;
-
-			if (indexA < linksA.size()) 
-				linkA = linksA.get(indexA) ;
-
-			if (indexB < linksB.size()) 
-				linkB = linksB.get(indexB) ;
-
-			if (linkA != null && linkB != null && linkA.getLinkId()==linkB.getLinkId()) {
-				useA = true ;
-				useB = true ;
-				linkArt = new Article(wikipedia.getEnvironment(), linkA.getLinkId()) ;
-				intersection ++ ;
-				
-				if (hasSentenceIntersection(linkA.getSentenceIndexes(), linkB.getSentenceIndexes()))
-					sentenceIntersection++ ;
-			} else {
-				if (linkA != null && (linkB == null || linkA.getLinkId() < linkB.getLinkId())) {
-					useA = true ;
-					linkArt = new Article(wikipedia.getEnvironment(), linkA.getLinkId()) ;
-
-					if (linkA.getLinkId() == cmp.getArticleB().getId()) {
-						intersection++ ;
-						mutual = true ;
-					}
-
-				} else {
-					useB = true ;
-					linkArt = new Article(wikipedia.getEnvironment(), linkB.getLinkId()) ;
-
-					if (linkB.getLinkId() == cmp.getArticleA().getId()) {
-						intersection++ ;
-						mutual = true ;
-					}
-				}
-			}
-			union ++ ;
-
-			if (useLinkCounts) {
-				//calculate lfiaf values for each vector
-				int linksToTarget ;
-				if (dir == LinkDirection.Out)
-					linksToTarget = linkArt.getTotalLinksInCount() ;
-				else
-					linksToTarget = linkArt.getTotalLinksOutCount() ;
-
-				double valA = 0 ;
-				double valB = 0 ;
-
-				if (mutual) {
-					valA = 1 ; 
-					valB = 1 ;
-				} else {
-					if (useA) valA = getLfiaf(linkA.getSentenceIndexes().size(), linksFromSourceA, linksToTarget) ;
-					if (useB) valB = getLfiaf(linkB.getSentenceIndexes().size(), linksFromSourceB, linksToTarget) ;
-				}
-
-				/*
-				if (useA) {
-					valA = getLfiaf(linkA.getSentenceIndexes().size(), linksFromSourceA, linksToTarget) ;
-					if (mutual)
-						valB = valA ;
-				}
-
-				if (useB) {
-					valB = getLfiaf(linkB.getSentenceIndexes().size(), linksFromSourceB, linksToTarget) ;
-					if (mutual)
-						valB = valA ;
-				}
-				 */
-				vectA.add(valA) ;
-				vectB.add(valB) ;
-			}
-
-			if (useA)
-				indexA++ ;
-			if (useB)
-				indexB++ ;
-		}
-
+		int intersection = tmp[0] ;
+		int sentenceIntersection = tmp[1];
+		int union = tmp[3] ;
 
 		//calculate google distance inspired measure
 		Double googleMeasure = null ;
@@ -480,6 +373,7 @@ public class ArticleComparer {
 		//calculate vector (tfidf) inspired measure
 
 		Double vectorMeasure = null ;
+		/*
 		if (useLinkCounts) {
 
 			if (vectA.isEmpty() || vectB.isEmpty())
@@ -509,6 +403,7 @@ public class ArticleComparer {
 				else
 					strB.append("-.---\t") ;
 					 */
+		/*
 					dotProduct = dotProduct + (valA * valB) ;
 					magnitudeA = magnitudeA + (valA * valA) ;
 					magnitudeB = magnitudeB + (valB * valB) ;
@@ -526,7 +421,7 @@ public class ArticleComparer {
 			//	System.out.println("A: (" + cmp.getArticleA() + ") " + strA) ;
 			//	System.out.println("B: (" + cmp.getArticleB() + ") " + strB) ;
 			//}
-		}
+		}*/
 
 		double intersectionProportion ;
 		if (union == 0)
@@ -545,7 +440,131 @@ public class ArticleComparer {
 
 		return cmp ;
 	}
+	
+	private int[] identifyIntersectionStuff(ArticleComparison cmp, LinkDirection dir, boolean useLinkCounts, ArrayList<DbLinkLocation>linksA, ArrayList<DbLinkLocation>linksB) {
+		
+		int intersection = 0 ;
+		int sentenceIntersection = 0 ;
+		int union = 0 ;
 
+		int indexA = 0 ;
+		int indexB = 0 ;
+
+		//ArrayList<Double> vectA = new ArrayList<Double>() ;
+		//ArrayList<Double> vectB = new ArrayList<Double>() ;
+
+		//get denominators for link frequency
+		Integer linksFromSourceA = 0 ;
+		Integer linksFromSourceB = 0 ;
+		if (useLinkCounts) {
+			if (dir == LinkDirection.Out) {
+				linksFromSourceA = cmp.getArticleA().getTotalLinksOutCount() ;
+				linksFromSourceB = cmp.getArticleB().getTotalLinksOutCount() ;
+			} else {
+				linksFromSourceA = cmp.getArticleA().getTotalLinksInCount() ;
+				linksFromSourceB = cmp.getArticleB().getTotalLinksInCount() ;
+			}
+		}
+
+		while (indexA < linksA.size() || indexB < linksB.size()) {
+
+			//identify which links to use (A, B, or both)
+
+			boolean useA = false;
+			boolean useB = false;
+			boolean mutual = false ;
+
+			DbLinkLocation linkA = null ;
+			DbLinkLocation linkB = null ;
+			
+			if (indexA < linksA.size()) 
+				linkA = linksA.get(indexA) ;
+
+			if (indexB < linksB.size()) 
+				linkB = linksB.get(indexB) ;
+
+			if (linkA != null && linkB != null && linkA.getLinkId()==linkB.getLinkId()) {
+				useA = true ;
+				useB = true ;
+				intersection ++ ;
+				
+				if (hasSentenceIntersection(linkA.getSentenceIndexes(), linkB.getSentenceIndexes()))
+					sentenceIntersection++ ;
+			} else {
+				if (linkA != null && (linkB == null || linkA.getLinkId() < linkB.getLinkId())) {
+					useA = true ;
+
+					if (linkA.getLinkId() == cmp.getArticleB().getId()) {
+						intersection++ ;
+						mutual = true ;
+					}
+
+				} else {
+					useB = true ;
+
+					if (linkB.getLinkId() == cmp.getArticleA().getId()) {
+						intersection++ ;
+						mutual = true ;
+					}
+				}
+			}
+			union ++ ;
+
+			if (useLinkCounts) {
+				System.out.println("Using link counts") ;
+				
+				Article linkArt ;
+				if (useA)
+					linkArt = new Article(wikipedia.getEnvironment(), linkA.getLinkId()) ;
+				else
+					linkArt = new Article(wikipedia.getEnvironment(), linkB.getLinkId()) ;
+				
+				//calculate lfiaf values for each vector
+				int linksToTarget ;
+				if (dir == LinkDirection.Out)
+					linksToTarget = linkArt.getTotalLinksInCount() ;
+				else
+					linksToTarget = linkArt.getTotalLinksOutCount() ;
+
+				double valA = 0 ;
+				double valB = 0 ;
+
+				if (mutual) {
+					valA = 1 ; 
+					valB = 1 ;
+				} else {
+					if (useA) valA = getLfiaf(linkA.getSentenceIndexes().size(), linksFromSourceA, linksToTarget) ;
+					if (useB) valB = getLfiaf(linkB.getSentenceIndexes().size(), linksFromSourceB, linksToTarget) ;
+				}
+
+				/*
+				if (useA) {
+					valA = getLfiaf(linkA.getSentenceIndexes().size(), linksFromSourceA, linksToTarget) ;
+					if (mutual)
+						valB = valA ;
+				}
+
+				if (useB) {
+					valB = getLfiaf(linkB.getSentenceIndexes().size(), linksFromSourceB, linksToTarget) ;
+					if (mutual)
+						valB = valA ;
+				}
+				 */
+				//vectA.add(valA) ;
+				//vectB.add(valB) ;
+			}
+
+			if (useA)
+				indexA++ ;
+			if (useB)
+				indexB++ ;
+		}
+		
+		int result[] = {intersection,sentenceIntersection,union} ;
+		return result ;
+	}
+
+	
 	private boolean hasSentenceIntersection(ArrayList<Integer> sentenceIndexesA, ArrayList<Integer>sentenceIndexesB) {
 		
 		int indexA = 0 ;

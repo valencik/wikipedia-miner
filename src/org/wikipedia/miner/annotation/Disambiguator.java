@@ -167,20 +167,12 @@ public class Disambiguator {
 	 */
 	public void train(ArticleSet articles, SnippetLength snippetLength, String datasetName, RelatednessCache rc) throws Exception{
 
-		ProgressTracker pn = new ProgressTracker(articles.getArticleIds().size(), "training", Disambiguator.class) ;
-		for (int id: articles.getArticleIds()) {
-			
-			Article art = null;
-			
-			try{ 
-				art = new Article(wikipedia.getEnvironment(), id) ;
-			} catch (Exception e) {
-				Logger.getLogger(Disambiguator.class).warn(id + " is not a valid article") ;
-			}
-			
-			if (art != null)
-				train(art, snippetLength, rc) ;
-			
+		dataset = decider.createNewDataset();
+		
+		ProgressTracker pn = new ProgressTracker(articles.size(), "training", Disambiguator.class) ;
+		for (Article art: articles) {
+		
+			train(art, snippetLength, rc) ;	
 			pn.update() ;
 		}
 		
@@ -353,7 +345,6 @@ public class Disambiguator {
 			throw new WekaException("You must build (or load) classifier first.") ;
 
 		Result<Integer> r = new Result<Integer>() ;
-		Article art = null ;
 		
 		double worstRecall = 1 ;
 		double worstPrecision = 1 ;
@@ -362,29 +353,21 @@ public class Disambiguator {
 		int perfectRecall = 0 ;
 		int perfectPrecision = 0 ;
 		
-		ProgressTracker pn = new ProgressTracker(testSet.getArticleIds().size(), "Testing", Disambiguator.class) ;
-		for (int id: testSet.getArticleIds()) {
-			try {
-				art = new Article(wikipedia2.getEnvironment(), id) ;
-			} catch (Exception e) {
-				System.err.println("Warning: " + id + " is not a valid article") ;
-			} ;
+		ProgressTracker pn = new ProgressTracker(testSet.size(), "Testing", Disambiguator.class) ;
+		for (Article art: testSet) {
 			
-			if (art != null) {
-				articlesTested ++ ;
-				
-				Result<Integer> ir = test(art, snippetLength, rc) ;
-				
-				if (ir.getRecall() ==1) perfectRecall++ ;
-				if (ir.getPrecision() == 1) perfectPrecision++ ;
-				
-				worstRecall = Math.min(worstRecall, ir.getRecall()) ;
-				worstPrecision = Math.min(worstPrecision, ir.getPrecision()) ;
-				
-				r.addIntermediateResult(ir) ;
-				
-			}
-				
+			articlesTested ++ ;
+			
+			Result<Integer> ir = test(art, snippetLength, rc) ;
+			
+			if (ir.getRecall() ==1) perfectRecall++ ;
+			if (ir.getPrecision() == 1) perfectPrecision++ ;
+			
+			worstRecall = Math.min(worstRecall, ir.getRecall()) ;
+			worstPrecision = Math.min(worstPrecision, ir.getPrecision()) ;
+			
+			r.addIntermediateResult(ir) ;
+			
 			
 			pn.update() ;
 		}
