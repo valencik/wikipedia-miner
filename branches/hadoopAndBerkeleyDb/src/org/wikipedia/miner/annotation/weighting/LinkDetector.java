@@ -30,6 +30,9 @@ import org.wikipedia.miner.annotation.ArticleCleaner.SnippetLength;
 import org.wikipedia.miner.annotation.preprocessing.DocumentPreprocessor;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
+import org.wikipedia.miner.util.ml.Dataset;
+import org.wikipedia.miner.util.ml.Decider;
+import org.wikipedia.miner.util.ml.DeciderBuilder;
 
 import weka.classifiers.Classifier;
 import weka.core.*;
@@ -50,11 +53,17 @@ public class LinkDetector extends TopicWeighter{
 	
 	private Wikipedia wikipedia ;
 	private ArticleCleaner cleaner ;
+	
+	
+	private enum Attributes {occurances,maxDisambigConfidence,avgDisambigConfidence,relatednessToOtherTopics,maxLinkProbability,avgLinkProbability,generality,firstOccurance,lastOccurance,spread} ;
+	private Decider<Attributes, Boolean> decider ;
+	private Dataset<Attributes, Boolean> dataset ;
+	
 		
-	private FastVector attributes ;
-	private Instances trainingData ;
-	private Instances header ;
-	private Classifier classifier ;
+	//private FastVector attributes ;
+	//private Instances trainingData ;
+	//private Instances header ;
+	//private Classifier classifier ;
 	
 	/**
 	 * Initialises a new LinkDetector. If the given wikipedia has been configured with a link detection model ({@link WikipediaConfiguration#getDetectionModel()}), then the
@@ -67,6 +76,12 @@ public class LinkDetector extends TopicWeighter{
 		this.wikipedia = wikipedia ;
 		this.cleaner = new ArticleCleaner() ;
 		
+		decider = (Decider<Attributes, Boolean>) new DeciderBuilder<Attributes>("LinkDisambiguator", Attributes.class)
+		.setDefaultAttributeTypeNumeric()
+		.setClassAttributeTypeBoolean("isValidLink")
+		.build();
+		
+		/*
 		attributes = new FastVector() ;
 
 		attributes.addElement(new Attribute("occurances")) ;
@@ -88,6 +103,7 @@ public class LinkDetector extends TopicWeighter{
 
 		this.header = new Instances("wikification_headerOnly", attributes, 0) ;
 		header.setClassIndex(header.numAttributes() -1) ;
+		*/
 		
 		if (wikipedia.getConfig().getLinkDetectionModel() != null) {
 			loadClassifier(wikipedia.getConfig().getLinkDetectionModel()) ;
@@ -104,39 +120,30 @@ public class LinkDetector extends TopicWeighter{
 	 */
 	public ArrayList<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception  {
 
-		if (classifier == null)
-			throw new Exception("You must train the link detector first.") ;
+		//if (classifier == null)
+		//	throw new Exception("You must train the link detector first.") ;
 
+		if (!decider.isReady()) 
+			throw new WekaException("You must build (or load) classifier first.") ;
+		
 		ArrayList<Topic> weightedTopics = new ArrayList<Topic>() ;
 
 		for (Topic topic: topics) {
-
-			double[] values = new double[header.numAttributes()];
-
-			values[0] = topic.getOccurances() ;
-			values[1] = topic.getMaxDisambigConfidence() ;
-			values[2] = topic.getAverageDisambigConfidence() ;
-			values[3] = topic.getRelatednessToOtherTopics() ;
-			values[4] = topic.getMaxLinkProbability() ;
-			values[5] = topic.getAverageLinkProbability() ;
-
-			if (topic.getGenerality() != null)
-				values[6] = topic.getGenerality() ;
-			else
-				values[6] = Instance.missingValue();
-
-			values[7] = topic.getFirstOccurance() ;
-			values[8] = topic.getLastOccurance() ;
-			values[9] = topic.getSpread() ;
+		
+			Instance i = decider.getInstanceBuilder()
+			.setAttribute(Attributes.occurances, topic.getOccurances())
+			.setAttribute(Attributes.maxDisambigConfidence, topic.getMaxDisambigConfidence())
+			.setAttribute(Attributes.avgDisambigConfidence, topic.getAverageDisambigConfidence())
+			.setAttribute(Attributes.relatednessToOtherTopics, topic.getRelatednessToOtherTopics())
+			.setAttribute(Attributes.maxLinkProbability, topic.getMaxLinkProbability())
+			.setAttribute(Attributes.avgLinkProbability, topic.getAverageLinkProbability())
+			.setAttribute(Attributes.generality, topic.getGenerality())
+			.setAttribute(Attributes.firstOccurance, topic.getFirstOccurance())
+			.setAttribute(Attributes.lastOccurance, topic.getLastOccurance())
+			.setAttribute(Attributes.spread, topic.getSpread())
+			.build() ;
 			
-			//values[10] = topic.getRelatednessToContext() ;
-
-			values[10] = Instance.missingValue() ;
-
-			Instance instance = new Instance(1.0, values) ;
-			instance.setDataset(header) ;
-			
-			double prob = classifier.distributionForInstance(instance)[0] ;
+			double prob = decider.getDecisionDistribution(i).get(true) ;
 			topic.setWeight(prob) ;
 			weightedTopics.add(topic) ;
 		}
@@ -160,21 +167,12 @@ public class LinkDetector extends TopicWeighter{
 	 */
 	public void train(ArticleSet articles, SnippetLength snippetLength, String datasetName, TopicDetector td, RelatednessCache rc) throws Exception{
 
-		trainingData = new Instances(datasetName, attributes, 0) ;
-		trainingData.setClassIndex(trainingData.numAttributes() -1) ;
-
-		ProgressTracker tracker = new ProgressTracker(articles.getArticleIds().size(), "training", LinkDetector.class) ;
-		for (int id: articles.getArticleIds()) {
+		dataset = decider.createNewDataset();
+		
+		ProgressTracker tracker = new ProgressTracker(articles.size(), "training", LinkDetector.class) ;
+		for (Article art: articles) {
 			
-			Article art = null;
-			try {
-				art = new Article(wikipedia.getEnvironment(), id) ;
-			} catch (Exception e) {
-				System.err.println("Warning: " + id + " is not a valid article") ;
-			} 
-			
-			if (art != null) 
-				train(art, snippetLength, td, rc) ;
+			train(art, snippetLength, td, rc) ;
 			
 			tracker.update() ;
 		}
@@ -188,19 +186,11 @@ public class LinkDetector extends TopicWeighter{
 	 * @throws IOException if the file cannot be written to
 	 */
 	@SuppressWarnings("unchecked")
-	public void saveTrainingData(File file) throws IOException {
+	public void saveTrainingData(File file) throws Exception {
 		
 		Logger.getLogger(LinkDetector.class).info("saving training data") ;
 		
-		BufferedWriter writer = new BufferedWriter(new FileWriter(file)) ;
-		writer.write(header.toString()) ;
-		
-		Enumeration<Instance> e = trainingData.enumerateInstances() ;
-		while (e.hasMoreElements()) {
-			Instance i = e.nextElement() ;
-			writer.write(i.toString() + "\n") ;
-		}
-		writer.close();
+		dataset.save(file) ;
 	}
 
 	/**
@@ -214,8 +204,7 @@ public class LinkDetector extends TopicWeighter{
 	public void loadTrainingData(File file) throws Exception{
 		Logger.getLogger(LinkDetector.class).info("loading training data") ;
 		
-		trainingData = new Instances(new FileReader(file)) ;
-		trainingData.setClassIndex(trainingData.numAttributes()-1) ;
+		dataset.load(file) ;
 	}
 
 	/**
@@ -227,10 +216,7 @@ public class LinkDetector extends TopicWeighter{
 	public void saveClassifier(File file) throws IOException {
 		Logger.getLogger(LinkDetector.class).info("saving classifier") ;
 		
-		ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file));
-		oos.writeObject(classifier);
-		oos.flush();
-		oos.close();
+		decider.save(file) ;
 	}
 
 	/**
@@ -242,9 +228,7 @@ public class LinkDetector extends TopicWeighter{
 	public void loadClassifier(File file) throws Exception {
 		Logger.getLogger(LinkDetector.class).info("loading classifier") ;
 		
-		ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file));
-		classifier = (Classifier) ois.readObject();
-		ois.close();
+		decider.load(file) ;
 	}
 
 	/**
@@ -256,14 +240,7 @@ public class LinkDetector extends TopicWeighter{
 	public void buildClassifier(Classifier classifier) throws Exception {
 		System.out.println("LinkDetector: Building classifier...") ;
 		
-		weightTrainingInstances() ;
-		
-		if (trainingData == null) {
-			throw new Exception("You must load training data or train on a set of articles before builing classifier.") ;
-		} else {
-			this.classifier = classifier ;
-			classifier.buildClassifier(trainingData) ;
-		}
+		decider.train(classifier, dataset) ;
 	}
 	
 	
@@ -281,7 +258,7 @@ public class LinkDetector extends TopicWeighter{
 	 */
 	public Result<Integer> test(ArticleSet testSet, SnippetLength snippetLength, TopicDetector td, RelatednessCache rc) throws Exception{
 
-		if (classifier == null) 
+		if (!decider.isReady()) 
 			throw new Exception("You must build (or load) classifier first.") ;
 		
 		double worstRecall = 1 ;
@@ -293,33 +270,21 @@ public class LinkDetector extends TopicWeighter{
 
 		Result<Integer> r = new Result<Integer>() ;
 
-		ProgressTracker tracker = new ProgressTracker(testSet.getArticleIds().size(), "Testing", LinkDetector.class) ;
-		for (int id: testSet.getArticleIds()) {
+		ProgressTracker tracker = new ProgressTracker(testSet.size(), "Testing", LinkDetector.class) ;
+		for (Article art: testSet) {
+				
+			articlesTested ++ ;
 			
-			Article art = null ;
+			Result<Integer> ir = test(art, snippetLength, td, rc) ;
 			
-			try {
-				art = new Article(wikipedia.getEnvironment(), id) ;
-			} catch (Exception e) {
-				System.err.println("Warning: " + id + " is not a valid article") ;
-			} 
+			if (ir.getRecall() ==1) perfectRecall++ ;
+			if (ir.getPrecision() == 1) perfectPrecision++ ;
 			
+			worstRecall = Math.min(worstRecall, ir.getRecall()) ;
+			worstPrecision = Math.min(worstPrecision, ir.getPrecision()) ;
 			
-			if (art != null) {
-				
-				articlesTested ++ ;
-				
-				Result<Integer> ir = test(art, snippetLength, td, rc) ;
-				
-				if (ir.getRecall() ==1) perfectRecall++ ;
-				if (ir.getPrecision() == 1) perfectPrecision++ ;
-				
-				worstRecall = Math.min(worstRecall, ir.getRecall()) ;
-				worstPrecision = Math.min(worstPrecision, ir.getPrecision()) ;
-				
-				r.addIntermediateResult(ir) ;
-				
-			}
+			r.addIntermediateResult(ir) ;
+			
 			
 			tracker.update() ;
 		}
@@ -338,32 +303,22 @@ public class LinkDetector extends TopicWeighter{
 
 		Collection<Topic> topics = td.getTopics(text, rc) ;
 		for (Topic topic: topics) {
-			double[] values = new double[trainingData.numAttributes()];
-
-			values[0] = topic.getOccurances() ;
-			values[1] = topic.getMaxDisambigConfidence() ;
-			values[2] = topic.getAverageDisambigConfidence() ;
-			values[3] = topic.getRelatednessToOtherTopics() ;
-			values[4] = topic.getMaxLinkProbability() ;
-			values[5] = topic.getAverageLinkProbability() ;
-
-			if (topic.getGenerality() >= 0)
-				values[6] = topic.getGenerality() ;
-			else
-				values[6] = Instance.missingValue();
-
-			values[7] = topic.getFirstOccurance() ;
-			values[8] = topic.getLastOccurance() ;
-			values[9] = topic.getSpread() ;
 			
-			//values[10] = topic.getRelatednessToContext() ;
-
-			if (groundTruth.contains(topic.getId()))
-				values[10] = 0 ;
-			else
-				values[10] = 1 ;
-
-			trainingData.add(new Instance(1.0, values));
+			Instance i = decider.getInstanceBuilder()
+			.setAttribute(Attributes.occurances, topic.getOccurances())
+			.setAttribute(Attributes.maxDisambigConfidence, topic.getMaxDisambigConfidence())
+			.setAttribute(Attributes.avgDisambigConfidence, topic.getAverageDisambigConfidence())
+			.setAttribute(Attributes.relatednessToOtherTopics, topic.getRelatednessToOtherTopics())
+			.setAttribute(Attributes.maxLinkProbability, topic.getMaxLinkProbability())
+			.setAttribute(Attributes.avgLinkProbability, topic.getAverageLinkProbability())
+			.setAttribute(Attributes.generality, topic.getGenerality())
+			.setAttribute(Attributes.firstOccurance, topic.getFirstOccurance())
+			.setAttribute(Attributes.lastOccurance, topic.getLastOccurance())
+			.setAttribute(Attributes.spread, topic.getSpread())
+			.setClassAttribute(groundTruth.contains(topic.getId()))
+			.build() ;
+			
+			dataset.add(i) ;
 		}
 	}
 
@@ -418,6 +373,7 @@ public class LinkDetector extends TopicWeighter{
 	}
 	
 	@SuppressWarnings("unchecked")
+	/*
 	private void weightTrainingInstances() {
 		
 		double positiveInstances = 0 ;
@@ -452,7 +408,7 @@ public class LinkDetector extends TopicWeighter{
 			else
 				i.setWeight(0.5 * (1.0/(1-p))) ;
 		}
-	}
+	}*/
 
 	
 	/**

@@ -291,9 +291,10 @@ public abstract class WDatabase<K,V> {
 	public V retrieve(K key) {
 		
 		if (isCached) {
+			//System.out.println("c") ;
 			return retrieveFromCache(key) ;
 		} else {
-			
+			//System.out.println("d") ;
 			Database db = getDatabase(true) ;
 			
 			DatabaseEntry dbKey = new DatabaseEntry() ;

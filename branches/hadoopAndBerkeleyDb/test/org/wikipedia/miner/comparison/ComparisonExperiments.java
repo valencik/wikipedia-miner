@@ -66,7 +66,7 @@ public class ComparisonExperiments {
 		
 		//wikipedia.close();
 	}
-
+	
 	public static void testArticleComparison(Wikipedia wikipedia, ComparisonDataSet set, EnumSet<DataDependency> dependencies) throws Exception {
 
 		DecimalFormat df = new DecimalFormat("0.##") ;
