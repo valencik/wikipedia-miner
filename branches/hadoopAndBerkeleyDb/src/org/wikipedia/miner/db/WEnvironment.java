@@ -87,7 +87,9 @@ public class WEnvironment  {
 	private WDatabase<Integer,DbIntList> dbRedirectSourcesByTarget ;
 	
 	private WDatabase<Integer, DbLinkLocationList> dbPageLinkIn ;
+	private WDatabase<Integer, DbIntList> dbPageLinkInNoSentences ;
 	private WDatabase<Integer, DbLinkLocationList> dbPageLinkOut ;
+	private WDatabase<Integer, DbIntList> dbPageLinkOutNoSentences ;
 	private PageLinkCountDatabase dbPageLinkCounts ;
 	
 	private WDatabase<Integer, DbIntList> dbCategoryParents ;
@@ -200,6 +202,16 @@ public class WEnvironment  {
 	public WDatabase<Integer, DbLinkLocationList> getDbPageLinkIn() {
 		return dbPageLinkIn;
 	}
+	
+	/**
+	 * Returns the {@link DatabaseType#pageLinksInNoSentences} database
+	 * 
+	 * @return see {@link DatabaseType#pageLinksInNoSentences} 
+	 */
+	public WDatabase<Integer, DbIntList> getDbPageLinkInNoSentences() {
+		return dbPageLinkInNoSentences;
+	}
+	
 
 	/**
 	 * Returns the {@link DatabaseType#pageLinksOut} database
@@ -208,6 +220,16 @@ public class WEnvironment  {
 	 */
 	public WDatabase<Integer, DbLinkLocationList> getDbPageLinkOut() {
 		return dbPageLinkOut;
+	}
+	
+	
+	/**
+	 * Returns the {@link DatabaseType#pageLinksOutNoSentences} database
+	 * 
+	 * @return see {@link DatabaseType#pageLinksOutNoSentences} 
+	 */
+	public WDatabase<Integer, DbIntList> getDbPageLinkOutNoSentences() {
+		return dbPageLinkOutNoSentences;
 	}
 	
 	/**
@@ -299,7 +321,7 @@ public class WEnvironment  {
 		
 		EnvironmentConfig envConf = new EnvironmentConfig() ;
 		envConf.setAllowCreate(false) ;
-		envConf.setReadOnly(false) ;
+		envConf.setReadOnly(true) ;
 		envConf.setCachePercent(20) ;
 		
 		env = new Environment(conf.getDatabaseDirectory(), envConf) ;
@@ -324,11 +346,13 @@ public class WEnvironment  {
 		initDatabases() ;
 		
 		EnvironmentConfig envConf = new EnvironmentConfig() ;
-		envConf.setAllowCreate(true) ;
-		envConf.setReadOnly(false) ;
 		envConf.setCachePercent(20) ;
 		
+		envConf.setAllowCreate(true) ;
+		envConf.setReadOnly(false) ;
+		
 		env = new Environment(conf.getDatabaseDirectory(), envConf) ;
+		
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -356,8 +380,14 @@ public class WEnvironment  {
 		
 		dbPageLinkIn = dbFactory.buildPageLinkDatabase(DatabaseType.pageLinksIn) ; 
 		databasesByType.put(DatabaseType.pageLinksIn, dbPageLinkIn) ;
+		dbPageLinkInNoSentences = dbFactory.buildPageLinkNoSentencesDatabase(DatabaseType.pageLinksInNoSentences) ; 
+		databasesByType.put(DatabaseType.pageLinksInNoSentences, dbPageLinkInNoSentences) ;
+		
 		dbPageLinkOut = dbFactory.buildPageLinkDatabase(DatabaseType.pageLinksOut) ; 
 		databasesByType.put(DatabaseType.pageLinksOut, dbPageLinkOut) ;
+		dbPageLinkOutNoSentences = dbFactory.buildPageLinkNoSentencesDatabase(DatabaseType.pageLinksOutNoSentences) ; 
+		databasesByType.put(DatabaseType.pageLinksOutNoSentences, dbPageLinkOutNoSentences) ;
+		
 		dbPageLinkCounts = dbFactory.buildPageLinkCountDatabase() ;
 		databasesByType.put(DatabaseType.pageLinkCounts, dbPageLinkCounts) ;
 		
@@ -429,33 +459,6 @@ public class WEnvironment  {
 		LabelDatabase db = getDbLabel(tp) ;
 		return db.exists() ;	
 	}
-	
-	
-	/**
-	 * Prepares the environment, so it can be searched efficiently for labels using the given text processor.
-	 * 
-	 * Note: you can use as many different text processors as you like
-	 * 
-	 * @see LabelDatabase#prepare(File, int)
-	 * 
-	 * @param tp a text processor
-	 * @param overwrite true if the preparation should occur even if the environment has been prepared for this processor already
-	 * @param tempDirectory a directory for writing temporary files
-	 * @param passes the number of the number of passes to break the task into (more = slower, but less memory required)
-	 * @throws IOException if the temporary directory is not writable
-	 */
-	public void prepareFor(TextProcessor tp, boolean overwrite, File tempDirectory, int passes) throws IOException {
-		
-		if (tp == null)
-			return ;
-		
-		if (!overwrite && isPreparedFor(tp))
-			return ;
-		
-		LabelDatabase db = getDbLabel(tp) ;
-		db.prepare(tempDirectory, passes) ;
-	}
-	
 	
 	
 	/**
@@ -571,8 +574,7 @@ public class WEnvironment  {
 
 		public void doPreparation() {
 			
-			boolean mustGatherIds = (conf.getMinLinksIn() > 0 && !conf.getDatabasesToCache().isEmpty() && conf.getArticlesOfInterest() != null) ;
-			
+			boolean mustGatherIds = (conf.getMinLinksIn() > 0 && !conf.getDatabasesToCache().isEmpty()) && conf.getArticlesOfInterest() == null ;
 			
 			int taskCount = conf.getDatabasesToCache().size() + 1;
 			if (mustGatherIds)
@@ -584,26 +586,23 @@ public class WEnvironment  {
 				tracker.startTask(1, "Connecting to database") ;
 				
 				
-				dbStatistics.cache(conf, null, null) ;
+				dbStatistics.cache(conf, null) ;
 				
 				tracker.update();
 				
-				TIntHashSet ids = null ;
 				if (mustGatherIds)
-					ids = getValidArticleIds(3, tracker) ;
-				
-				if (conf.getArticlesOfInterest() != null)
-					ids = conf.getArticlesOfInterest() ;
+					conf.setArticlesOfInterest(getValidArticleIds(conf.getMinLinksIn(), tracker)) ;
 				
 				for(DatabaseType dbName:conf.getDatabasesToCache()) {
 					
 					if (dbName == DatabaseType.label)
-						getDbLabel(conf.getDefaultTextProcessor()).cache(conf, ids, tracker) ;
+						getDbLabel(conf.getDefaultTextProcessor()).cache(conf, tracker) ;
 					else
-						getDatabase(dbName).cache(conf, ids, tracker) ;
+						getDatabase(dbName).cache(conf, tracker) ;
 				}
 				
-				ids = null ;
+				conf.setArticlesOfInterest(null) ;
+				
 				System.gc() ;
 				
 			} catch (Exception e) {
@@ -635,6 +634,9 @@ public class WEnvironment  {
 			Logger.getLogger(WIterator.class).warn("Unclosed enviroment. You may be causing a memory leak.") ;
 		}
 	}
+	
+	
+	
 	
 	/**
 	 * Builds a WEnvironment, by loading all of the data files stored in the given directory into persistent databases.
@@ -697,7 +699,9 @@ public class WEnvironment  {
 		env.dbRedirectSourcesByTarget.loadFromCsvFile(redirectSourcesByTarget, overwrite, null) ;
 		
 		env.dbPageLinkIn.loadFromCsvFile(pageLinksIn, overwrite, null) ;
+		env.dbPageLinkInNoSentences.loadFromCsvFile(pageLinksIn, overwrite, null) ;
 		env.dbPageLinkOut.loadFromCsvFile(pageLinksOut, overwrite, null) ;
+		env.dbPageLinkOutNoSentences.loadFromCsvFile(pageLinksOut, overwrite, null) ;
 		env.dbPageLinkCounts.loadFromCsvFiles(pageLinksIn, pageLinksOut, overwrite, null) ;
 		
 		env.dbCategoryParents.loadFromCsvFile(categoryParents, overwrite, null) ;
@@ -711,6 +715,46 @@ public class WEnvironment  {
 		
 		env.dbMarkup.loadFromXmlFile(markup, overwrite, null) ;
 		
+		env.close();
+		
+		TextProcessor tp = conf.getDefaultTextProcessor() ;
+		if (tp != null) {
+			File tmpDir = new File(conf.getDataDirectory() + File.separator + "tmp" + tp.getName()) ;
+			tmpDir.mkdir() ;
+			tmpDir.deleteOnExit() ;
+			
+			prepareTextProcessor(tp, conf, tmpDir, overwrite, 5) ;
+		}
+	}
+	
+	/**
+	 * Prepares the environment, so it can be searched efficiently for labels using the given text processor.
+	 * 
+	 * Note: you can use as many different text processors as you like
+	 * 
+	 * @see LabelDatabase#prepare(File, int)
+	 * 
+	 * @param tp a text processor
+	 * @param conf a configuration specifying where the databases are to be stored, etc.
+	 * @param tempDirectory a directory for writing temporary files
+	 * @param overwrite true if the preparation should occur even if the environment has been prepared for this processor already
+	 * @param passes the number of the number of passes to break the task into (more = slower, but less memory required)
+	 * @throws IOException if the temporary directory is not writable
+	 */
+	public static void prepareTextProcessor(TextProcessor tp, WikipediaConfiguration conf, File tempDirectory, boolean overwrite, int passes) throws IOException {
+		
+		if (tp == null)
+			return ;
+		
+		WEnvironment env = new WEnvironment(conf) ;
+		
+		if (!overwrite && env.isPreparedFor(tp))
+			return ;
+		
+		LabelDatabase db = env.getDbLabel(tp) ;
+		db.prepare(tempDirectory, passes) ;
+		
+		env.cleanAndCheckpoint() ;
 		env.close();
 	}
 	

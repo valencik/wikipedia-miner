@@ -134,19 +134,37 @@ public class Article extends Page {
 	 */
 	public Article[] getLinksIn() {
 
-		DbLinkLocationList tmpLinks = env.getDbPageLinkIn().retrieve(id) ;
-		if (tmpLinks == null || tmpLinks.getLinkLocations() == null) 
-			return new Article[0] ;
-
-		Article[] links = new Article[tmpLinks.getLinkLocations().size()] ;
-
-		int index = 0 ;
-		for (DbLinkLocation ll:tmpLinks.getLinkLocations()) {
-			links[index] = new Article(env, ll.getLinkId()) ;
-			index++ ;
+		if (env.getDbPageLinkIn().isCached() && !env.getDbPageLinkInNoSentences().isCached()) {
+			
+			DbLinkLocationList tmpLinks = env.getDbPageLinkIn().retrieve(id) ;
+			if (tmpLinks == null || tmpLinks.getLinkLocations() == null) 
+				return new Article[0] ;
+	
+			Article[] links = new Article[tmpLinks.getLinkLocations().size()] ;
+	
+			int index = 0 ;
+			for (DbLinkLocation ll:tmpLinks.getLinkLocations()) {
+				links[index] = new Article(env, ll.getLinkId()) ;
+				index++ ;
+			}
+	
+			return links ;	
+		} else {
+			
+			DbIntList tmpLinks = env.getDbPageLinkInNoSentences().retrieve(id) ;
+			if (tmpLinks == null || tmpLinks.getValues() == null) 
+				return new Article[0] ;
+	
+			Article[] links = new Article[tmpLinks.getValues().size()] ;
+	
+			int index = 0 ;
+			for (Integer linkId:tmpLinks.getValues()) {
+				links[index] = new Article(env, linkId) ;
+				index++ ;
+			}
+			
+			return links ;
 		}
-
-		return links ;		
 	}
 
 	/**
@@ -158,19 +176,37 @@ public class Article extends Page {
 	 */
 	public Article[] getLinksOut()  {
 
-		DbLinkLocationList tmpLinks = env.getDbPageLinkOut().retrieve(id) ;
-		if (tmpLinks == null || tmpLinks.getLinkLocations() == null) 
-			return new Article[0] ;
-
-		Article[] links = new Article[tmpLinks.getLinkLocations().size()] ;
-
-		int index = 0 ;
-		for (DbLinkLocation ll:tmpLinks.getLinkLocations()) {
-			links[index] = new Article(env, ll.getLinkId()) ;
-			index++ ;
+		if (env.getDbPageLinkOut().isCached() && !env.getDbPageLinkOutNoSentences().isCached()) {
+			
+			DbLinkLocationList tmpLinks = env.getDbPageLinkOut().retrieve(id) ;
+			if (tmpLinks == null || tmpLinks.getLinkLocations() == null) 
+				return new Article[0] ;
+	
+			Article[] links = new Article[tmpLinks.getLinkLocations().size()] ;
+	
+			int index = 0 ;
+			for (DbLinkLocation ll:tmpLinks.getLinkLocations()) {
+				links[index] = new Article(env, ll.getLinkId()) ;
+				index++ ;
+			}
+	
+			return links ;	
+		} else {
+			
+			DbIntList tmpLinks = env.getDbPageLinkOutNoSentences().retrieve(id) ;
+			if (tmpLinks == null || tmpLinks.getValues() == null) 
+				return new Article[0] ;
+	
+			Article[] links = new Article[tmpLinks.getValues().size()] ;
+	
+			int index = 0 ;
+			for (Integer linkId:tmpLinks.getValues()) {
+				links[index] = new Article(env, linkId) ;
+				index++ ;
+			}
+			
+			return links ;
 		}
-
-		return links ;	
 	}
 
 	/**

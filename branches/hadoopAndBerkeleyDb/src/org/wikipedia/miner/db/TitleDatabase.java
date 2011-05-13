@@ -1,6 +1,7 @@
 package org.wikipedia.miner.db;
 
 import gnu.trove.TIntHash;
+import gnu.trove.TIntHashSet;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -55,8 +56,10 @@ public class TitleDatabase extends WDatabase<String,Integer>{
 
 	@Override
 	public Integer filterCacheEntry(WEntry<String, Integer> e,
-			WikipediaConfiguration conf, TIntHash validIds) {
+			WikipediaConfiguration conf) {
 
+		TIntHashSet validIds = conf.getArticlesOfInterest() ;
+		
 		if (getType() == DatabaseType.articlesByTitle) {
 			if (validIds != null && !validIds.contains(e.getValue()))
 				return null ;
@@ -72,8 +75,9 @@ public class TitleDatabase extends WDatabase<String,Integer>{
 			return ;
 
 		if (tracker == null) tracker = new ProgressTracker(1, WDatabase.class) ;
-		tracker.startTask(dataFile.length(), "Loading " + getName() + " database") ;
+		tracker.startTask(dataFile.length(), "Loading " + getName()) ;
 
+		
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(dataFile), "UTF-8")) ;
 
 		long bytesRead = 0 ;
@@ -90,12 +94,14 @@ public class TitleDatabase extends WDatabase<String,Integer>{
 
 			WEntry<String,Integer> entry = deserialiseCsvRecord(cri) ;
 
-			if (entry != null) {
+			if (entry != null) {				
 				tmp.put(entry.getKey(), entry.getValue()) ;
 				tracker.update(bytesRead) ;
 			}
 		}
-
+		input.close();
+		
+		
 		
 		Database db = getDatabase(false) ;
 

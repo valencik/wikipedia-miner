@@ -41,7 +41,7 @@ public class MarkupDatabase extends WDatabase<Integer, String> {
 
 	@Override
 	public String filterCacheEntry(WEntry<Integer, String> e,
-			WikipediaConfiguration conf, TIntHash validIds) {
+			WikipediaConfiguration conf) {
 		throw new UnsupportedOperationException() ;
 	}
 

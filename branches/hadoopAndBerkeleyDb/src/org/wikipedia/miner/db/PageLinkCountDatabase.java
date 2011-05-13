@@ -1,6 +1,7 @@
 package org.wikipedia.miner.db;
 
 import gnu.trove.TIntHash;
+import gnu.trove.TIntHashSet;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -103,8 +104,10 @@ public class PageLinkCountDatabase extends IntObjectDatabase<DbPageLinkCounts>{
 	@Override
 	public DbPageLinkCounts filterCacheEntry(
 			WEntry<Integer, DbPageLinkCounts> e,
-			WikipediaConfiguration conf, TIntHash validIds) {
+			WikipediaConfiguration conf) {
 
+		TIntHashSet validIds = conf.getArticlesOfInterest() ;
+		
 		if (validIds != null && !validIds.contains(e.getKey()))
 			return null ; 
 

@@ -1,9 +1,17 @@
 package org.wikipedia.miner.db;
 
 import gnu.trove.TIntHash;
+import gnu.trove.TIntHashSet;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.TreeMap;
 
 import org.apache.hadoop.record.CsvRecordInput;
 import org.apache.log4j.Logger;
@@ -11,12 +19,15 @@ import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.*;
 import org.wikipedia.miner.model.Page.PageType;
+import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.text.TextProcessor;
 
 
 import com.sleepycat.bind.tuple.IntegerBinding;
 import com.sleepycat.bind.tuple.LongBinding;
+import com.sleepycat.je.Database;
+import com.sleepycat.je.DatabaseEntry;
 
 
 /**
@@ -67,12 +78,13 @@ public class WDatabaseFactory {
 			@Override
 			public DbPage filterCacheEntry(
 					WEntry<Integer, DbPage> e, 
-					WikipediaConfiguration conf,
-					TIntHash validIds
+					WikipediaConfiguration conf
 			) {
 
 				PageType pageType = PageType.values()[e.getValue().getType()] ;
 
+				TIntHashSet validIds = conf.getArticlesOfInterest() ;
+				
 				if (validIds == null || validIds.contains(e.getKey()) || pageType == PageType.category || pageType==PageType.redirect) 
 					return e.getValue() ;
 				else
@@ -146,8 +158,10 @@ public class WDatabaseFactory {
 			}
 
 			@Override
-			public DbLabelForPageList filterCacheEntry(WEntry<Integer,DbLabelForPageList> e, WikipediaConfiguration conf, TIntHash validIds) {
+			public DbLabelForPageList filterCacheEntry(WEntry<Integer,DbLabelForPageList> e, WikipediaConfiguration conf) {
 
+				TIntHashSet validIds = conf.getArticlesOfInterest() ;
+				
 				if (validIds != null && !validIds.contains(e.getKey()))
 					return null ;
 
@@ -193,10 +207,12 @@ public class WDatabaseFactory {
 			@Override
 			public DbLinkLocationList filterCacheEntry(
 					WEntry<Integer, DbLinkLocationList> e,
-					WikipediaConfiguration conf, TIntHash validIds) {
+					WikipediaConfiguration conf) {
 
 				int id = e.getKey() ;
 				DbLinkLocationList links = e.getValue() ;
+				
+				TIntHashSet validIds = conf.getArticlesOfInterest() ;
 
 				if (validIds != null && !validIds.contains(id))
 					return null ;
@@ -221,6 +237,121 @@ public class WDatabaseFactory {
 		} ;
 	}
 
+	
+	/**
+	 * Returns a database associating Integer ids with the ids of articles it links to or that link to it.
+	 * 
+	 * @param type either {@link DatabaseType#pageLinksIn} or {@link DatabaseType#pageLinksOut}.
+	 * @return a database associating Integer ids with the ids of articles it links to or that link to it.
+	 */
+	public WDatabase<Integer, DbIntList> buildPageLinkNoSentencesDatabase(DatabaseType type) {
+
+		if (type != DatabaseType.pageLinksInNoSentences && type != DatabaseType.pageLinksOutNoSentences)
+			throw new IllegalArgumentException("type must be either DatabaseType.pageLinksInNoSentences or DatabaseType.pageLinksOutNoSentences") ;
+
+		RecordBinding<DbIntList> keyBinding = new RecordBinding<DbIntList>() {
+			public DbIntList createRecordInstance() {
+				return new DbIntList() ;
+			}
+		} ;
+
+		return new IntObjectDatabase<DbIntList>(
+				env, 
+				type, 
+				keyBinding
+		) {
+
+			@Override
+			public WEntry<Integer, DbIntList> deserialiseCsvRecord(CsvRecordInput record) throws IOException {
+				// this has to read from pagelinks file (with sentences
+				
+				Integer id = record.readInt(null) ;
+
+				DbLinkLocationList l = new DbLinkLocationList() ;
+				l.deserialize(record) ;
+				
+				ArrayList<Integer> linkIds = new ArrayList<Integer>() ;
+				
+				for (DbLinkLocation ll:l.getLinkLocations()) 
+					linkIds.add(ll.getLinkId()) ;
+				
+				return new WEntry<Integer, DbIntList>(id, new DbIntList(linkIds)) ;
+			}
+
+			@Override
+			public DbIntList filterCacheEntry(
+					WEntry<Integer, DbIntList> e,
+					WikipediaConfiguration conf) {
+
+				int id = e.getKey() ;
+				DbIntList links = e.getValue() ;
+				
+				TIntHashSet validIds = conf.getArticlesOfInterest() ;
+
+				if (validIds != null && !validIds.contains(id))
+					return null ;
+
+				ArrayList<Integer> newLinks = new ArrayList<Integer>() ;
+
+				for (Integer link:links.getValues()) {
+					if (validIds != null && !validIds.contains(link))
+						continue ;
+
+					newLinks.add(link) ;
+				}
+
+				if (newLinks.size() == 0)
+					return null ;
+
+				links.setValues(newLinks) ;
+
+				return links ;
+			}
+			
+			@Override
+			public void loadFromCsvFile(File dataFile, boolean overwrite, ProgressTracker tracker) throws IOException  {
+
+				if (exists() && !overwrite)
+					return ;
+
+				if (tracker == null) tracker = new ProgressTracker(1, WDatabase.class) ;
+				tracker.startTask(dataFile.length(), "Loading " + getName()) ;
+
+				BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(dataFile), "UTF-8")) ;
+
+				long bytesRead = 0 ;
+				int lineNum = 0 ;
+
+				Database db = getDatabase(false) ;
+
+				String line ;
+				while ((line=input.readLine()) != null) {
+					bytesRead = bytesRead + line.length() + 1 ;
+					lineNum++ ;
+
+					CsvRecordInput cri = new CsvRecordInput(new ByteArrayInputStream((line + "\n").getBytes("UTF-8"))) ;
+
+					WEntry<Integer,DbIntList> entry = deserialiseCsvRecord(cri) ;
+
+					if (entry != null) {				
+						DatabaseEntry k = new DatabaseEntry() ;
+						keyBinding.objectToEntry(entry.getKey(), k) ;
+
+						DatabaseEntry v = new DatabaseEntry() ;
+						valueBinding.objectToEntry(entry.getValue(), v) ;
+
+						db.put(null, k, v) ;
+					}
+					tracker.update(bytesRead) ;
+				}
+				input.close();
+
+				env.cleanAndCheckpoint() ;
+				getDatabase(true) ;
+			}
+
+		} ;
+	}
 
 	/**
 	 * Returns a database appropriate for the given {@link DatabaseType}
@@ -265,10 +396,12 @@ public class WDatabaseFactory {
 			}
 
 			@Override
-			public DbIntList filterCacheEntry(WEntry<Integer,DbIntList> e, WikipediaConfiguration conf, TIntHash validIds) {
+			public DbIntList filterCacheEntry(WEntry<Integer,DbIntList> e, WikipediaConfiguration conf) {
 				int key = e.getKey() ;
 				ArrayList<Integer> values = e.getValue().getValues() ;
 
+				TIntHashSet validIds = conf.getArticlesOfInterest() ;
+				
 				ArrayList<Integer> newValues = null ;
 
 				switch (type) {
@@ -324,8 +457,10 @@ public class WDatabaseFactory {
 
 			@Override
 			public Integer filterCacheEntry(
-					WEntry<Integer, Integer> e, WikipediaConfiguration conf,
-					TIntHash validIds) {
+					WEntry<Integer, Integer> e, 
+					WikipediaConfiguration conf
+			) {
+				TIntHashSet validIds = conf.getArticlesOfInterest() ;
 
 				if (validIds != null && !validIds.contains(e.getValue()))
 					return null ; 
@@ -369,8 +504,8 @@ public class WDatabaseFactory {
 
 			@Override
 			public Long filterCacheEntry(
-					WEntry<Integer, Long> e, WikipediaConfiguration conf,
-					TIntHash validIds) {
+					WEntry<Integer, Long> e, WikipediaConfiguration conf
+			) {
 				return e.getValue() ;
 			}
 		} ;
@@ -407,9 +542,10 @@ public class WDatabaseFactory {
 
 			@Override
 			public DbTranslations filterCacheEntry(
-					WEntry<Integer, DbTranslations> e, WikipediaConfiguration conf,
-					TIntHash validIds) {
-
+					WEntry<Integer, DbTranslations> e, WikipediaConfiguration conf
+			) {
+				TIntHashSet validIds = conf.getArticlesOfInterest() ;
+				
 				if (validIds != null && !validIds.contains(e.getKey()))
 					return null ; 
 
