@@ -2,6 +2,7 @@ package org.wikipedia.miner.db;
 
 import gnu.trove.THashMap;
 import gnu.trove.TIntHash;
+import gnu.trove.TIntHashSet;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -122,8 +123,10 @@ public class LabelDatabase extends WDatabase<String, DbLabel> {
 	}
 
 	@Override
-	public DbLabel filterCacheEntry(WEntry<String,DbLabel> e, WikipediaConfiguration conf, TIntHash validIds) {
+	public DbLabel filterCacheEntry(WEntry<String,DbLabel> e, WikipediaConfiguration conf) {
 
+		TIntHashSet validIds = conf.getArticlesOfInterest() ;
+		
 		DbLabel label = e.getValue() ;
 
 		if ((float)label.getLinkDocCount()/label.getTextDocCount() < conf.getMinLinkProbability())
@@ -219,6 +222,8 @@ public class LabelDatabase extends WDatabase<String, DbLabel> {
 			Iterator<Map.Entry<String,DbLabel>> mapIter = tmpProcessedLabels.entrySet().iterator() ;
 
 			File tempFile = new File(tempDir.getPath() + File.separator + "tmpLabels" + pass + ".csv") ;
+			tempFile.deleteOnExit() ;
+			
 			BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile)) ;
 
 			while (mapIter.hasNext()) {

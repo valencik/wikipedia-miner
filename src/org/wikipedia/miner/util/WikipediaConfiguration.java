@@ -30,11 +30,12 @@ import org.xml.sax.SAXException;
 
 public class WikipediaConfiguration {
 	
-	private enum ParamName{langCode,databaseDirectory,defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
+	private enum ParamName{langCode,databaseDirectory,dataDirectory, defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
 	
 	private String langCode ;
 
 	private File dbDirectory ;
+	private File dataDirectory ;
 	private TextProcessor defaultTextProcessor = null ;
 
 	private HashMap<DatabaseType, CachePriority> databasesToCache = new HashMap<DatabaseType, CachePriority>() ;
@@ -86,6 +87,14 @@ public class WikipediaConfiguration {
 		
 	public File getDatabaseDirectory() {
 		return dbDirectory ;
+	}
+	
+	public File getDataDirectory() {
+		return dataDirectory ;
+	}
+	
+	public void setDataDirectory(File f) {
+		dataDirectory = f ;
 	}
 
 	public void setDefaultTextProcessor(TextProcessor tp) {
@@ -266,6 +275,9 @@ public class WikipediaConfiguration {
 				case databaseDirectory:
 					this.dbDirectory = new File(paramValue) ;
 					break ;
+				case dataDirectory:
+					this.dataDirectory = new File(paramValue) ;
+					break ;
 				case defaultTextProcessor:
 					Class tpClass = Class.forName(paramValue) ;
 					this.defaultTextProcessor = (TextProcessor)tpClass.newInstance() ;
@@ -343,15 +355,6 @@ public class WikipediaConfiguration {
 		} catch (Exception e) {
 			return ParamName.unknown ;
 		}
-	}
-	
-	public static void main(String args[]) throws ParserConfigurationException, SAXException, IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-		WikipediaConfiguration conf = new WikipediaConfiguration(new File("/Users/dmilne/Research/workspace/wm_hadoopAndBerkeleyDb/configs/en.xml")) ;
-		
-		System.out.println(conf.getLangCode()) ;
-		
-		System.out.println(conf.getArticleComparisonDependancies()) ;
-		
 	}
 	
 }

@@ -7,8 +7,10 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -74,9 +76,20 @@ public abstract class WDatabase<K,V> {
 		pageLinksIn, 
 		
 		/**
+		 * Associates integer ids with the ids of articles that link to it
+		 */
+		pageLinksInNoSentences,
+		
+		
+		/**
 		  * Associates integer ids with the ids of articles that it links to, and the sentence indexes where these links are found
 		 */
 		pageLinksOut, 
+		
+		/**
+		 * Associates integer ids with the ids of articles that it links to
+		 */
+		pageLinksOutNoSentences,
 		
 		/**
 		 * Associates integer ids with counts of how many pages it links to or that link to it
@@ -328,7 +341,7 @@ public abstract class WDatabase<K,V> {
 	 * @param validIds the set of article ids that are valid and should be cached
 	 * @return the value that should be cached along with the given key, or null if it should be excluded
 	 */
-	public abstract V filterCacheEntry(WEntry<K,V> e, WikipediaConfiguration conf, TIntHash validIds) ;
+	public abstract V filterCacheEntry(WEntry<K,V> e, WikipediaConfiguration conf) ;
 	
 	
 	/**
@@ -389,8 +402,10 @@ public abstract class WDatabase<K,V> {
 	 * @param conf a configuration specifying how items should be cached.
 	 * @param validIds an optional set of article ids that should be cached. Any information about articles not in this list will be excluded from the cache. 
 	 * @param tracker an optional progress tracker
+	 * @throws IOException 
+	 * @throws DatabaseException 
 	 */
-	public void cache(WikipediaConfiguration conf, TIntHash validIds, ProgressTracker tracker) {
+	public void cache(WikipediaConfiguration conf, ProgressTracker tracker) throws DatabaseException, IOException {
 		
 		Database db = getDatabase(true) ;
 		
@@ -403,13 +418,53 @@ public abstract class WDatabase<K,V> {
 		
 		tracker.startTask(db.count(), "caching " + name + " database") ;
 		
+		//first, try caching from file
+		if (conf.getDatabaseDirectory() != null) {
+			File dataFile = new File(conf.getDatabaseDirectory() + File.separator + name + ".csv") ; 
+			
+			if (dataFile.canRead()) {
+				
+				BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(dataFile), "UTF-8")) ;
+
+				long lineNum = 0 ;
+				
+				String line ;
+				while ((line=input.readLine()) != null) {
+					lineNum++ ;
+						
+					CsvRecordInput cri = new CsvRecordInput(new ByteArrayInputStream((line + "\n").getBytes("UTF-8"))) ;
+								
+					WEntry<K,V> entry = deserialiseCsvRecord(cri) ;
+					
+					if (entry != null) {
+						V filteredValue = filterCacheEntry(entry, conf) ;
+						
+						if (filteredValue != null) {
+							WEntry<K,V> filteredEntry = new WEntry<K,V>(entry.getKey(), filteredValue) ;
+							addToCache(filteredEntry) ;
+						}
+					}
+					
+					tracker.update(lineNum) ;
+				}
+					
+				input.close();	
+				finalizeCache() ;
+				
+				return;
+			}
+		}
+		
+		
+		
+		//we haven't managed to cache from file, so let's do it from db
 		WIterator<K,V> iter = getIterator() ;
 		
 		
 		while (iter.hasNext()) {
 			WEntry<K,V> entry = iter.next();
 			
-			V filteredValue = filterCacheEntry(entry, conf, validIds) ;
+			V filteredValue = filterCacheEntry(entry, conf) ;
 			
 			if (filteredValue != null) {
 				WEntry<K,V> filteredEntry = new WEntry<K,V>(entry.getKey(), filteredValue) ;
