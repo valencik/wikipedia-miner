@@ -324,9 +324,11 @@ public class Page implements Comparable<Page> {
 
 		if (pd != null)
 			return createPage(env, id, pd) ;
-		else
-			return null ;
-
+		else {
+			pd = new DbPage("Invalid id or excluded via caching", PageType.invalid.ordinal(), -1) ;
+			
+			return new Page(env, id, pd) ;
+		}
 	}
 
 	/**

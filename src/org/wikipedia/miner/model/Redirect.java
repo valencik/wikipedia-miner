@@ -48,6 +48,9 @@ public class Redirect extends Page {
 			
 			Page target = Page.createPage(env, targetId) ;
 			
+			if (!target.exists())
+				return null ;
+			
 			if (target.getType() == PageType.redirect)
 				currId = targetId ;
 			else
