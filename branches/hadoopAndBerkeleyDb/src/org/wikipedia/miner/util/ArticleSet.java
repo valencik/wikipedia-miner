@@ -36,11 +36,17 @@ import org.wikipedia.miner.model.Page.PageType;
  * Can either be generated randomly from Wikipedia, or loaded from file.
  */
 public class ArticleSet extends TreeSet<Article> {
+	
+	//TODO: This screams out for the builder design pattern
+	
 	//private TreeSet<Integer> articleIds = new TreeSet<Integer>() ;
 	private MarkupStripper stripper = new MarkupStripper() ;
 	
 	public ArticleSet() {
 		super() ;
+		
+		
+		
 	}
 	
 	/**
@@ -87,18 +93,14 @@ public class ArticleSet extends TreeSet<Article> {
 	 * @param maxWordCount the maximum number of words allowed in an article
 	 * @param maxListProportion the maximum proportion of list items (over total line count) that an article may contain. 
 	 */
-	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion, ArticleSet exclude) {
+	public ArticleSet(Wikipedia wikipedia, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion, Pattern mustMatch, Pattern mustNotMatch, ArticleSet exclude) {
 		
 		Vector<Article> roughCandidates = getRoughCandidates(wikipedia, minInLinks, minOutLinks) ;
 		
-		
-		buildFromRoughCandidates(wikipedia, roughCandidates, size, minInLinks, minOutLinks, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, exclude) ;
-		//articleIds = new TreeSet<Integer>() ;
-		
-
+		buildFromRoughCandidates(wikipedia, roughCandidates, size, minInLinks, minOutLinks, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, mustMatch, mustNotMatch, exclude) ;
 	}
 	
-	protected void buildFromRoughCandidates(Wikipedia wikipedia, Vector<Article> roughCandidates, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion, ArticleSet exclude) {
+	protected void buildFromRoughCandidates(Wikipedia wikipedia, Vector<Article> roughCandidates, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion, Pattern mustMatch, Pattern mustNotMatch, ArticleSet exclude) {
 		
 		DecimalFormat df = new DecimalFormat("#0.00 %") ;
 		
@@ -122,7 +124,7 @@ public class ArticleSet extends TreeSet<Article> {
 			Article art = roughCandidates.elementAt(index) ;
 			roughCandidates.removeElementAt(index) ;
 									
-			if (isArticleValid(art, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, exclude)) 
+			if (isArticleValid(art, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, mustMatch, mustNotMatch, exclude)) 
 				add(art) ;
 			
 			
@@ -191,7 +193,7 @@ public class ArticleSet extends TreeSet<Article> {
 		return articles ;
 	}
 		
-	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion, ArticleSet exclude) {
+	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion, Pattern mustMatch, Pattern mustNotMatch, ArticleSet exclude) {
 			
 		Logger.getLogger(ArticleSet.class).debug("Evaluating " + art) ;
 		
@@ -199,13 +201,13 @@ public class ArticleSet extends TreeSet<Article> {
 		
 		//we don't want any disambiguations
 		if (art.getType() == PageType.disambiguation) {
-			Logger.getLogger(ArticleSet.class).debug(" - rejected for disambiguation page") ;
+			Logger.getLogger(ArticleSet.class).debug(" - rejected due to disambiguation") ;
 			return false ;	
 			
 		}
 		
 		if (this.contains(art)) {
-			Logger.getLogger(ArticleSet.class).debug(" - rejected for being in exclusion list") ;
+			Logger.getLogger(ArticleSet.class).debug(" - rejected due to exclusion list") ;
 			return false ;	
 		}
 		
@@ -222,6 +224,24 @@ public class ArticleSet extends TreeSet<Article> {
 		
 		if (markup == null)
 			return false ;
+		
+		if (mustMatch != null) {
+			Matcher m = mustMatch.matcher(markup) ;
+			
+			if (!m.find()) {
+				Logger.getLogger(ArticleSet.class).debug(" - rejected due to mustMatch pattern") ;
+				return false ;	
+			}
+		}
+		
+		if (mustNotMatch != null) {
+			Matcher m = mustNotMatch.matcher(markup) ;
+			
+			if (m.find()) {
+				Logger.getLogger(ArticleSet.class).debug(" - rejected due to mustNotMatch pattern") ;
+				return false ;	
+			}
+		}
 		
 		markup = stripper.stripToPlainText(markup, null) ; 
 		
@@ -297,7 +317,10 @@ public class ArticleSet extends TreeSet<Article> {
 		return true ;
 	}
 	
-	public static ArticleSet[] buildExclusiveArticleSets(int[] sizes, Wikipedia wikipedia, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion) {
+	public static ArticleSet[] buildExclusiveArticleSets(int[] sizes, Wikipedia wikipedia, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion, Pattern mustMatch, Pattern mustNotMatch) {
+		
+
+		
 		
 		ArticleSet sets[] = new ArticleSet[sizes.length] ;
 		
@@ -308,7 +331,7 @@ public class ArticleSet extends TreeSet<Article> {
 		for (int i=0 ; i<sizes.length ; i++) {
 			sets[i] = new ArticleSet() ;
 			
-			sets[i].buildFromRoughCandidates(wikipedia, roughCandidates, sizes[i], minInLinks, minOutLinks, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, gatheredSoFar) ;
+			sets[i].buildFromRoughCandidates(wikipedia, roughCandidates, sizes[i], minInLinks, minOutLinks, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, mustMatch, mustNotMatch, gatheredSoFar) ;
 			
 			gatheredSoFar.addAll(sets[i]) ;
 		}
