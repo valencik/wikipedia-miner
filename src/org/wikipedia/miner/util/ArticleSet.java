@@ -39,6 +39,8 @@ public class ArticleSet extends TreeSet<Article> {
 	
 	//TODO: This screams out for the builder design pattern
 	
+	private static final long serialVersionUID = 6142971965290887331L;
+	
 	//private TreeSet<Integer> articleIds = new TreeSet<Integer>() ;
 	private MarkupStripper stripper = new MarkupStripper() ;
 	
