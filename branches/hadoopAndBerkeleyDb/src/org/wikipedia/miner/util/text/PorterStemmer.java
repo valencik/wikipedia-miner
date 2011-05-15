@@ -122,7 +122,7 @@ public class PorterStemmer extends TextProcessor {
 		 * adding characters, you can call stem(void) to stem the word.
 		 * 
 		 * @param ch the character to be added.
-		 */
+		 *//*
 		protected void add(char ch)
 		{  if (i == b.length)
 		{  char[] new_b = new char[i+INC];
@@ -130,7 +130,7 @@ public class PorterStemmer extends TextProcessor {
 		b = new_b;
 		}
 		b[i++] = ch;
-		}
+		}*/
 
 
 		/** 
@@ -157,14 +157,14 @@ public class PorterStemmer extends TextProcessor {
 		/**
 		 * Returns the length of the word resulting from the stemming process.
 		 */
-		protected int getResultLength() { return i_end; }
+		//protected int getResultLength() { return i_end; }
 
 		/**
 		 * Returns a reference to a character buffer containing the results of
 		 * the stemming process.  You also need to consult getResultLength()
 		 * to determine the length of the result.
 		 */
-		protected char[] getResultBuffer() { return b; }
+		//protected char[] getResultBuffer() { return b; }
 
 		/* cons(i) is true <=> b[i] is a consonant. */
 
