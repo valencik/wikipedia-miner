@@ -246,7 +246,7 @@ public class WikipediaConfiguration {
 		return EnumSet.copyOf(dependancies) ;
 	}
 	
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings("rawtypes")
 	private void initFromXml(Element xml) throws IOException, ClassNotFoundException, InstantiationException, IllegalAccessException {
 		
 		ArrayList<ArticleComparer.DataDependency> artCompDependencies = new ArrayList<ArticleComparer.DataDependency>() ;
