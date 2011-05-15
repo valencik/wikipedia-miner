@@ -155,9 +155,21 @@ public abstract class InstanceBuilder<A extends Enum,C> {
 	
 	public abstract InstanceBuilder<A,C> setClassAttribute(C value) ;
 	
-	public InstanceBuilder setWeight(Double weight) {
+	public InstanceBuilder<A,C> setWeight(Double weight) {
 		
 		_instance.setWeight(weight) ;
+		
+		return this ;
+	}
+	
+	public InstanceBuilder<A,C> replaceAllMissingValuesWith(Double value) {
+		
+		int c = _instance.classIndex() ;
+		
+		for (int i=0 ; i<_instance.numValues();i++) {
+			if (_instance.isMissing(i) && i != c)
+				_instance.setValue(i, value) ;
+		}
 		
 		return this ;
 	}
@@ -203,6 +215,5 @@ public abstract class InstanceBuilder<A extends Enum,C> {
 		
 		return _instance ;
 	}
-	
 	
 }
