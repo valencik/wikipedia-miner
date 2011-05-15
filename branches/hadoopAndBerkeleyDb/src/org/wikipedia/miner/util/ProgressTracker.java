@@ -23,7 +23,7 @@ public class ProgressTracker {
 	private double minReportProgress = 0.01 ;
 	private double lastReportProgress ;
 	
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings("rawtypes")
 	private Class logClass ;
 	
 
@@ -36,7 +36,7 @@ public class ProgressTracker {
 	 * @param taskParts the number of parts this task involves.
 	 * @param message the message to be displayed alongside all progress updates
 	 */
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings("rawtypes")
 	public ProgressTracker(long taskParts, String message, Class logClass) {
 		tasks = 1 ;
 		tasksDone = -1 ;
@@ -54,7 +54,7 @@ public class ProgressTracker {
 	 * 
 	 * @param tasks the task this notifier will track.
 	 */
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings("rawtypes")
 	public ProgressTracker(int tasks, Class logClass) {
 		this.tasks = tasks ;
 		this.logClass = logClass ;
