@@ -25,7 +25,7 @@ public class ComparisonExperiments {
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[0])) ;
 		
-		conf.setMinLinksIn(3) ;
+		conf.setMinLinksIn(20) ;
 		conf.setMinLinkProbability(0.005F) ;
 		conf.setMinSenseProbability(0.01F) ;
 		
@@ -36,14 +36,14 @@ public class ComparisonExperiments {
 		//conf.setLabelDisambiguationModel(null) ;
 		//conf.setLabelComparisonModel(null) ;
 		
-		//conf.addDatabaseToCache(DatabaseType.pageLinksOut, CachePriority.space) ;
-		conf.addDatabaseToCache(DatabaseType.pageLinksIn, CachePriority.space) ;
-		//conf.addDatabaseToCache(DatabaseType.pageLinkCounts, CachePriority.space) ;
+		conf.addDatabaseToCache(DatabaseType.pageLinksOut, CachePriority.space) ;
+		conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences, CachePriority.space) ;
+		conf.addDatabaseToCache(DatabaseType.pageLinkCounts, CachePriority.space) ;
 		
 		ArrayList<DataDependency> d = new ArrayList<DataDependency>() ;
-		//d.add(DataDependency.pageLinksOut) ;
+		d.add(DataDependency.pageLinksOut) ;
 		d.add(DataDependency.pageLinksIn) ;
-		//d.add(DataDependency.linkCounts) ;
+		d.add(DataDependency.linkCounts) ;
 		
 		EnumSet<DataDependency> dependencies = EnumSet.copyOf(d) ;
 		
@@ -51,7 +51,7 @@ public class ComparisonExperiments {
 
 		Wikipedia wikipedia = new Wikipedia(conf, false) ;
 
-		ComparisonDataSet set = new ComparisonDataSet(new File("/Users/dmilne/Research/wikipedia/datasets/wikipediaSimilarity353.new.csv")) ;
+		ComparisonDataSet set = new ComparisonDataSet(new File("data/wikipediaSimilarity353.new.csv")) ;
 		/*
 		ArticleComparer artCmp = new ArticleComparer(wikipedia) ;
 		LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
@@ -61,8 +61,8 @@ public class ComparisonExperiments {
 		
 		System.out.println(lblCmp.getRelatedness(lblA, lblB)) ;
 		*/
-		//testArticleComparison(wikipedia, set, dependencies) ;
-		testLabelComparison(wikipedia, set, dependencies) ;
+		testArticleComparison(wikipedia, set, dependencies) ;
+		//testLabelComparison(wikipedia, set, dependencies) ;
 		
 		//wikipedia.close();
 	}
@@ -80,14 +80,11 @@ public class ComparisonExperiments {
 		cmp.train(set) ;
 		cmp.buildDefaultClassifier() ;
 		cmp.saveClassifier(new File("models/articleComparison_inLinks.model")) ;
-		
+		cmp.saveTrainingData(new File("data/articleComparison.arff")) ;
 		
 		
 		//cmp.loadClassifier(new File("/Users/dmilne/Research/wikipedia/temp/artCmp.model")) ;
 		
-		
-		
-	
 		ComparisonDataSet[][] folds = set.getFolds() ;
 		double totalCorrelation = 0 ;
 
