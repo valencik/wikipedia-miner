@@ -75,7 +75,8 @@
 
 	<!-- 
 		A file containing a Weka classifier for generating relatedness measures between articles
-		This must be trained using the same dependencies listed above.
+		This must be trained using the same dependencies listed above.If you do not supply one, 
+		then article comparisons will be made without machine learning.
 	 -->
 	<articleComparisonModel>
 	</articleComparisonModel>
