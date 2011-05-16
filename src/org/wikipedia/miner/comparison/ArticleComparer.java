@@ -62,11 +62,11 @@ public class ArticleComparer {
 
 	enum Attributes {
 		inLinkGoogleMeasure, 
-		inLinkUnion, 
+		//inLinkUnion, 
 		inLinkIntersection,
 		inLinkVectorMeasure,
 		outLinkGoogleMeasure, 
-		outLinkUnion, 
+		//outLinkUnion, 
 		outLinkIntersection, 
 		outLinkVectorMeasure,
 	}
@@ -107,34 +107,6 @@ public class ArticleComparer {
 		.setClassAttributeTypeNumeric("relatedness")
 		.build();
 
-		/*
-		ArrayList<String> attrNames = new ArrayList<String>();
-
-		if (dependancies.contains(DataDependency.pageLinksIn)) {
-
-			attrNames.add("inLinkGoogleMeasure") ;
-			attrNames.add("inLinkGoogleSentenceMeasure") ;
-			//attrNames.add("inLinkUnion") ;
-			//attrNames.add("inLinkIntersection") ;
-
-			if (dependancies.contains(DataDependency.linkCounts)) 
-				attrNames.add("inLinkVectorMeasure") ;
-		}
-
-		if (dependancies.contains(DataDependency.pageLinksOut)) {
-
-			attrNames.add("outLinkGoogleMeasure") ;
-			attrNames.add("outLinkGoogleSentenceMeasure") ;
-			//attrNames.add("outLinkUnion") ;
-			//attrNames.add("outLinkIntersection") ;
-
-			if (dependancies.contains(DataDependency.linkCounts)) 
-				attrNames.add("outLinkVectorMeasure") ;
-		}
-
-		relatednessMeasurer = new DoublePredictorOld("articleRelatednessMeasurer", attrNames.toArray(new String[attrNames.size()]), "articleRelatedness") ;
-		 */
-
 		if (wikipedia.getConfig().getArticleComparisonModel() != null) 
 			this.loadClassifier(wikipedia.getConfig().getArticleComparisonModel()) ;
 	}
@@ -147,31 +119,41 @@ public class ArticleComparer {
 		ArticleComparison cmp = getComparison(artA, artB) ;
 		if (cmp == null)
 			return 0.0 ;
+		
+		
+		if (
+			(cmp.getInLinkIntersectionProportion() == null || cmp.getInLinkIntersectionProportion() == 0) 
+			&& (cmp.getOutLinkIntersectionProportion() == null || cmp.getOutLinkIntersectionProportion()==0)
+		)
+			return 0.0 ;
+		//System.out.println("gi " + cmp.getInLinkGoogleMeasure()) ;
+		//System.out.println("go " + cmp.getOutLinkGoogleMeasure()) ;
+		//System.out.println("ti " + cmp.getInLinkVectorMeasure()) ;
+		//System.out.println("to " + cmp.getOutLinkVectorMeasure()) ;
 
 		if (!relatednessMeasurer.isReady()) {
 			//Logger.getLogger(ArticleComparer.class).debug("Article comparison without ml") ;
 			//no classifier available, so just return mean of gathered measurements ;
-			double total = 0 ;
+			
 			int count = 0 ;
-
+			double total = 0 ;
+			
 			if (dependancies.contains(DataDependency.pageLinksIn)) {
-				if (cmp.getInLinkGoogleMeasure() != null) 
-					total = total + (1-cmp.getInLinkGoogleMeasure()) ;
 				count++ ;
+				total = total + cmp.getInLinkGoogleMeasure() ;
+
 				if (dependancies.contains(DataDependency.linkCounts)) {
-					if (cmp.getInLinkVectorMeasure() != null)
-						total = total + cmp.getInLinkVectorMeasure() ;
 					count++ ;
+					total = total + cmp.getInLinkVectorMeasure() ;
 				} 
 			}
 			if (dependancies.contains(DataDependency.pageLinksOut)) {
-				if (cmp.getOutLinkGoogleMeasure() != null)
-					total = total + (1-cmp.getOutLinkGoogleMeasure()) ;
 				count++ ;
+				total = total + cmp.getOutLinkGoogleMeasure() ;
+				
 				if (dependancies.contains(DataDependency.linkCounts)) {
-					if (cmp.getOutLinkVectorMeasure() != null)
-						total = total + cmp.getOutLinkVectorMeasure() ;
 					count++ ;
+					total = total + cmp.getOutLinkVectorMeasure() ;
 				} 
 			}
 
@@ -467,35 +449,18 @@ public class ArticleComparer {
 
 		//calculate google distance inspired measure
 		Double googleMeasure = null ;
-		Double googleSentenceMeasure = null ;
 
 		if (intersection == 0) {
 			googleMeasure = 1.0 ;
-			googleSentenceMeasure = 1.0 ;
 		} else {
 			double a = Math.log(linksA.size()) ;
 			double b = Math.log(linksB.size()) ;
 			double ab = Math.log(intersection) ;
 
 			googleMeasure = (Math.max(a, b) -ab) / (m - Math.min(a, b)) ;
-
-			//do rough normalization
-			if (googleMeasure > 1)
-				googleMeasure = 1.0 ;
-
-			//calculate sentence based measure
-			/*
-                    if (sentenceIntersection == 0)
-                            googleSentenceMeasure = 1.0 ;
-                    else {
-                            double abs = Math.log(sentenceIntersection) ;
-                            googleSentenceMeasure = (Math.max(a, b) -abs) / (m - Math.min(a, b)) ;
-
-                            if (googleSentenceMeasure > 1)
-                                    googleSentenceMeasure = 1.0 ;
-                    }*/
-
 		}
+		
+		googleMeasure = ArticleComparison.normalizeGoogleMeasure(googleMeasure) ;
 
 		//calculate vector (tfidf) inspired measure
 
@@ -540,6 +505,8 @@ public class ArticleComparer {
 				vectorMeasure = Math.acos(dotProduct / (magnitudeA * magnitudeB)) ;
 				if (vectorMeasure.isNaN())
 					vectorMeasure = Math.PI/2 ;
+				
+				vectorMeasure = ArticleComparison.normalizeVectorMeasure(vectorMeasure) ;
 			}
 
 			//if (vectorMeasure.isNaN()) {
@@ -559,281 +526,11 @@ public class ArticleComparer {
 		//System.out.println();
 
 		if (dir == LinkDirection.Out)
-			cmp.setOutLinkFeatures(googleMeasure, googleSentenceMeasure, vectorMeasure, union, intersectionProportion) ;
+			cmp.setOutLinkFeatures(googleMeasure, vectorMeasure, union, intersectionProportion) ;
 		else
-			cmp.setInLinkFeatures(googleMeasure, googleSentenceMeasure, vectorMeasure, union, intersectionProportion) ;
+			cmp.setInLinkFeatures(googleMeasure, vectorMeasure, union, intersectionProportion) ;
 
 		return cmp ;
-	}
-
-	/*
-
-	// names of all parameters make sense if we assume dir is out
-	private ArticleComparison setPageLinkFeatures(ArticleComparison cmp, LinkDirection dir, boolean useLinkCounts) {
-
-		//don't gather training or testing data when articles are the same: this screws up normalization
-		if (cmp.getArticleA().getId() == cmp.getArticleB().getId())
-			return cmp ;
-
-		ArrayList<Integer> linksA = getLinks(cmp.getArticleA().getId(), dir) ;
-		ArrayList<Integer> linksB = getLinks(cmp.getArticleB().getId(), dir) ;
-
-		int[] tmp = identifyIntersectionStuff(cmp, dir, useLinkCounts, linksA, linksB) ;
-
-		int intersection = tmp[0] ;
-		//int sentenceIntersection = tmp[1];
-		int union = tmp[1] ;
-
-		//calculate google distance inspired measure
-		Double googleMeasure = null ;
-		Double googleSentenceMeasure = null ;
-
-		if (intersection == 0) {
-			googleMeasure = 1.0 ;
-			googleSentenceMeasure = 1.0 ;
-		} else {
-			double a = Math.log(linksA.size()) ;
-			double b = Math.log(linksB.size()) ;
-			double ab = Math.log(intersection) ;
-
-			googleMeasure = (Math.max(a, b) -ab) / (m - Math.min(a, b)) ;
-
-			//do rough normalization
-			if (googleMeasure > 1)
-				googleMeasure = 1.0 ;
-
-			//calculate sentence based measure
-			/*
-			if (sentenceIntersection == 0)
-				googleSentenceMeasure = 1.0 ;
-			else {
-				double abs = Math.log(sentenceIntersection) ;
-				googleSentenceMeasure = (Math.max(a, b) -abs) / (m - Math.min(a, b)) ;
-
-				if (googleSentenceMeasure > 1)
-					googleSentenceMeasure = 1.0 ;
-			}
-	 */
-
-	//}
-
-	//calculate vector (tfidf) inspired measure
-
-	//Double vectorMeasure = null ;
-	/*
-		if (useLinkCounts) {
-
-			if (vectA.isEmpty() || vectB.isEmpty())
-				vectorMeasure = Math.PI/2 ;
-			else {
-
-				double dotProduct = 0 ;
-				double magnitudeA = 0 ;
-				double magnitudeB = 0 ;
-
-				//StringBuffer strA = new StringBuffer() ;
-				//StringBuffer strB = new StringBuffer() ;
-
-
-				for (int x=0;x<vectA.size();x++) {
-					double valA = vectA.get(x) ;
-					double valB = vectB.get(x) ;
-
-					/*
-				if (valA > 0)
-					strA.append(df.format(valA) + "\t") ;
-				else 
-					strA.append("-.---\t") ;
-
-				if (valB > 0)
-					strB.append(df.format(valB)+ "\t") ;
-				else
-					strB.append("-.---\t") ;
-	 */
-	/*
-					dotProduct = dotProduct + (valA * valB) ;
-					magnitudeA = magnitudeA + (valA * valA) ;
-					magnitudeB = magnitudeB + (valB * valB) ;
-				}
-
-				magnitudeA = Math.sqrt(magnitudeA) ;
-				magnitudeB = Math.sqrt(magnitudeB) ;
-
-				vectorMeasure = Math.acos(dotProduct / (magnitudeA * magnitudeB)) ;		
-				if (vectorMeasure.isNaN())
-					vectorMeasure = Math.PI/2 ;
-			}
-
-			//if (vectorMeasure.isNaN()) {
-			//	System.out.println("A: (" + cmp.getArticleA() + ") " + strA) ;
-			//	System.out.println("B: (" + cmp.getArticleB() + ") " + strB) ;
-			//}
-		}*/
-	/*
-		double intersectionProportion ;
-		if (union == 0)
-			intersectionProportion = 0 ;
-		else
-			intersectionProportion = (double)intersection/union ;
-
-		//System.out.println("Intersection: " + intersection + "\tUnion: " + union) ;
-		//System.out.println("Relatedness:" + df.format(googleMeasure)) ;
-		//System.out.println();
-
-		if (dir == LinkDirection.Out)
-			cmp.setOutLinkFeatures(googleMeasure, googleSentenceMeasure, vectorMeasure, union, intersectionProportion) ;
-		else
-			cmp.setInLinkFeatures(googleMeasure, googleSentenceMeasure, vectorMeasure, union, intersectionProportion) ;
-
-		return cmp ;
-	}
-
-	private int[] identifyIntersectionStuff(ArticleComparison cmp, LinkDirection dir, boolean useLinkCounts, ArrayList<Integer>linksA, ArrayList<Integer>linksB) {
-
-		int intersection = 0 ;
-		//int sentenceIntersection = 0 ;
-		int union = 0 ;
-
-		int indexA = 0 ;
-		int indexB = 0 ;
-
-		//ArrayList<Double> vectA = new ArrayList<Double>() ;
-		//ArrayList<Double> vectB = new ArrayList<Double>() ;
-
-		//get denominators for link frequency
-		Integer linksFromSourceA = 0 ;
-		Integer linksFromSourceB = 0 ;
-		if (useLinkCounts) {
-			if (dir == LinkDirection.Out) {
-				linksFromSourceA = cmp.getArticleA().getTotalLinksOutCount() ;
-				linksFromSourceB = cmp.getArticleB().getTotalLinksOutCount() ;
-			} else {
-				linksFromSourceA = cmp.getArticleA().getTotalLinksInCount() ;
-				linksFromSourceB = cmp.getArticleB().getTotalLinksInCount() ;
-			}
-		}
-
-		while (indexA < linksA.size() || indexB < linksB.size()) {
-
-			//identify which links to use (A, B, or both)
-
-			boolean useA = false;
-			boolean useB = false;
-			boolean mutual = false ;
-
-			Integer linkA = null ;
-			Integer linkB = null ;
-
-			if (indexA < linksA.size()) 
-				linkA = linksA.get(indexA) ;
-
-			if (indexB < linksB.size()) 
-				linkB = linksB.get(indexB) ;
-
-			if (linkA != null && linkB != null && linkA==linkB) {
-				useA = true ;
-				useB = true ;
-				intersection ++ ;
-
-				//if (hasSentenceIntersection(linkA.getSentenceIndexes(), linkB.getSentenceIndexes()))
-				//	sentenceIntersection++ ;
-			} else {
-				if (linkA != null && (linkB == null || linkA< linkB)) {
-					useA = true ;
-
-					if (linkA == cmp.getArticleB().getId()) {
-						intersection++ ;
-						mutual = true ;
-					}
-
-				} else {
-					useB = true ;
-
-					if (linkB == cmp.getArticleA().getId()) {
-						intersection++ ;
-						mutual = true ;
-					}
-				}
-			}
-			union ++ ;
-
-			/*
-			if (useLinkCounts) {
-				System.out.println("Using link counts") ;
-
-				Article linkArt ;
-				if (useA)
-					linkArt = new Article(wikipedia.getEnvironment(), linkA) ;
-				else
-					linkArt = new Article(wikipedia.getEnvironment(), linkB) ;
-
-				//calculate lfiaf values for each vector
-				int linksToTarget ;
-				if (dir == LinkDirection.Out)
-					linksToTarget = linkArt.getTotalLinksInCount() ;
-				else
-					linksToTarget = linkArt.getTotalLinksOutCount() ;
-
-				double valA = 0 ;
-				double valB = 0 ;
-
-				if (mutual) {
-					valA = 1 ; 
-					valB = 1 ;
-				} else {
-					if (useA) valA = getLfiaf(linkA.getSentenceIndexes().size(), linksFromSourceA, linksToTarget) ;
-					if (useB) valB = getLfiaf(linkB.getSentenceIndexes().size(), linksFromSourceB, linksToTarget) ;
-				}
-
-				/*
-				if (useA) {
-					valA = getLfiaf(linkA.getSentenceIndexes().size(), linksFromSourceA, linksToTarget) ;
-					if (mutual)
-						valB = valA ;
-				}
-
-				if (useB) {
-					valB = getLfiaf(linkB.getSentenceIndexes().size(), linksFromSourceB, linksToTarget) ;
-					if (mutual)
-						valB = valA ;
-				}
-	 */
-	//vectA.add(valA) ;
-	//vectB.add(valB) ;
-	//}
-	/*
-			if (useA)
-				indexA++ ;
-			if (useB)
-				indexB++ ;
-		}
-
-		int result[] = {intersection,union} ;
-		return result ;
-	}*/
-
-
-	private boolean hasSentenceIntersection(ArrayList<Integer> sentenceIndexesA, ArrayList<Integer>sentenceIndexesB) {
-
-		int indexA = 0 ;
-		int indexB = 0 ;
-
-		while (indexA < sentenceIndexesA.size() && indexB < sentenceIndexesB.size())  {
-
-			int sentenceA = sentenceIndexesA.get(indexA) ;
-			int sentenceB = sentenceIndexesB.get(indexB) ;
-
-			if (sentenceA == sentenceB) {
-				return true ;
-			} else {
-				if ((sentenceA < sentenceB && sentenceA > 0)|| sentenceB < 0) {
-					indexA ++ ;
-				} else {
-					indexB ++ ;
-				}
-			}
-		}
-		return false ;
 	}
 
 	private ArrayList<Integer> getLinks(int artId, LinkDirection dir) {
@@ -879,7 +576,7 @@ public class ArticleComparer {
 		if (dependancies.contains(DataDependency.pageLinksIn)) {
 
 			ib.setAttribute(Attributes.inLinkGoogleMeasure, cmp.getInLinkGoogleMeasure()) ;
-			ib.setAttribute(Attributes.inLinkUnion, cmp.getInLinkUnion()) ;
+			//ib.setAttribute(Attributes.inLinkUnion, cmp.getInLinkUnion()) ;
 			ib.setAttribute(Attributes.inLinkIntersection, cmp.getInLinkIntersectionProportion()) ;
 
 			if (dependancies.contains(DataDependency.linkCounts)) 
@@ -888,7 +585,7 @@ public class ArticleComparer {
 				ib.setAttribute(Attributes.inLinkVectorMeasure, 0) ;
 		} else {
 			ib.setAttribute(Attributes.inLinkGoogleMeasure, 0) ;
-			ib.setAttribute(Attributes.inLinkUnion, 0) ;
+			//ib.setAttribute(Attributes.inLinkUnion, 0) ;
 			ib.setAttribute(Attributes.inLinkIntersection, 0) ;
 			ib.setAttribute(Attributes.inLinkVectorMeasure, 0) ;
 		}
@@ -897,7 +594,7 @@ public class ArticleComparer {
 		
 		if (dependancies.contains(DataDependency.pageLinksOut)) {			
 			ib.setAttribute(Attributes.outLinkGoogleMeasure, wrapMissingValue(cmp.getOutLinkGoogleMeasure())) ;
-			ib.setAttribute(Attributes.outLinkUnion, wrapMissingValue(cmp.getOutLinkUnion())) ;
+			//ib.setAttribute(Attributes.outLinkUnion, wrapMissingValue(cmp.getOutLinkUnion())) ;
 			ib.setAttribute(Attributes.outLinkIntersection, wrapMissingValue(cmp.getOutLinkIntersectionProportion())) ;
 
 			if (dependancies.contains(DataDependency.linkCounts)) 
@@ -906,7 +603,7 @@ public class ArticleComparer {
 				ib.setAttribute(Attributes.outLinkVectorMeasure, 0) ;
 		} else {
 			ib.setAttribute(Attributes.outLinkGoogleMeasure, 0) ;
-			ib.setAttribute(Attributes.outLinkUnion, 0) ;
+			//ib.setAttribute(Attributes.outLinkUnion, 0) ;
 			ib.setAttribute(Attributes.outLinkIntersection, 0) ;
 			ib.setAttribute(Attributes.outLinkVectorMeasure, 0) ;
 		}
