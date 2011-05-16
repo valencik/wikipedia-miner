@@ -4,17 +4,37 @@ import java.io.File;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.Random;
 
 import jsc.correlation.SpearmanCorrelation;
 
 import org.wikipedia.miner.comparison.ArticleComparer.DataDependency;
 import org.wikipedia.miner.db.WDatabase.CachePriority;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
+import org.wikipedia.miner.model.Article;
+import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.model.Wikipedia;
+import org.wikipedia.miner.model.Page.PageType;
+import org.wikipedia.miner.util.MemoryMeasurer;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 
 public class ComparisonExperiments {
 	
+	Wikipedia _wikipedia ;
+	
+	ComparisonDataSet _set  ; 
+	
+	DecimalFormat _df = new DecimalFormat("0.##") ;
+	
+	
+	public ComparisonExperiments(Wikipedia wikipedia, ComparisonDataSet set) {
+		
+		_wikipedia = wikipedia ;
+		_set = set ;
+		
+		
+	}
 	
 	public static void main(String[] args) throws Exception {
 		
@@ -25,70 +45,60 @@ public class ComparisonExperiments {
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[0])) ;
 		
-		conf.setMinLinksIn(20) ;
-		conf.setMinLinkProbability(0.005F) ;
-		conf.setMinSenseProbability(0.01F) ;
 		
 		
-		
+		//conf.setMinLinksIn(20) ;
+		//conf.setMinLinkProbability(0.005F) ;
+		//conf.setMinSenseProbability(0.01F) ;
 		
 		//conf.setArticleComparisonModel(null) ;
 		//conf.setLabelDisambiguationModel(null) ;
 		//conf.setLabelComparisonModel(null) ;
 		
-		conf.addDatabaseToCache(DatabaseType.pageLinksOut, CachePriority.space) ;
-		conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences, CachePriority.space) ;
-		conf.addDatabaseToCache(DatabaseType.pageLinkCounts, CachePriority.space) ;
+		//conf.addDatabaseToCache(DatabaseType.pageLinksOut, CachePriority.space) ;
+		//conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences, CachePriority.space) ;
+		//conf.addDatabaseToCache(DatabaseType.pageLinkCounts, CachePriority.space) ;
 		
-		ArrayList<DataDependency> d = new ArrayList<DataDependency>() ;
-		d.add(DataDependency.pageLinksOut) ;
-		d.add(DataDependency.pageLinksIn) ;
-		d.add(DataDependency.linkCounts) ;
+		//ArrayList<DataDependency> d = new ArrayList<DataDependency>() ;
+		//d.add(DataDependency.pageLinksOut) ;
+		//d.add(DataDependency.pageLinksIn) ;
+		//d.add(DataDependency.linkCounts) ;
 		
-		EnumSet<DataDependency> dependencies = EnumSet.copyOf(d) ;
+		//EnumSet<DataDependency> dependencies = EnumSet.copyOf(d) ;
+		//conf.setArticleComparisonDependancies(dependencies) ;
 		
-
-
+		long memStart = MemoryMeasurer.getBytesUsed() ;
+		long timeStart = System.currentTimeMillis() ;
+		
 		Wikipedia wikipedia = new Wikipedia(conf, false) ;
-
+		
+		long timeEnd = System.currentTimeMillis() ;
+		long memEnd = MemoryMeasurer.getBytesUsed() ;
+		
+		System.out.println("Memory Used: " + (memEnd - memStart) + "b") ;
+		System.out.println("Time Spent: " + (timeEnd - timeStart) + "ms") ;
+		
 		ComparisonDataSet set = new ComparisonDataSet(new File("data/wikipediaSimilarity353.new.csv")) ;
-		/*
-		ArticleComparer artCmp = new ArticleComparer(wikipedia) ;
-		LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
 		
-		Label lblA = new Label(wikipedia.getEnvironment(), "Kiwi") ;
-		Label lblB = new Label(wikipedia.getEnvironment(), "Takahe") ;
+		ComparisonExperiments ce = new ComparisonExperiments(wikipedia, set) ;
 		
-		System.out.println(lblCmp.getRelatedness(lblA, lblB)) ;
-		*/
-		testArticleComparison(wikipedia, set, dependencies) ;
+		
+		ce.testArticleComparisonWithCrossfoldValidation() ;
 		//testLabelComparison(wikipedia, set, dependencies) ;
 		
-		//wikipedia.close();
+		wikipedia.close();
 	}
 	
-	public static void testArticleComparison(Wikipedia wikipedia, ComparisonDataSet set, EnumSet<DataDependency> dependencies) throws Exception {
-
-		DecimalFormat df = new DecimalFormat("0.##") ;
-
-	
+	public void testArticleComparisonWithCrossfoldValidation() throws Exception {
 		
-
+		System.out.println("Testing article comparison") ;
 		
-		ArticleComparer cmp = new ArticleComparer(wikipedia,dependencies) ;
-		
-		cmp.train(set) ;
-		cmp.buildDefaultClassifier() ;
-		cmp.saveClassifier(new File("models/articleComparison_inLinks.model")) ;
-		cmp.saveTrainingData(new File("data/articleComparison.arff")) ;
-		
-		
-		//cmp.loadClassifier(new File("/Users/dmilne/Research/wikipedia/temp/artCmp.model")) ;
-		
-		ComparisonDataSet[][] folds = set.getFolds() ;
+		ComparisonDataSet[][] folds = _set.getFolds() ;
 		double totalCorrelation = 0 ;
 
 		for (int fold=0 ; fold<folds.length ; fold++) {
+			
+			ArticleComparer cmp = new ArticleComparer(_wikipedia) ;
 
 			cmp.train(folds[fold][0]) ;
 			cmp.buildDefaultClassifier() ;
@@ -102,73 +112,83 @@ public class ComparisonExperiments {
 			totalCorrelation += sc.getR() ;
 		}
 
-		System.out.println("Average Correllation: " + (totalCorrelation/10) ) ;
-
-		
-		
-		/*
-		ArrayList<Double> manualMeasures = new ArrayList<Double>() ;
-		ArrayList<Double> autoMeasures = new ArrayList<Double>() ;
-		ProgressTracker pt = new ProgressTracker(set.size(), "Gathering relatedness measures", ComparisonTests.class) ;
-		for (ComparisonDataSet.Item item:set.getItems()) {
-
-			Article artA = null;
-			Article artB = null;
-
-			if (item.getIdA()> 0)
-				artA = new Article(wikipedia.getEnvironment(), item.getIdA()) ;
-
-			if (item.getIdB()> 0)
-				artB = new Article(wikipedia.getEnvironment(), item.getIdB()) ;
-
-
-			if (artA != null && artB != null) {
-
-				Double manual = item.getRelatedness() ;
-				Double auto  = 	cmp.getRelatedness(artA, artB) ;
-
-				if (auto != null) {
-
-					System.out.println(artA.getTitle() + " v.s. " + artB.getTitle() + " m:" + df.format(manual) + " a:" + df.format(auto)) ;
-					manualMeasures.add(manual) ;
-					autoMeasures.add(auto) ;
-				}
-			}
-			pt.update() ;
-		//	System.out.println("similaritySet.push({termA:\"" + item.getTermA() + "\", termB:\"" + item.getTermB() + "\", relatedness:" + item.getRelatedness() + "}) ;") ;
-		}
-
-
-		double[][] data = new double[manualMeasures.size()][2] ;
-		for (int i=0 ; i<manualMeasures.size(); i++) {
-			data[i][0] = manualMeasures.get(i) ;
-			data[i][1] = autoMeasures.get(i) ;
-		}
-
-		SpearmanCorrelation sc = new SpearmanCorrelation(new PairedData(data)) ;
-
-		System.out.println("Correllation: " + sc.getR()) ;
-		 
-
-
-		
-		
-		
-		//System.out.println(cmp.getRelatedness(wikipedia.getMostLikelyArticle("Waikato", null), wikipedia.getMostLikelyArticle("Waikato University", null))) ;
-
-		cmp.train(set, "full 353") ;
-		cmp.saveTrainingData(new File("/Users/dmilne/Research/wikipedia/temp/artCmp353.arff")) ;
-		cmp.saveClassifier(new File("/Users/dmilne/Research/wikipedia/temp/artCmp.model")) ;
-		
-		*/
+		double avgCorrelation = (totalCorrelation/10) ;
+		System.out.println("Average Correllation: " + avgCorrelation) ;
 	}
-
-	public static void testLabelComparison(Wikipedia wikipedia, ComparisonDataSet set, EnumSet<DataDependency> dependencies) throws Exception {
+	
+	public void testArticleComparisonSpeed(int size) throws Exception {
 		
-		/*
-		 
-		ComparisonDataSet[][] folds = set.getFolds() ;
-
+		System.out.println("Testing article comparison speed") ;
+		
+		System.out.println(" - gathering all articles") ;
+		
+		ArrayList<Integer> allIds = new ArrayList<Integer>() ;
+		
+		
+		Iterator<Page> iter = _wikipedia.getPageIterator(PageType.article);
+		while (iter.hasNext()) {
+			Page p = iter.next();
+		
+			allIds.add(p.getId()) ;
+		}
+		
+		System.out.println(" - gathering random articles") ;
+		
+		ArrayList<Article> selectedArticles = new ArrayList<Article>() ;
+		Random r = new Random() ;
+		
+		while (selectedArticles.size() < size) {
+			int index = r.nextInt(allIds.size()) ;
+			
+			Article art = new Article(_wikipedia.getEnvironment(), allIds.get(index)) ;
+			if (art.exists())
+				selectedArticles.add(art) ;
+			
+			allIds.remove(index) ;
+		}
+		
+		allIds = null ;
+		
+		
+		ArticleComparer cmp = new ArticleComparer(_wikipedia) ;
+		
+		
+		long startTime = System.currentTimeMillis() ;
+		int comparisons = 0 ;
+		
+		for (Article artA:selectedArticles) {
+			for (Article artB:selectedArticles) {
+				comparisons++ ;
+				cmp.getRelatedness(artA, artB) ;
+			}
+		}
+		
+		long endTime = System.currentTimeMillis() ;
+		
+		System.out.println(comparisons + " comparisons in " + (endTime-startTime) + " ms") ;
+			
+		
+	}
+	
+	public void saveArticleComparisonModelAndTrainingData(File modelFile, File arffFile) throws Exception {
+		
+		ArticleComparer cmp = new ArticleComparer(_wikipedia) ;
+		
+		cmp.train(_set) ;
+		cmp.buildDefaultClassifier() ;
+		
+		if (modelFile != null)
+			cmp.saveClassifier(modelFile) ;
+		
+		if (arffFile != null)
+			cmp.saveTrainingData(arffFile) ;
+	}
+	
+	
+	
+	public void testLabelComparisonWithCrossfoldValidation() throws Exception {
+		
+		ComparisonDataSet[][] folds = _set.getFolds() ;
 
 		double totalCorrelation = 0 ;
 		double totalAccuracy = 0 ;
@@ -176,12 +196,12 @@ public class ComparisonExperiments {
 		for (int fold=0 ; fold<folds.length ; fold++) {
 			
 			//train article comparer
-			ArticleComparer artCmp = new ArticleComparer(wikipedia, EnumSet.copyOf(dependencies)) ;
+			ArticleComparer artCmp = new ArticleComparer(_wikipedia) ;
 			artCmp.train(folds[fold][0]) ;
 			artCmp.buildDefaultClassifier() ;
 			
 			//train label comparer
-			LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
+			LabelComparer lblCmp = new LabelComparer(_wikipedia, artCmp) ;
 			lblCmp.train(folds[fold][0], "353 fold " + fold) ;
 			lblCmp.buildDefaultClassifiers() ;
 			
@@ -201,58 +221,85 @@ public class ComparisonExperiments {
 
 		System.out.println("Average relatedness correllation: " + (totalCorrelation/10) ) ;
 		System.out.println("Average disambiguation accuracy: " + (totalAccuracy/10) ) ;
+	}
+	
+	public void saveLabelComparisonModelAndTrainingData(File disambigModel, File comparisonModel, File disambigArff, File comparisonArff) throws Exception {
 		
-		*/
-		
-		ArticleComparer artCmp = new ArticleComparer(wikipedia, EnumSet.copyOf(dependencies)) ;
-		artCmp.loadClassifier(new File("../wm_hadoopAndBerkeleyDb/models/articleComparison_inLinks.model")) ;
+		ArticleComparer artCmp = new ArticleComparer(_wikipedia) ;
+		//artCmp.loadClassifier(new File("../wm_hadoopAndBerkeleyDb/models/articleComparison_inLinks.model")) ;
 
-		LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
+		LabelComparer lblCmp = new LabelComparer(_wikipedia, artCmp) ;
 
-		lblCmp.train(set, "full 353") ;
+		lblCmp.train(_set, "full 353") ;
 		
 		lblCmp.buildDefaultClassifiers() ;
 		
-		lblCmp.saveDisambiguationClassifier(new File("models/labelDisambiguation.model")) ;
-		lblCmp.saveComparisonClassifier(new File("models/labelComparison.model")) ;
+		if (disambigModel != null)
+			lblCmp.saveDisambiguationClassifier(disambigModel) ;
 		
-		//lblCmp.saveSenseSelectionTrainingData(new File("/Users/dmilne/Research/wikipedia/temp/artCmp353_labelSenseSelection.arff")) ;
-		//lblCmp.saveRelatednessMeasuringTrainingData(new File("/Users/dmilne/Research/wikipedia/temp/artCmp353_labelRelatednessMeasuring.arff")) ;
-
+		if (comparisonModel != null)
+			lblCmp.saveComparisonClassifier(comparisonModel) ;
 		
-		/*
-
-		ArrayList<Double> manualMeasures = new ArrayList<Double>() ;
-		ArrayList<Double> autoMeasures = new ArrayList<Double>() ;
-		ProgressTracker pt = new ProgressTracker(set.size(), "Gathering relatedness measures", ComparisonTests.class) ;
-		for (ComparisonDataSet.Item item:set.getItems()) {
-
-			Label labelA = new Label(wikipedia.getEnvironment(), item.getTermA()) ;
-			Label labelB = new Label(wikipedia.getEnvironment(), item.getTermB()) ;
-
-			Double manual = item.getRelatedness() ;
-			Double auto  = 	lblCmp.getRelatedness(labelA, labelB) ;
-
-			if (auto != null) {
-
-				System.out.println(labelA.getText() + " v.s. " + labelB.getText() + " m:" + df.format(manual) + " a:" + df.format(auto)) ;
-				manualMeasures.add(manual) ;
-				autoMeasures.add(auto) ;
-			}
-			pt.update()  ;
-		//	System.out.println("similaritySet.push({termA:\"" + item.getTermA() + "\", termB:\"" + item.getTermB() + "\", relatedness:" + item.getRelatedness() + "}) ;") ;
-		}
+		if (disambigArff != null)
+			lblCmp.saveDisambiguationTrainingData(disambigArff) ;
 		
-		double[][] data = new double[manualMeasures.size()][2] ;
-		for (int i=0 ; i<manualMeasures.size(); i++) {
-			data[i][0] = manualMeasures.get(i) ;
-			data[i][1] = autoMeasures.get(i) ;
-		}
-
-		SpearmanCorrelation sc = new SpearmanCorrelation(new PairedData(data)) ;
-
-		System.out.println("Correllation: " + sc.getR()) ;
-		*/
+		if (comparisonArff != null)
+			lblCmp.saveComparisonTrainingData(comparisonArff) ;
 	}
+	
+	public void testLabelComparisonSpeed(int size) throws Exception {
+		
+		System.out.println("Testing article comparison speed") ;
+		
+		System.out.println(" - gathering all articles") ;
+		
+		ArrayList<Integer> allIds = new ArrayList<Integer>() ;
+		
+		
+		Iterator<Page> iter = _wikipedia.getPageIterator(PageType.article);
+		while (iter.hasNext()) {
+			Page p = iter.next();
+		
+			allIds.add(p.getId()) ;
+		}
+		
+		System.out.println(" - gathering random articles") ;
+		
+		ArrayList<Article> selectedArticles = new ArrayList<Article>() ;
+		Random r = new Random() ;
+		
+		while (selectedArticles.size() < size) {
+			int index = r.nextInt(allIds.size()) ;
+			
+			Article art = new Article(_wikipedia.getEnvironment(), allIds.get(index)) ;
+			if (art.exists())
+				selectedArticles.add(art) ;
+			
+			allIds.remove(index) ;
+		}
+		
+		allIds = null ;
+		
+		
+		ArticleComparer cmp = new ArticleComparer(_wikipedia) ;
+		
+		
+		long startTime = System.currentTimeMillis() ;
+		int comparisons = 0 ;
+		
+		for (Article artA:selectedArticles) {
+			for (Article artB:selectedArticles) {
+				comparisons++ ;
+				cmp.getRelatedness(artA, artB) ;
+			}
+		}
+		
+		long endTime = System.currentTimeMillis() ;
+		
+		System.out.println(comparisons + " comparisons in " + (endTime-startTime) + " ms") ;
+			
+		
+	}
+	
 
 }

@@ -25,6 +25,7 @@ import org.wikipedia.miner.db.WIterator;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.DbLabel;
 import org.wikipedia.miner.model.Page.PageType;
+import org.wikipedia.miner.util.LabelIterator;
 import org.wikipedia.miner.util.PageIterator;
 import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
@@ -236,10 +237,20 @@ public class Wikipedia {
 	public PageIterator getPageIterator(PageType type) {
 		return new PageIterator(env, type) ;		
 	}
+	
+	/**
+	 * Returns an iterator for all labels in the database, processed according to the given text processor (may be null), in alphabetical order.
+	 * 
+	 * @param tp the text processor
+	 * @return an iterator for all labels in the database, processed according to the given text processor (may be null), in alphabetical order.
+	 */
+	public LabelIterator getLabelIterator(TextProcessor tp) {
+		return new LabelIterator(env, tp) ;
+	}
 
 	/**
-	 * Tidily closes the database environment behind this wikipedia dump. This should be done whenever
-	 * one is finished using the dump. 
+	 * Tidily closes the database environment behind this wikipedia instance. This should be done whenever
+	 * one is finished using it. 
 	 */
 	public void close() {
 		env.close();

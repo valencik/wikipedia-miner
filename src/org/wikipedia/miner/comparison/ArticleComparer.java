@@ -884,8 +884,17 @@ public class ArticleComparer {
 
 			if (dependancies.contains(DataDependency.linkCounts)) 
 				ib.setAttribute(Attributes.inLinkVectorMeasure, cmp.getInLinkVectorMeasure()) ;
+			else
+				ib.setAttribute(Attributes.inLinkVectorMeasure, 0) ;
+		} else {
+			ib.setAttribute(Attributes.inLinkGoogleMeasure, 0) ;
+			ib.setAttribute(Attributes.inLinkUnion, 0) ;
+			ib.setAttribute(Attributes.inLinkIntersection, 0) ;
+			ib.setAttribute(Attributes.inLinkVectorMeasure, 0) ;
 		}
 
+		
+		
 		if (dependancies.contains(DataDependency.pageLinksOut)) {			
 			ib.setAttribute(Attributes.outLinkGoogleMeasure, wrapMissingValue(cmp.getOutLinkGoogleMeasure())) ;
 			ib.setAttribute(Attributes.outLinkUnion, wrapMissingValue(cmp.getOutLinkUnion())) ;
@@ -893,6 +902,13 @@ public class ArticleComparer {
 
 			if (dependancies.contains(DataDependency.linkCounts)) 
 				ib.setAttribute(Attributes.outLinkVectorMeasure, wrapMissingValue(cmp.getOutLinkVectorMeasure())) ;
+			else
+				ib.setAttribute(Attributes.outLinkVectorMeasure, 0) ;
+		} else {
+			ib.setAttribute(Attributes.outLinkGoogleMeasure, 0) ;
+			ib.setAttribute(Attributes.outLinkUnion, 0) ;
+			ib.setAttribute(Attributes.outLinkIntersection, 0) ;
+			ib.setAttribute(Attributes.outLinkVectorMeasure, 0) ;
 		}
 
 		if (relatedness != null)

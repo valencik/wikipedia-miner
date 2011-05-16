@@ -64,10 +64,7 @@ public class Label {
 		this.text = text ;
 		this.textProcessor = tp ;
 		this.detailsSet = false ;
-	}
-	
-	
-	
+	}	
 
 	//public ==================================================================
 
@@ -277,4 +274,13 @@ public class Label {
 		
 		this.detailsSet = true ;
 	}	
+	
+	
+	public static Label createLabel(WEnvironment env, String text, DbLabel dbLabel, TextProcessor tp) {
+		Label l = new Label(env, text, tp) ;
+		l.setDetails(dbLabel) ;
+		
+		return l ;
+	}
+	
 }
