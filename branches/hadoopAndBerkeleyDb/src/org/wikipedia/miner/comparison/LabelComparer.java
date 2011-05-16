@@ -25,7 +25,7 @@ public class LabelComparer {
 	private ArticleComparer articleComparer ;
 	
 	private enum SenseAttr {
-		predictedRelatedness, avgPriorProbability, maxPriorProbability, minPriorProbability
+		predictedRelatedness, avgPriorProbability, maxPriorProbability, minPriorProbability, avgGenerality, maxGenerality, minGenerality
 	}
 	
 	private enum RelatednessAttr {
