@@ -137,22 +137,11 @@ public class ArticleComparison {
 			return 1 ;
 		
 		double sr = (Math.PI/2) - vectorMeasure ; // reverse, so 0=no relation, PI/2= same
-		sr = sr / (Math.PI/2) ; // normalize, so measure is between 0 and 1 ;  
+		sr = sr / (Math.PI/2) ; // normalize, so measure is between 0 and 1 rather than 0 and PI/2 ;  
 		
-		//this roughly follows a power law (almost all measures are near 0) so let's log it to spread it out a bit.
-		sr = Math.log(sr + 1) ;
-		
-		//this is a rough hack, but vector measure is almost always near 0, even for related topics
-		//let's boost it a bit, so it can be combined sensibly with the google measure
-		
-		//the boost was calculated by measuring two closely related topics ("Kiwi" and "Takahe") and ensuring that this would 
-		//receive a score of 90% ;
-		
-		sr = sr * 25 ;
-		
-		//but don't let it get too high
-		if (sr > 0.99)
-			sr = 0.99 ;
+		//ROUGH HACK: this roughly follows a power law (almost all measures are near 0) so let's log it to spread it out a bit.
+		sr = Math.log((sr*1000) + 1) ;
+		sr = sr/4 ;
 		
 		return sr ;
 	}

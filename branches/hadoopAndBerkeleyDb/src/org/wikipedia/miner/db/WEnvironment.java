@@ -322,7 +322,7 @@ public class WEnvironment  {
 		EnvironmentConfig envConf = new EnvironmentConfig() ;
 		envConf.setAllowCreate(false) ;
 		envConf.setReadOnly(true) ;
-		envConf.setCachePercent(20) ;
+		envConf.setCachePercent(10) ;
 		
 		env = new Environment(conf.getDatabaseDirectory(), envConf) ;
 		
@@ -346,7 +346,7 @@ public class WEnvironment  {
 		initDatabases() ;
 		
 		EnvironmentConfig envConf = new EnvironmentConfig() ;
-		envConf.setCachePercent(20) ;
+		envConf.setCachePercent(10) ;
 		
 		envConf.setAllowCreate(true) ;
 		envConf.setReadOnly(false) ;

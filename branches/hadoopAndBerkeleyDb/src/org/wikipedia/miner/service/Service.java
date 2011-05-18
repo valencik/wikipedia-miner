@@ -159,10 +159,10 @@ public abstract class Service extends HttpServlet {
 		try {
 
 			response.setHeader("Cache-Control", "no-cache"); 
-			response.setCharacterEncoding("UTF8") ;
+			response.setCharacterEncoding("UTF-8") ;
 
 			if (prmHelp.getValue(request)) {
-				response.setContentType("application/xml");
+				response.setContentType("application/xml;charset=UTF-8");
 
 				serializer.transform(new DOMSource(getXmlDescription()), new StreamResult(response.getWriter()));
 				return ;

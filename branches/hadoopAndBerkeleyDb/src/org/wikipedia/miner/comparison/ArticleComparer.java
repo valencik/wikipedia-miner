@@ -126,8 +126,10 @@ public class ArticleComparer {
 			&& (cmp.getOutLinkIntersectionProportion() == null || cmp.getOutLinkIntersectionProportion()==0)
 		)
 			return 0.0 ;
+		
+		
 		//System.out.println("gi " + cmp.getInLinkGoogleMeasure()) ;
-		//System.out.println("go " + cmp.getOutLinkGoogleMeasure()) ;
+		///System.out.println("go " + cmp.getOutLinkGoogleMeasure()) ;
 		//System.out.println("ti " + cmp.getInLinkVectorMeasure()) ;
 		//System.out.println("to " + cmp.getOutLinkVectorMeasure()) ;
 
@@ -261,7 +263,7 @@ public class ArticleComparer {
 	 */
 	public void buildDefaultClassifier() throws Exception {
 
-		Classifier classifier = new IsotonicRegression() ;
+		Classifier classifier = new GaussianProcesses() ;
 		relatednessMeasurer.train(classifier, trainingDataset) ;
 	}
 
@@ -320,7 +322,7 @@ public class ArticleComparer {
 		trainingDataset.add(getInstance(cmp, relatedness)) ;
 	}
 
-	private ArticleComparison getComparison(Article artA, Article artB) {
+	public ArticleComparison getComparison(Article artA, Article artB) {
 
 		ArticleComparison cmp = new ArticleComparison(artA, artB) ;
 

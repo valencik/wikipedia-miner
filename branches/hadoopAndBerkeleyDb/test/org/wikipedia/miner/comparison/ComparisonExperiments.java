@@ -1,6 +1,16 @@
 package org.wikipedia.miner.comparison;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -11,17 +21,22 @@ import java.util.Random;
 import jsc.correlation.SpearmanCorrelation;
 
 import org.wikipedia.miner.comparison.ArticleComparer.DataDependency;
+import org.wikipedia.miner.comparison.LabelComparer.ComparisonDetails;
+import org.wikipedia.miner.comparison.LabelComparer.SensePair;
 import org.wikipedia.miner.db.WDatabase.CachePriority;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.model.Article;
+import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Page.PageType;
+import org.wikipedia.miner.util.ArticleSet;
 import org.wikipedia.miner.util.MemoryMeasurer;
 import org.wikipedia.miner.util.PageIterator;
 import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
+import org.wikipedia.miner.util.text.TextProcessor;
 
 public class ComparisonExperiments {
 	
@@ -49,7 +64,7 @@ public class ComparisonExperiments {
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[0])) ;
 		
-		//conf.setArticleComparisonModel(null) ;
+		conf.setArticleComparisonModel(null) ;
 		
 		//conf.setMinLinksIn(20) ;
 		//conf.setMinLinkProbability(0.005F) ;
@@ -59,9 +74,13 @@ public class ComparisonExperiments {
 		//conf.setLabelDisambiguationModel(null) ;
 		//conf.setLabelComparisonModel(null) ;
 		
+		conf.setArticleComparisonModel(new File("models/articleComparison_allDependencies.model")) ;
+		
 		conf.addDatabaseToCache(DatabaseType.pageLinksOut, CachePriority.space) ;
 		conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences, CachePriority.space) ;
 		conf.addDatabaseToCache(DatabaseType.pageLinkCounts, CachePriority.space) ;
+		conf.addDatabaseToCache(DatabaseType.label, CachePriority.space) ;
+		
 		
 		ArrayList<DataDependency> d = new ArrayList<DataDependency>() ;
 		d.add(DataDependency.pageLinksOut) ;
@@ -85,15 +104,15 @@ public class ComparisonExperiments {
 		ComparisonDataSet set = new ComparisonDataSet(new File("data/wikipediaSimilarity353.new.csv")) ;
 		
 		ComparisonExperiments ce = new ComparisonExperiments(wikipedia, set) ;
-		
-		
-		ce.testArticleComparisonWithCrossfoldValidation(true) ;
-		ce.saveArticleComparisonModelAndTrainingData(new File("models/articleComparison_allDependencies.model"), new File("data/articleComparison.arff")) ;
+	
+		//ce.testArticleComparisonWithCrossfoldValidation(true) ;
+		//ce.saveArticleComparisonModelAndTrainingData(new File("models/articleComparison_allDependencies.model"), new File("data/articleComparison.arff")) ;
 		
 		//ce.testArticleComparisonSpeed(100) ;
 		
 		
 		//Eyeball some comparisons directly
+		/*
 		ArrayList<Article> arts = new ArrayList<Article>() ;
 		arts.add(wikipedia.getArticleByTitle("Kiwi")) ;
 		arts.add(wikipedia.getArticleByTitle("Takahe")) ;
@@ -102,11 +121,26 @@ public class ComparisonExperiments {
 		arts.add(wikipedia.getArticleByTitle("New Zealand")) ;
 		arts.add(wikipedia.getArticleByTitle("Hadoop")) ;
 		
+		
+		
 		ce.printAllComparisons(arts) ;
+		*/
 		
 		
-		//testLabelComparison(wikipedia, set, dependencies) ;
+		File randomLabelFile = new File("data/randomLabels.txt") ;
+		//ce.saveRandomLabelSet(1000, randomLabelFile) ;
 		
+		ce.testLabelComparisonWithCrossfoldValidation() ;
+		//ce.saveLabelComparisonModelAndTrainingData(new File("models/labelDisamgiguation.model"), new File("models/labelComparison.model"), new File("data/labelDisambig.arff"), new File("data/labelComparison.arff")) ;
+		
+		//ArrayList<Label> randomLabels = ce.loadLabelSet(randomLabelFile) ;
+		//ce.testLabelComparisonSpeed(randomLabels) ;
+		
+		
+		Label labelA = new Label(wikipedia.getEnvironment(), "Kiwi") ;
+		Label labelB = new Label(wikipedia.getEnvironment(), "Bird") ;
+		
+		ce.printLabelComparisonDetails(labelA, labelB) ;
 		
 		//wikipedia.close();
 	}
@@ -121,6 +155,55 @@ public class ComparisonExperiments {
 				System.out.println(artA + " vs " + artB + ": " + _df.format(sr)) ;
 			}
 		}
+		
+	}
+	
+	public void printVectorScoreMultipliers(Collection<Article> articles) throws Exception {
+		
+		double inTotal = 0 ;
+		int inCount = 0 ;
+		
+		double outTotal = 0 ;
+		int outCount = 0 ;
+		
+		ArticleComparer cmp = new ArticleComparer(_wikipedia) ;
+		
+		for (Article artA:articles) {
+			for (Article artB:articles) {
+				double sr = cmp.getRelatedness(artA, artB) ;
+				
+				
+				if (sr != 0 && sr != 1) {
+					
+					System.out.println(artA + " vs " + artB + ": " + _df.format(sr)) ;
+				
+					ArticleComparison ac = cmp.getComparison(artA, artB) ;
+					
+					if (ac.inLinkFeaturesSet() && ac.getInLinkGoogleMeasure() != 0 && ac.getInLinkVectorMeasure() != 0) {
+						inCount++ ;
+						
+						double ratio = ac.getInLinkGoogleMeasure() / ac.getInLinkVectorMeasure() ;
+						System.out.println(" - in ratio: " + ratio) ;
+						inTotal = inTotal + ratio ;
+					}
+					
+					if (ac.outLinkFeaturesSet() && ac.getOutLinkGoogleMeasure() != 0 && ac.getOutLinkVectorMeasure() != 0) {
+						outCount++ ;
+						
+						double ratio = ac.getOutLinkGoogleMeasure() / ac.getOutLinkVectorMeasure() ;
+						System.out.println(" - out ratio: " + ratio) ;
+						outTotal = outTotal + ratio ;
+					}
+					
+				}
+			}
+		}
+		
+		double inRatio = inTotal/inCount ;
+		double outRatio = outTotal/outCount ;
+		
+		
+		System.out.println("Average ratios in:" + inRatio + " out:" + outRatio) ;
 		
 	}
 	
@@ -155,67 +238,10 @@ public class ComparisonExperiments {
 		System.out.println("Average Correllation: " + avgCorrelation) ;
 	}
 	
-	public void testArticleComparisonSpeed(int size) throws Exception {
-		
-		System.out.println("Testing article comparison speed") ;
-				
-		ArrayList<Integer> allIds = new ArrayList<Integer>() ;
-		
-		
-		PageIterator iter = _wikipedia.getPageIterator(PageType.article);
-		long artCount = _wikipedia.getEnvironment().retrieveStatistic(StatisticName.articleCount) ;
-		ProgressTracker pt = new ProgressTracker(artCount, "Gathering all articles", ComparisonExperiments.class) ;
-		
-		while (iter.hasNext()) {
-			pt.update();
-			Page p = iter.next();
-		
-			allIds.add(p.getId()) ;
-		}
-		//iter.close() ;
-		
-		System.out.println(" - gathering random articles") ;
-		
-		ArrayList<Article> selectedArticles = new ArrayList<Article>() ;
-		Random r = new Random() ;
-		
-		while (selectedArticles.size() < size) {
-			int index = r.nextInt(allIds.size()) ;
-			
-			Article art = new Article(_wikipedia.getEnvironment(), allIds.get(index)) ;
-			if (art.exists()) {
-				selectedArticles.add(art) ;
-				//System.out.println(art) ;
-			}
-				
-			allIds.remove(index) ;
-		}
-		
-		allIds = null ;
-		
-		
-		ArticleComparer cmp = new ArticleComparer(_wikipedia) ;
-		
-		
-		long startTime = System.currentTimeMillis() ;
-		int comparisons = 0 ;
-		
-		for (Article artA:selectedArticles) {
-			for (Article artB:selectedArticles) {
-				comparisons++ ;
-				double sr = cmp.getRelatedness(artA, artB) ;
-				
-				System.out.println(artA + " vs " + artB + ": " + _df.format(sr)) ;
-			}
-		}
-		
-		long endTime = System.currentTimeMillis() ;
-		
-		System.out.println(comparisons + " comparisons in " + (endTime-startTime) + " ms") ;
-		
-		
-		
-	}
+	
+	
+	
+
 	
 	public void saveArticleComparisonModelAndTrainingData(File modelFile, File arffFile) throws Exception {
 		
@@ -231,7 +257,71 @@ public class ComparisonExperiments {
 			cmp.saveTrainingData(arffFile) ;
 	}
 	
+	public void saveRandomArticleSet(int size, File output) throws IOException {
+		
+		ArticleSet artSet = new ArticleSet() ;
+		
+		ArrayList<Integer> allIds = new ArrayList<Integer>() ;
+		
+		PageIterator iter = _wikipedia.getPageIterator(PageType.article);
+		long artCount = _wikipedia.getEnvironment().retrieveStatistic(StatisticName.articleCount) ;
+		ProgressTracker pt = new ProgressTracker(artCount, "Gathering all articles", ComparisonExperiments.class) ;
+		
+		while (iter.hasNext()) {
+			pt.update();
+			Page p = iter.next();
+			if (p.exists())
+				allIds.add(p.getId()) ;
+		}
+		//iter.close() ;
+		
+		System.out.println(" - gathering random articles") ;
+		
+		int collectedArticles = 0 ;
+		Random r = new Random() ;
+		
+		while (collectedArticles < size) {
+			int index = r.nextInt(allIds.size()) ;
+			
+			int artId = allIds.get(index) ;
+			artSet.add(new Article(_wikipedia.getEnvironment(), artId)) ;
+						
+			collectedArticles++ ;	
+			allIds.remove(index) ;
+		}
+		
+		artSet.save(output) ;
+	}
 	
+	public ArticleSet loadArticleSet(File file) throws Exception {
+		
+		ArticleSet artSet = new ArticleSet(file, _wikipedia) ;
+		
+		return artSet ;
+	}
+	
+	public void testArticleComparisonSpeed(ArticleSet articles) throws Exception {
+		
+		System.out.println("Testing article comparison speed") ;
+
+		ArticleComparer cmp = new ArticleComparer(_wikipedia) ;
+		
+		long startTime = System.currentTimeMillis() ;
+		int comparisons = 0 ;
+		
+		for (Article artA:articles) {
+			for (Article artB:articles) {
+				comparisons++ ;
+				double sr = cmp.getRelatedness(artA, artB) ;
+				
+				//System.out.println(artA + " vs " + artB + ": " + _df.format(sr)) ;
+			}
+		}
+		
+		long endTime = System.currentTimeMillis() ;
+		
+		System.out.println(comparisons + " comparisons in " + (endTime-startTime) + " ms") ;
+	}
 	
 	public void testLabelComparisonWithCrossfoldValidation() throws Exception {
 		
@@ -294,55 +384,80 @@ public class ComparisonExperiments {
 			lblCmp.saveComparisonTrainingData(comparisonArff) ;
 	}
 	
-	public void testLabelComparisonSpeed(int size) throws Exception {
+	public void saveRandomLabelSet(int size, File output) throws IOException {
 		
-		System.out.println("Testing article comparison speed") ;
+		Writer out = new BufferedWriter(new OutputStreamWriter( new FileOutputStream(output), "UTF8")) ;
 		
-		System.out.println(" - gathering all articles") ;
+		ArrayList<String> allLabels = new ArrayList<String>() ;
 		
-		ArrayList<Integer> allIds = new ArrayList<Integer>() ;
+		TextProcessor tp = _wikipedia.getConfig().getDefaultTextProcessor() ;
+	
+		Iterator<Label> iter = _wikipedia.getLabelIterator(tp);
+		long labelCount = _wikipedia.getEnvironment().getDbLabel(tp).getDatabaseSize() ;
 		
-		
-		Iterator<Page> iter = _wikipedia.getPageIterator(PageType.article);
-		ProgressTracker pt = new ProgressTracker(_wikipedia.getEnvironment().retrieveStatistic(StatisticName.articleCount), "Gathering all articles", ComparisonExperiments.class) ;
+		ProgressTracker pt = new ProgressTracker(labelCount, "Gathering all labels", ComparisonExperiments.class) ;
 		while (iter.hasNext()) {
 			pt.update();
-			Page p = iter.next();
+			Label l = iter.next();
 		
-			allIds.add(p.getId()) ;
+			if (l.exists())
+				allLabels.add(l.getText()) ;
 		}
 		
-		System.out.println(" - gathering random articles") ;
-		
-		ArrayList<Article> selectedArticles = new ArrayList<Article>() ;
+		System.out.println(" - gathering random labels") ;
+
+		int labelsCollected = 0 ;
 		Random r = new Random() ;
 		
-		while (selectedArticles.size() < size) {
-			int index = r.nextInt(allIds.size()) ;
+		while (labelsCollected < size) {
+			int index = r.nextInt(allLabels.size()) ;
+			
+			String l = allLabels.get(index) ;
+			out.write(l + "\n") ;
+			
+			labelsCollected++ ;
 			
 			
-			Article art = new Article(_wikipedia.getEnvironment(), allIds.get(index)) ;
-			if (art.exists()) {
-				selectedArticles.add(art) ;
-				System.out.println(art) ;
-			}
-				
-			allIds.remove(index) ;
+			allLabels.remove(index) ;
 		}
 		
-		allIds = null ;
+		out.close();
+	}
+	
+	public ArrayList<Label> loadLabelSet(File file) throws Exception {
 		
+		ArrayList<Label> labels = new ArrayList<Label>() ;
+		BufferedReader in = new BufferedReader(new InputStreamReader( new FileInputStream(file), "UTF8")) ;
 		
-		ArticleComparer cmp = new ArticleComparer(_wikipedia) ;
+		TextProcessor tp = _wikipedia.getConfig().getDefaultTextProcessor() ;
 		
+		String line ;
+		while ((line=in.readLine()) != null) {
+			
+			String labelText = line.trim();
+			
+			Label label = new Label(_wikipedia.getEnvironment(), labelText, tp) ;
+			labels.add(label) ;
+			
+		}
+		
+		return labels ;
+	}
+	
+	public void testLabelComparisonSpeed(ArrayList<Label> labels) throws Exception {
+		
+		System.out.println("Testing label comparison speed") ;
+		
+		ArticleComparer artCmp = new ArticleComparer(_wikipedia) ;
+		LabelComparer lblCmp = new LabelComparer(_wikipedia, artCmp) ;
 		
 		long startTime = System.currentTimeMillis() ;
 		int comparisons = 0 ;
 		
-		for (Article artA:selectedArticles) {
-			for (Article artB:selectedArticles) {
+		for (Label lblA:labels) {
+			for (Label lblB:labels) {
 				comparisons++ ;
-				cmp.getRelatedness(artA, artB) ;
+				lblCmp.getRelatedness(lblA, lblB) ;
 			}
 		}
 		
@@ -351,6 +466,21 @@ public class ComparisonExperiments {
 		System.out.println(comparisons + " comparisons in " + (endTime-startTime) + " ms") ;
 			
 		
+	}
+	
+	public void printLabelComparisonDetails(Label a, Label b) throws Exception {
+		
+		ArticleComparer artCmp = new ArticleComparer(_wikipedia) ;
+		LabelComparer lblCmp = new LabelComparer(_wikipedia, artCmp) ;
+		
+		ComparisonDetails cd = lblCmp.compare(a, b) ;
+		
+		System.out.println(" - Relatedness: " + cd.getLabelRelatedness()) ;
+		System.out.println(" - Interpretations: " ) ;
+		
+		for (SensePair sp:cd.getPlausableInterpretations()) {
+			System.out.println("   - " + sp.getSenseA() + " vs. " + sp.getSenseB() + ":" + sp.getSenseRelatedness()) ;
+		}
 	}
 	
 
