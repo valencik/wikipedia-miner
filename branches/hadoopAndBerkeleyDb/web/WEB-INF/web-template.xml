@@ -30,141 +30,193 @@
 
 
 
-
-    <servlet>
-      <servlet-name>ProgressService</servlet-name>
+<servlet>
+      <servlet-name>getProgress</servlet-name>
       <description>
 
       </description>
       <servlet-class>
         org.wikipedia.miner.service.ProgressService
       </servlet-class>
+      <load-on-startup/>
     </servlet>
     
     <servlet-mapping>
-      <servlet-name>ProgressService</servlet-name>
+      <servlet-name>getProgress</servlet-name>
       <url-pattern>/getProgress</url-pattern>
     </servlet-mapping>
 
 
 
     <servlet>
-      <servlet-name>DefineService</servlet-name>
-      <description>
-
-      </description>
-      <servlet-class>
-        org.wikipedia.miner.service.DefineService
-      </servlet-class>
-    </servlet>
-    
-    <servlet-mapping>
-      <servlet-name>DefineService</servlet-name>
-      <url-pattern>/define</url-pattern>
-    </servlet-mapping>
-
-
-
-    <servlet>
-      <servlet-name>SearchService</servlet-name>
+      <servlet-name>search</servlet-name>
       <description>
 
       </description>
       <servlet-class>
         org.wikipedia.miner.service.SearchService
       </servlet-class>
+      <load-on-startup/>
     </servlet>
     
     <servlet-mapping>
-      <servlet-name>SearchService</servlet-name>
+      <servlet-name>search</servlet-name>
       <url-pattern>/search</url-pattern>
     </servlet-mapping>
 
 
-
     <servlet>
-      <servlet-name>BrowseService</servlet-name>
+      <servlet-name>exploreArticle</servlet-name>
       <description>
 
       </description>
       <servlet-class>
-        org.wikipedia.miner.service.BrowseService
+        org.wikipedia.miner.service.ExploreArticleService
       </servlet-class>
+      <load-on-startup/>
     </servlet>
     
     <servlet-mapping>
-      <servlet-name>BrowseService</servlet-name>
-      <url-pattern>/browse</url-pattern>
+      <servlet-name>exploreArticle</servlet-name>
+      <url-pattern>/exploreArticle</url-pattern>
     </servlet-mapping>
 
 
+    <servlet>
+      <servlet-name>exploreCategory</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.ExploreCategoryService
+      </servlet-class>
+      <load-on-startup/>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>exploreCategory</servlet-name>
+      <url-pattern>/exploreCategory</url-pattern>
+    </servlet-mapping>
 
     <servlet>
-      <servlet-name>CompareService</servlet-name>
+      <servlet-name>compare</servlet-name>
       <description>
 
       </description>
       <servlet-class>
         org.wikipedia.miner.service.CompareService
       </servlet-class>
+      <load-on-startup/>
     </servlet>
     
     <servlet-mapping>
-      <servlet-name>CompareService</servlet-name>
+      <servlet-name>compare</servlet-name>
       <url-pattern>/compare</url-pattern>
     </servlet-mapping>
 
 
 
     <servlet>
-      <servlet-name>WikifyService</servlet-name>
+      <servlet-name>wikify</servlet-name>
       <description>
 
       </description>
       <servlet-class>
         org.wikipedia.miner.service.WikifyService
       </servlet-class>
+      <load-on-startup/>
     </servlet>
     
     <servlet-mapping>
-      <servlet-name>WikifyService</servlet-name>
+      <servlet-name>wikify</servlet-name>
       <url-pattern>/wikify</url-pattern>
     </servlet-mapping>
 
 
 
     <servlet>
-      <servlet-name>CorrectionService</servlet-name>
+      <servlet-name>suggest</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.SuggestService
+      </servlet-class>
+      <load-on-startup/>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>suggest</servlet-name>
+      <url-pattern>/suggest</url-pattern>
+    </servlet-mapping>
+
+    <servlet>
+      <servlet-name>correct</servlet-name>
       <description>
 
       </description>
       <servlet-class>
         org.wikipedia.miner.service.CorrectionService
       </servlet-class>
+      <load-on-startup/>
     </servlet>
     
     <servlet-mapping>
-      <servlet-name>CorrectionService</servlet-name>
+      <servlet-name>correct</servlet-name>
       <url-pattern>/correct</url-pattern>
     </servlet-mapping>
 
     
     <servlet>
-      <servlet-name>StatisticsService</servlet-name>
+      <servlet-name>getStats</servlet-name>
       <description>
 
       </description>
       <servlet-class>
         org.wikipedia.miner.service.StatsService
       </servlet-class>
+      <load-on-startup/>
     </servlet>
     
     <servlet-mapping>
-      <servlet-name>StatisticsService</servlet-name>
+      <servlet-name>getStats</servlet-name>
       <url-pattern>/getStats</url-pattern>
     </servlet-mapping>
 
+
+    <servlet>
+      <servlet-name>listWikipedias</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.ListWikipediasService
+      </servlet-class>
+      <load-on-startup/>
+    </servlet>
     
+    <servlet-mapping>
+      <servlet-name>listWikipedias</servlet-name>
+      <url-pattern>/listWikipedias</url-pattern>
+    </servlet-mapping>
+
+
+    <servlet>
+      <servlet-name>listServices</servlet-name>
+      <description>
+
+      </description>
+      <servlet-class>
+        org.wikipedia.miner.service.ListServicesService
+      </servlet-class>
+      <load-on-startup/>
+    </servlet>
+    
+    <servlet-mapping>
+      <servlet-name>listServices</servlet-name>
+      <url-pattern>/listServices</url-pattern>
+    </servlet-mapping>
+
 
 
     <session-config>
