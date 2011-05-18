@@ -2,8 +2,10 @@ package org.wikipedia.miner.comparison;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.TreeSet;
 
 import jsc.correlation.SpearmanCorrelation;
 import jsc.datastructures.PairedData;
@@ -15,7 +17,9 @@ import org.wikipedia.miner.util.ml.*;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.GaussianProcesses;
+import weka.classifiers.functions.SMO;
 import weka.classifiers.meta.Bagging;
+import weka.classifiers.meta.FilteredClassifier;
 import weka.core.Instance;
 import weka.core.Utils;
 
@@ -25,7 +29,7 @@ public class LabelComparer {
 	private ArticleComparer articleComparer ;
 	
 	private enum SenseAttr {
-		predictedRelatedness, avgPriorProbability, maxPriorProbability, minPriorProbability, avgGenerality, maxGenerality, minGenerality
+		predictedRelatedness, distanceFromBenchmarkRelatedness, distanceFromTopRelatedness, distanceFromTopPriorProbability, avgPriorProbability, maxPriorProbability, minPriorProbability, avgGenerality, maxGenerality, minGenerality
 	}
 	
 	private enum RelatednessAttr {
@@ -155,6 +159,9 @@ public class LabelComparer {
 			if (item.getIdA() < 0 || item.getIdB() < 0)
 				continue ;
 			
+			if (item.getRelatedness() < 0.5)
+				continue ;
+			
 			totalInterpretations++ ;
 			
 			Label labelA = new Label(wikipedia.getEnvironment(), item.getTermA()) ;
@@ -169,7 +176,7 @@ public class LabelComparer {
 				if (sp.getSenseA().getId() == item.getIdA() && sp.getSenseB().getId() == item.getIdB())
 					correctInterpretations ++ ;
 			}
-			
+			pt.update();
 		}
 		
 		if (totalInterpretations > 0)
@@ -199,9 +206,14 @@ public class LabelComparer {
 
 	
 	public void buildDefaultClassifiers() throws Exception {
-		Classifier ssClassifier = new Bagging() ;
-		ssClassifier.setOptions(Utils.splitOptions("-P 10 -S 1 -I 10 -W weka.classifiers.trees.J48 -- -U -M 2")) ;
+		
+		
+		Classifier ssClassifier = new SMO() ;
+		//ssClassifier.setOptions(Utils.splitOptions("-F \"weka.filters.supervised.instance.Resample -B 1.0 -S 1 -Z 100.0\" -W weka.classifiers.trees.J48 -- -C 0.25 -M 2")) ;
 		senseSelector.train(ssClassifier, senseDataset) ;
+		
+		
+		
 		
 		Classifier rmClassifier = new GaussianProcesses() ;
 		relatednessMeasurer.train(rmClassifier, relatednessDataset) ;
@@ -281,50 +293,97 @@ public class LabelComparer {
 
 		private void init(Label labelA, Label labelB, Integer senseIdA, Integer senseIdB, Double relatedness) throws Exception {
 			
-			double totalSpRelatedness = 0 ;
-			double totalWeightedSpRelatedness = 0 ;
-			double totalWeight = 0 ;
-			int spCount = 0 ;
+			
+			
 			
 			this.labelA = labelA ;
 			this.labelB = labelB ;
 			concatenation = new Label(wikipedia.getEnvironment(), labelA.getText() + " " + labelB.getText()) ;
 			
+			double benchmarkRelatedness = 0 ;
+			double spacer = 0.3 ;
+			
+			ArrayList<SensePair> candidateInterpretations = new ArrayList<SensePair>() ;
+			
+			double topPriorProbability = 0 ;
+			double topRelatedness = 0 ;
+			
 			for (Label.Sense senseA:labelA.getSenses()) {
 				
 				if (senseA.getPriorProbability() < wikipedia.getConfig().getMinSenseProbability())
-					continue ;
+					break ;
 				
 				for (Label.Sense senseB:labelB.getSenses()) {
 					
 					if (senseB.getPriorProbability() < wikipedia.getConfig().getMinSenseProbability())
-						continue ;
+						break ;
 					
-					SensePair sp ;
+					SensePair sp = new SensePair(senseA, senseB) ;
 					
-					if (senseIdA != null && senseIdB != null) {
-						//this is a training instance, where correct senses are known
-						if (senseA.getId() == senseIdA && senseB.getId() == senseIdB) {
-							sp = new SensePair(senseA, senseB, true) ;
+					if (sp.getSenseRelatedness() > benchmarkRelatedness + (benchmarkRelatedness*spacer)) {
+						//this sets a new benchmark
+						benchmarkRelatedness = sp.getSenseRelatedness() ;
+						candidateInterpretations.clear();
+						candidateInterpretations.add(sp); 
+						topPriorProbability = sp.avgPriorProbability ;
+						topRelatedness = sp.senseRelatedness ;
+						
+					} else if (sp.getSenseRelatedness() > benchmarkRelatedness - (benchmarkRelatedness*spacer)) {
+						//this is close enough to benchmark to be considered
+						candidateInterpretations.add(sp);
+						
+						if (sp.avgPriorProbability > topPriorProbability) 
+							topPriorProbability = sp.avgPriorProbability ;
+						
+						if (sp.senseRelatedness > topRelatedness)
+							topRelatedness = sp.senseRelatedness ;
+					}
+				}
+			}
+			
+			double totalSpRelatedness = 0 ;
+			double totalWeightedSpRelatedness = 0 ;
+			double totalWeight = 0 ;
+			int spCount = 0 ;
+			
+			for (SensePair sp:candidateInterpretations) {
+				
+				
+				sp.setDistanceFromBenchmarkRelatedness(benchmarkRelatedness-sp.getSenseRelatedness()) ;
+				sp.setDistanceFromTopRelatedness(topRelatedness-sp.getSenseRelatedness()) ;
+				sp.setDistanceFromTopPriorProbability(topPriorProbability-sp.avgPriorProbability) ;
+				
+				if (senseIdA != null && senseIdB != null) {
+					//this is a training instance, where correct senses are known
+					if (senseIdA > 0 && senseIdB >0) {
+						if (sp.getSenseA().getId() == senseIdA && sp.getSenseB().getId() == senseIdB) {
+							sp.setIsValid(true) ;
 							plausableInterpretations.add(sp) ;
 						} else {
-							sp = new SensePair(senseA, senseB, false) ;
+							sp.setIsValid(false) ;
 						}
-					} else {
-						//correct senses must be predicted
-						sp = new SensePair(senseA, senseB) ;
-						if (sp.getDisambiguationConfidence() > 0.5)
-							plausableInterpretations.add(sp) ;
+						
+						if (sp.getSenseRelatedness() > 0.5)
+							senseDataset.add(sp.getInstance()) ;
 					}
 					
-					if (sp.getSenseRelatedness() > maxSpRelatedness)
-						maxSpRelatedness = sp.getSenseRelatedness() ;
-					
-					totalSpRelatedness += sp.getSenseRelatedness() ;
-					totalWeightedSpRelatedness += (sp.avgPriorProbability * sp.getSenseRelatedness()) ;
-					totalWeight += sp.avgPriorProbability ;
-					spCount++ ;
+				} else {
+					//correct senses must be predicted
+					sp.predictIsValid() ;
+					if (sp.getDisambiguationConfidence() > 0.1)
+						plausableInterpretations.add(sp) ;
 				}
+		
+				if (sp.getSenseRelatedness() > maxSpRelatedness)
+					maxSpRelatedness = sp.getSenseRelatedness() ;
+				
+				System.out.println("inspected candidate interpretation" + sp) ;
+				
+				
+				totalSpRelatedness += sp.getSenseRelatedness() ;
+				totalWeightedSpRelatedness += (sp.avgPriorProbability * sp.getSenseRelatedness()) ;
+				totalWeight += sp.avgPriorProbability ;
+				spCount++ ;
 			}
 						
 			Collections.sort(plausableInterpretations) ;	
@@ -373,25 +432,62 @@ public class LabelComparer {
 		
 		private Label.Sense senseA ;
 		private Label.Sense senseB ;
+		
 		private Double avgPriorProbability ;
-		private double maxPriorProbability ;
-		private double minPriorProbability ;
+		private Double maxPriorProbability ;
+		private Double minPriorProbability ;
+		
+		private Double avgGenerality ;
+		private Double maxGenerality ;
+		private Double minGenerality ;
+		
+		
+		private Double distanceFromBenchmarkRelatedness ;
+		private Double distanceFromTopRelatedness ;
+		private Double distanceFromTopPriorProbability ;
 		
 		private Double senseRelatedness ;
 		
 		private Boolean isValid = null ;
 		private Double disambiguationConfidence = null ;
 		
-		private SensePair(Label.Sense senseA, Label.Sense senseB, Boolean valid) throws Exception {
-			init(senseA, senseB, valid) ;
-		}
+		//private SensePair(Label.Sense senseA, Label.Sense senseB, Boolean valid) throws Exception {
+		//	init(senseA, senseB, valid) ;
+		//}
 		
 		private SensePair(Label.Sense senseA, Label.Sense senseB) throws Exception {
-			init(senseA, senseB, null) ;
+			init(senseA, senseB) ;
+		}
+		
+		private void setIsValid(boolean valid) {
+			
+			isValid = valid ;
+			if (isValid)
+				disambiguationConfidence = 1.0 ;
+			else
+				disambiguationConfidence = 0.0 ;
+			
+		}
+		
+		private void setDistanceFromBenchmarkRelatedness(double distance) {
+			distanceFromBenchmarkRelatedness = distance ;
+		}
+		
+		private void setDistanceFromTopRelatedness(double distance) {
+			distanceFromTopRelatedness = distance ;
+		}
+		
+		private void setDistanceFromTopPriorProbability(double distance) {
+			distanceFromTopPriorProbability = distance ;
+		}
+		
+		private void predictIsValid() throws ClassMissingException, AttributeMissingException, Exception {
+			disambiguationConfidence = senseSelector.getDecisionDistribution(getInstance()).get(true) ;
+			isValid = (disambiguationConfidence > 0.5) ;
 		}
 		
 		
-		private void init(Label.Sense senseA, Label.Sense senseB, Boolean valid) throws Exception {
+		private void init(Label.Sense senseA, Label.Sense senseB) throws Exception {
 			
 			this.senseA = senseA ;
 			this.senseB = senseB ;
@@ -400,21 +496,14 @@ public class LabelComparer {
 			minPriorProbability = Math.min(senseA.getPriorProbability(), senseB.getPriorProbability()) ;
 			avgPriorProbability = (maxPriorProbability+minPriorProbability)/2 ;
 			
-			senseRelatedness = articleComparer.getRelatedness(senseA, senseB) ;
-			
-			if (valid != null) {
-				isValid = valid ;
-				if (isValid)
-					disambiguationConfidence = 1.0 ;
-				else
-					disambiguationConfidence = 0.0 ;
-				
-				senseDataset.add(getInstance()) ;
-				
-			} else {
-				disambiguationConfidence = senseSelector.getDecisionDistribution(getInstance()).get(true) ;
-				isValid = (disambiguationConfidence > 0.5) ;
+			if (senseA.getGenerality() != null && senseB.getGenerality() != null) {
+				maxGenerality = (double)Math.max(senseA.getGenerality(), senseB.getGenerality()) ;
+				minGenerality = (double)Math.min(senseA.getGenerality(), senseB.getGenerality()) ;
+				avgGenerality = (maxGenerality+minGenerality)/2 ;
 			}
+			
+			
+			senseRelatedness = articleComparer.getRelatedness(senseA, senseB) ;
 		}
 		
 
@@ -446,6 +535,14 @@ public class LabelComparer {
 			ib.setAttribute(SenseAttr.maxPriorProbability, maxPriorProbability) ;
 			ib.setAttribute(SenseAttr.minPriorProbability, minPriorProbability) ;
 			
+			ib.setAttribute(SenseAttr.avgGenerality, avgGenerality) ;
+			ib.setAttribute(SenseAttr.maxGenerality, maxGenerality) ;
+			ib.setAttribute(SenseAttr.minGenerality, minGenerality) ;
+			
+			ib.setAttribute(SenseAttr.distanceFromBenchmarkRelatedness, distanceFromBenchmarkRelatedness) ;
+			ib.setAttribute(SenseAttr.distanceFromTopRelatedness, distanceFromTopRelatedness) ;
+			ib.setAttribute(SenseAttr.distanceFromTopPriorProbability, distanceFromTopPriorProbability) ;
+			
 			if (disambiguationConfidence != null)
 				ib.setClassAttribute(isValid) ;
 			
@@ -458,7 +555,7 @@ public class LabelComparer {
 			int cmp = 0 ;
 			
 			if (disambiguationConfidence != null && sp.disambiguationConfidence != null) {
-				cmp =  sp.disambiguationConfidence.compareTo(disambiguationConfidence) ;
+				cmp = sp.disambiguationConfidence.compareTo(disambiguationConfidence) ;
 				if (cmp != 0)
 					return cmp ;
 			}
@@ -473,6 +570,27 @@ public class LabelComparer {
 			
 			cmp = senseB.compareTo(sp.senseB) ;
 			return cmp ;
+		}
+		
+		@Override
+		public String toString() {
+			
+			DecimalFormat df = new DecimalFormat("0.000") ;
+			
+			StringBuffer sb = new StringBuffer() ;
+			sb.append(senseA) ;
+			sb.append(" vs. ") ;
+			sb.append(senseB) ;
+			
+			if (disambiguationConfidence != null) 
+				sb.append(" dc:" + df.format(disambiguationConfidence)) ;
+			else
+				sb.append(" dc:null") ;
+			
+			sb.append(" r:" + df.format(senseRelatedness)) ;
+			sb.append(" pp:" + df.format(avgPriorProbability)) ;
+			
+			return sb.toString() ;
 		}
 	}
 }
