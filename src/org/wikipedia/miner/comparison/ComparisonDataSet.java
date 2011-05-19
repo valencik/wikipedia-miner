@@ -1,15 +1,13 @@
 package org.wikipedia.miner.comparison;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-
-import javax.xml.parsers.ParserConfigurationException;
-
 import org.apache.log4j.Logger;
-import org.xml.sax.SAXException;
 
 public class ComparisonDataSet {
 
@@ -20,7 +18,7 @@ public class ComparisonDataSet {
 		items = new ArrayList<Item>() ;
 	}
 
-	public ComparisonDataSet(File file)  throws IOException {
+	public ComparisonDataSet(File file, int maxRelatedness)  throws IOException {
 		items = new ArrayList<Item>() ;
 
 		int articlePairs = 0 ;
@@ -54,7 +52,7 @@ public class ComparisonDataSet {
 				Double relatedness = new Double(values[4]) ;
 
 				//make between 0 and 1; its what we are used to.
-				relatedness = relatedness/10 ;
+				relatedness = relatedness/maxRelatedness ;
 
 				if (idA > 0 && idB > 0)
 					articlePairs ++ ;
@@ -108,28 +106,54 @@ public class ComparisonDataSet {
 		return items ;
 	}
 
-	public void addItem(String termA, int idA, String termB, int idB, double relatedness) {
+	public void addItem(String termA, Integer idA, String termB, Integer idB, double relatedness) {
 
 		items.add(new Item(termA, idA, termB, idB, relatedness)) ;
 
+	}
+	
+	public void save(File file) throws Exception {
+		
+		BufferedWriter out = new BufferedWriter(new FileWriter(file)) ;
+		
+		for (Item item:items) {
+			
+			String msg = item.termA + "," + item.idA + "," + item.termB + "," + item.idB + "," + item.relatedness + "\n" ;
+			
+			//byte[] bytes = UnicodeUtil.convert(msg.getBytes(), "UTF-8"); 
+			
+			out.write(msg) ;
+		}
+		
+		out.close();
 	}
 
 
 	public class Item {
 
 		private String termA ;
-		private Integer idA ;
+		private int idA ;
 
 		private String termB ;
-		private Integer idB ;
+		private int idB ;
 
 		private double relatedness ;
 
 		public Item(String termA, Integer idA, String termB, Integer idB, double relatedness) {
 			this.termA = termA ;
-			this.idA = idA ;
+			
+			if (idA == null)
+				this.idA = -1 ;
+			else
+				this.idA = idA ;
+			
 			this.termB = termB ;
-			this.idB = idB ;
+			
+			if (idB == null)
+				this.idB = -1 ;
+			else
+				this.idB = idB ;
+			
 			this.relatedness = relatedness ;
 		}
 
