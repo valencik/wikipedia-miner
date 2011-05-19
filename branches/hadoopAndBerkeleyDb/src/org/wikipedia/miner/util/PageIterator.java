@@ -151,5 +151,10 @@ public class PageIterator implements Iterator<Page> {
 		
 		System.out.println(count) ;
 	}*/
+	
+	public void close() {
+		iter.close();
+		
+	}
 }
 
