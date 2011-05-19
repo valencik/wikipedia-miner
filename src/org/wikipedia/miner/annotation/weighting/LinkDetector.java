@@ -35,6 +35,7 @@ import org.wikipedia.miner.util.ml.Decider;
 import org.wikipedia.miner.util.ml.DeciderBuilder;
 
 import weka.classifiers.Classifier;
+import weka.classifiers.meta.Bagging;
 import weka.core.*;
 
 /**
@@ -243,6 +244,12 @@ public class LinkDetector extends TopicWeighter{
 		decider.train(classifier, dataset) ;
 	}
 	
+	
+	public void buildDefaultClassifier() throws Exception {
+		Classifier classifier = new Bagging() ;
+		classifier.setOptions(Utils.splitOptions("-P 10 -S 1 -I 10 -W weka.classifiers.trees.J48 -- -U -M 2")) ;
+		decider.train(classifier, dataset) ;
+	}
 	
 	/**
 	 * Tests the link detector on a set of Wikipedia articles, to see how well it makes the same 

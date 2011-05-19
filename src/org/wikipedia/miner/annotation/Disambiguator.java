@@ -37,6 +37,7 @@ import org.wikipedia.miner.util.text.*;
 import org.wikipedia.miner.model.Label.Sense;
 
 import weka.classifiers.*;
+import weka.classifiers.meta.Bagging;
 import weka.core.* ;
 import weka.filters.supervised.instance.Resample ;
 
@@ -249,6 +250,12 @@ public class Disambiguator {
 	public void buildClassifier(Classifier classifier) throws Exception {
 		Logger.getLogger(Disambiguator.class).info("building classifier") ;
 
+		decider.train(classifier, dataset) ;
+	}
+	
+	public void buildDefaultClassifier() throws Exception {
+		Classifier classifier = new Bagging() ;
+		classifier.setOptions(Utils.splitOptions("-P 10 -S 1 -I 10 -W weka.classifiers.trees.J48 -- -U -M 2")) ;
 		decider.train(classifier, dataset) ;
 	}
 	
