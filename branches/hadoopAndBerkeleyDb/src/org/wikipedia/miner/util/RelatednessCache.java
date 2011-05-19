@@ -33,6 +33,9 @@ public class RelatednessCache {
 	TLongDoubleHashMap cachedRelatedness ;
 	ArticleComparer comparer ;
 	
+	private long comparisonsRequested = 0 ;
+	private long comparisonsCalculated = 0 ;
+	
 	/**
 	 * Initialises the relatedness cache, where relatedness will be measured using the given {@link  ArticleComparer}.
 	 *  
@@ -54,21 +57,39 @@ public class RelatednessCache {
 	 */
 	public double getRelatedness(Article art1, Article art2) throws Exception {
 		
+		comparisonsRequested++ ;
+		
 		//generate unique key for this pair
 		long min = Math.min(art1.getId(), art2.getId()) ;
 		long max = Math.max(art1.getId(), art2.getId()) ;
 		long key = min + (max << 30) ;
 		
 		double relatedness ;
+		
 				
 		if (!cachedRelatedness.containsKey(key)) {		
 			relatedness = comparer.getRelatedness(art1, art2) ;		
 			cachedRelatedness.put(key, relatedness) ;
+			
+			comparisonsCalculated++ ;
 		} else {
 			relatedness = cachedRelatedness.get(key) ;
 		}
 		
 		//System.out.println(art1 + " vs. " + art2 + ", " + relatedness) ;
 		return relatedness ;
-	}	
+	}
+	
+	public long getComparisonsCalculated() {
+		return comparisonsCalculated ;
+	}
+	
+	public long getComparisonsRequested() {
+		return comparisonsRequested ;
+	}
+	
+	public double getCachedProportion() {
+		double p = (double)comparisonsCalculated/comparisonsRequested ;
+		return 1-p ;
+	}
 }
