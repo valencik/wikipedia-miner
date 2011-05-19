@@ -113,6 +113,10 @@ public class WikipediaConfiguration {
 		databasesToCache.put(type, priority) ;
 	}
 	
+	public void clearDatabasesToCache() {
+		databasesToCache.clear();
+	}
+	
 	public Set<DatabaseType> getDatabasesToCache() {
 		return databasesToCache.keySet() ;
 	}
