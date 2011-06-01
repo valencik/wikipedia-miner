@@ -79,4 +79,8 @@ public class LabelIterator implements Iterator<Label>{
 		else
 			return Label.createLabel(env, e.getKey(), e.getValue(), tp) ;
 	}
+
+	public void close() {
+		iter.close();
+	}
 }
