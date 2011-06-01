@@ -7,7 +7,7 @@
 
                 <RootCategory>Fundamental categories</RootCategory>
                 
-                <DisambiguationCategory>disambiguation</DisambiguationCategory>
+                <DisambiguationCategory>Disambiguation</DisambiguationCategory>
                 
                 <DisambiguationTemplate>disambiguation</DisambiguationTemplate>
                 <DisambiguationTemplate>disambig</DisambiguationTemplate>
@@ -22,6 +22,7 @@
                 <DisambiguationTemplate>shipindex</DisambiguationTemplate>
                 <DisambiguationTemplate>SIA</DisambiguationTemplate>
 
+				<RedirectIdentifier>REDIRECT</RedirectIdentifier>
         </Language>
 
 
@@ -37,6 +38,21 @@
 		<DisambiguationTemplate>2CC</DisambiguationTemplate>
 		<DisambiguationTemplate>3CC</DisambiguationTemplate>
 		<DisambiguationTemplate>hndis</DisambiguationTemplate>
+		
+		<RedirectIdentifier>REDIRECT</RedirectIdentifier>
+		
+	</Language>
+	
+	<Language code="de" name="German" localName="Deutsch">
+
+		<RootCategory>!Hauptkategorie</RootCategory>
+
+		<DisambiguationCategory>Begriffsklärung</DisambiguationCategory>
+
+		<DisambiguationTemplate>Begriffsklärung</DisambiguationTemplate>
+		
+		<RedirectIdentifier>REDIRECT</RedirectIdentifier>
+		<RedirectIdentifier>WEITERLEITUNG</RedirectIdentifier>
 		
 	</Language>
 

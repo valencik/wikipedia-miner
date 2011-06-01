@@ -20,12 +20,14 @@ import org.apache.hadoop.fs.Path;
 
 public class LanguageConfiguration {
 	
-	private enum LangTag {Language, RootCategory, DisambiguationCategory, DisambiguationTemplate, ignorable}
+	private enum LangTag {Language, RootCategory, DisambiguationCategory, DisambiguationTemplate, RedirectIdentifier, ignorable}
 
 	String rootCategory = null ;  
 	Vector<String> disambigCategories = new Vector<String>() ;
 	Vector<String> disambigTemplates = new Vector<String>() ;
+	Vector<String> redirectIdentifiers = new Vector<String>() ;
 	Pattern disambigPattern ;
+	Pattern redirectPattern ;
 	
 	public LanguageConfiguration(FileSystem dfs, String langCode, Path languageConfigFile) throws XMLStreamException, FactoryConfigurationError, IOException {
 		this.init(new InputStreamReader(dfs.open(languageConfigFile)), langCode) ;
@@ -76,6 +78,9 @@ public class LanguageConfiguration {
 					case DisambiguationTemplate:
 						disambigTemplates.add(characters.toString().trim());
 						break ;
+					case RedirectIdentifier:
+						redirectIdentifiers.add(characters.toString().trim());
+						break ;
 					}
 				}
 				characters = new StringBuffer() ;
@@ -94,6 +99,9 @@ public class LanguageConfiguration {
 		
 		if (rootCategory == null) 
 			throw new XMLStreamException("language configuration does not specify a root category") ;
+		
+		if (redirectIdentifiers == null) 
+			throw new XMLStreamException("language configuration does not specify any redirect identifiers") ;
 		
 		//now construct regex pattern for detecting disambig pages ;
 		
@@ -156,6 +164,18 @@ public class LanguageConfiguration {
 			else
 				disambigPattern = Pattern.compile(disambigTemplateRegex, Pattern.CASE_INSENSITIVE) ;
 		}
+		
+		StringBuffer redirectRegex = new StringBuffer("\\#") ;
+		redirectRegex.append("(") ;
+		for (String ri:redirectIdentifiers) {
+			redirectRegex.append(ri) ;
+			redirectRegex.append("|") ;
+		}
+		redirectRegex.deleteCharAt(redirectRegex.length()-1) ;
+		redirectRegex.append(")[:\\s]*(?:\\[\\[(.*)\\]\\]|(.*))") ;
+		
+		redirectPattern = Pattern.compile(redirectRegex.toString(), Pattern.CASE_INSENSITIVE) ;
+		
 	}
 	
 	public String getRootCategoryName() {
@@ -170,9 +190,18 @@ public class LanguageConfiguration {
 		return disambigTemplates ;
 	}
 	
+	public Vector<String> getRedirectIdentifiers() {
+		return redirectIdentifiers ;
+	}
+	
 	public Pattern getDisambiguationPattern() {
 		return disambigPattern ;
 	}
+	
+	public Pattern getRedirectPattern() {
+		return redirectPattern ;
+	}
+	
 	
 	private LangTag resolveLangTag(String tagName) {
 

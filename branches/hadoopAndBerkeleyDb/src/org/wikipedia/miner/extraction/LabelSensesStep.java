@@ -5,7 +5,9 @@ import gnu.trove.TObjectIntHashMap;
 
 import java.io.File;
 import java.io.DataOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.* ;
@@ -14,6 +16,8 @@ import java.util.regex.Pattern;
 
 import opennlp.maxent.io.SuffixSensitiveGISModelReader;
 import opennlp.tools.sentdetect.SentenceDetectorME;
+import opennlp.tools.sentdetect.SentenceModel;
+import opennlp.tools.util.Span;
 
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.filecache.DistributedCache;
@@ -198,8 +202,27 @@ public class LabelSensesStep extends Configured implements Tool {
 
 					if (p.getName().equals(new Path(job.get(DumpExtractor.KEY_SENTENCE_MODEL)).getName())) {
 						Logger.getLogger(LabelSensesMapper.class).info("Located cached sentence model " + p.toString()) ;
-						File sentenceModel = new File(p.toString()) ;
-						sentenceDetector = new SentenceDetectorME(new SuffixSensitiveGISModelReader(sentenceModel).getModel()) ;
+						File sentenceModelFile = new File(p.toString()) ;
+						
+						InputStream sentenceModelStream = new FileInputStream(sentenceModelFile);
+						SentenceModel model = null ;
+						try {
+						  model = new SentenceModel(sentenceModelStream);
+						}
+						catch (IOException e) {
+						  e.printStackTrace();
+						}
+						finally {
+						  if (sentenceModelStream != null) {
+						    try {
+						    	sentenceModelStream.close();
+						    }
+						    catch (IOException e) {
+						    }
+						  }
+						}
+
+						sentenceDetector = new SentenceDetectorME(model) ;
 					}
 
 					if (p.getName().equals(new Path(DumpExtractor.OUTPUT_SITEINFO).getName())) {
@@ -401,11 +424,9 @@ public class LabelSensesStep extends Configured implements Tool {
 			//also mask content in brackets, so it is impossible to split within these. 
 			markup_linksMasked = stripper.stripRegions(markup_linksMasked, stripper.gatherComplexRegions(markup_linksMasked, "\\(", "\\)"), 'A') ;
 
-
-
 			//add all splits detected by OpenNLP sentenceDetector
-			for(int split:sentenceDetector.sentPosDetect(markup_linksMasked))
-				sentenceSplits.add(split) ;
+			for(Span span:sentenceDetector.sentPosDetect(markup_linksMasked))
+				sentenceSplits.add(span.getEnd()) ;
 
 			//add all splits detected in markup (multiple newlines, or lines starting with indent or list marker)
 
