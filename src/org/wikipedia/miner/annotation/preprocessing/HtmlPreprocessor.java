@@ -80,7 +80,7 @@ public class HtmlPreprocessor extends DocumentPreprocessor{
 			bodyStart = 0 ;
 		
 		
-		System.out.println(temp.substring(0, bodyStart)) ;
+		//System.out.println(temp.substring(0, bodyStart)) ;
 		
 		
 		//add title to context

@@ -21,7 +21,6 @@
 package org.wikipedia.miner.annotation;
 
 import java.io.*;
-import java.sql.*;
 import java.util.*;
 import java.util.regex.*;
 
@@ -162,7 +161,7 @@ public class TopicDetector {
 	
 	
 	
-	private Vector<TopicReference> getReferences(String text) throws SQLException{
+	private Vector<TopicReference> getReferences(String text) {
 
 		Vector<TopicReference> references = new Vector<TopicReference>() ;
 		//int sentenceStart = 0 ;

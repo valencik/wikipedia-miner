@@ -60,6 +60,8 @@ public class LinkDetector extends TopicWeighter{
 	private Decider<Attributes, Boolean> decider ;
 	private Dataset<Attributes, Boolean> dataset ;
 	
+	int linksConsidered = 0 ;
+	
 		
 	//private FastVector attributes ;
 	//private Instances trainingData ;
@@ -111,6 +113,10 @@ public class LinkDetector extends TopicWeighter{
 		}
 	}
 	
+	public int getLinksConsidered() {
+		return linksConsidered ;
+	}
+	
 	/**
 	 * Weights and sorts the the given list of topics according to how likely they are to be Wikipedia links if the 
 	 * document they were extracted from was a Wikipedia article. 
@@ -147,6 +153,8 @@ public class LinkDetector extends TopicWeighter{
 			double prob = decider.getDecisionDistribution(i).get(true) ;
 			topic.setWeight(prob) ;
 			weightedTopics.add(topic) ;
+			
+			linksConsidered++ ;
 		}
 
 		Collections.sort(weightedTopics) ;
@@ -177,6 +185,8 @@ public class LinkDetector extends TopicWeighter{
 			
 			tracker.update() ;
 		}
+		
+		weightTrainingInstances() ;
 	}
 
 	/**
@@ -206,6 +216,11 @@ public class LinkDetector extends TopicWeighter{
 		Logger.getLogger(LinkDetector.class).info("loading training data") ;
 		
 		dataset.load(file) ;
+		weightTrainingInstances() ;
+	}
+	
+	public void clearTrainingData() {
+		dataset = null ;
 	}
 
 	/**
@@ -379,43 +394,42 @@ public class LinkDetector extends TopicWeighter{
 		return links ;		
 	}
 	
+	//TODO: this should really be refactored as a separate filter
 	@SuppressWarnings("unchecked")
-	/*
 	private void weightTrainingInstances() {
-		
+
 		double positiveInstances = 0 ;
 		double negativeInstances = 0 ; 
-		
-		Enumeration<Instance> e = trainingData.enumerateInstances() ;
-		
+
+		Enumeration<Instance> e = dataset.enumerateInstances() ;
+
 		while (e.hasMoreElements()) {
-			Instance i = e.nextElement() ;
-			
-			double isValidSense = i.value(attributes.size()-1) ;
-			
+			Instance i = (Instance) e.nextElement() ;
+
+			double isValidSense = i.value(3) ;
+
 			if (isValidSense == 0) 
 				positiveInstances ++ ;
 			else
 				negativeInstances ++ ;
 		}
-		
+
 		double p = (double) positiveInstances / (positiveInstances + negativeInstances) ;
-				
-		System.out.println("stats: positive=" +p + ", negative=" + (1-p)) ;
-		
-		e = trainingData.enumerateInstances() ;
-		
+
+		e = dataset.enumerateInstances() ;
+
 		while (e.hasMoreElements()) {
-			Instance i = e.nextElement() ;
-			
-			double isLinked = i.value(attributes.size()-1) ;
-			
-			if (isLinked == 0) 
+			Instance i = (Instance) e.nextElement() ;
+
+			double isValidSense = i.value(3) ;
+
+			if (isValidSense == 0) 
 				i.setWeight(0.5 * (1.0/p)) ;
 			else
 				i.setWeight(0.5 * (1.0/(1-p))) ;
 		}
-	}*/
+
+	}
 
 	
 	/**

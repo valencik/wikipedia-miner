@@ -20,8 +20,6 @@
 
 package org.wikipedia.miner.annotation;
 
-import java.sql.SQLException;
-
 import org.wikipedia.miner.model.* ;
 import org.wikipedia.miner.util.*;
 
@@ -58,7 +56,7 @@ public class TopicReference implements Comparable<TopicReference>{
 	 * @param position the location (start and end character indices) from which this reference was mined
 	 * @throws SQLException if there is a problem with the Wikipedia database that the label was obtained from
 	 */
-	public TopicReference(Label label, Position position) throws SQLException{
+	public TopicReference(Label label, Position position) {
 		this.label = label ;
 		this.position = position ;
 		
