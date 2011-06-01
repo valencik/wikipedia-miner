@@ -104,7 +104,7 @@ public class DumpExtractor {
 		conf.set(KEY_SENTENCE_MODEL, args[3]) ;
 		conf.set(KEY_OUTPUT_DIR, args[4]) ;
 		
-		conf.set("mapred.child.java.opts", "-Xmx1800M -d32") ;
+		conf.set("mapred.child.java.opts", "-Xmx3G") ;
 		
 		//force one reducer. These don't take very long, and multiple reducers would make finalise file functions more complicated.  
 		conf.setNumReduceTasks(1) ;

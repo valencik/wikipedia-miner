@@ -28,8 +28,7 @@ public class DumpPageParser {
 	private LanguageConfiguration languageConfiguration ;
 	private SiteInfo siteInfo ;
 	
-	private Pattern redirectPattern = Pattern.compile("\\#redirect[:\\s]*(?:\\[\\[(.*)\\]\\]|(.*))", Pattern.CASE_INSENSITIVE) ;
-	
+	//private Pattern redirectPattern ; 
 	private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'") ;
 	
 
@@ -127,14 +126,14 @@ public class DumpPageParser {
 				type = PageType.disambiguation ;
 			}
 			
-			m = redirectPattern.matcher(text) ;
+			m = languageConfiguration.getRedirectPattern().matcher(text) ;
 			if (m.find()) {
 				type = PageType.redirect ;
 				
-				if (m.group(1) != null)
-					redirectTarget = m.group(1) ;
-				else
+				if (m.group(2) != null)
 					redirectTarget = m.group(2) ;
+				else
+					redirectTarget = m.group(3) ;
 			}
 		}
 		
