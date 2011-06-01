@@ -19,7 +19,8 @@ import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
-import org.wikipedia.miner.util.ml.*;
+
+import weka.wrapper.*;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.GaussianProcesses;

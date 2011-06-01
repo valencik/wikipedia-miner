@@ -14,7 +14,8 @@ import org.wikipedia.miner.annotation.Disambiguator;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.ProgressTracker;
-import org.wikipedia.miner.util.ml.*;
+
+import weka.wrapper.*;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.GaussianProcesses;

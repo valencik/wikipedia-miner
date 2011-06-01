@@ -30,9 +30,8 @@ import org.wikipedia.miner.annotation.ArticleCleaner.SnippetLength;
 import org.wikipedia.miner.annotation.preprocessing.DocumentPreprocessor;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
-import org.wikipedia.miner.util.ml.Dataset;
-import org.wikipedia.miner.util.ml.Decider;
-import org.wikipedia.miner.util.ml.DeciderBuilder;
+
+import weka.wrapper.*;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.meta.Bagging;
