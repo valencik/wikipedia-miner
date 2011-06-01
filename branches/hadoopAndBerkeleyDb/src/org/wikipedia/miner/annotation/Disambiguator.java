@@ -32,9 +32,10 @@ import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
-import org.wikipedia.miner.util.ml.*;
 import org.wikipedia.miner.util.text.*;
 import org.wikipedia.miner.model.Label.Sense;
+
+import weka.wrapper.*;
 
 import weka.classifiers.*;
 import weka.classifiers.meta.Bagging;
