@@ -48,6 +48,7 @@ public class ComparisonExperiments {
 
 	ArrayList<Label> _randomLabels ;
 	ArticleSet _randomArticles ;
+	
 
 	public ComparisonExperiments(Wikipedia wikipedia, ComparisonDataSet set, File randomArticles, File randomLabels) throws Exception {
 
@@ -83,33 +84,41 @@ public class ComparisonExperiments {
 
 	public static void main(String[] args) throws Exception {
 
-		//File confFile = new File("configs/en.xml") ;
-		//ComparisonDataSet set = new ComparisonDataSet(new File("data/wikipediaSimilarity353_2011.csv"), 10) ;
-		//File randomArticleFile = new File("data/randomArticles.txt") ;
-		//File randomLabelFile = new File("data/randomLabels.txt") ;
 		
+		File confFile = new File("configs/en.xml") ;
+		ComparisonDataSet set = new ComparisonDataSet(new File("data/compare/wikipediaSimilarity353.csv"), 10) ;
+		File randomArticleFile = new File("data/compare/en_randomArticles.txt") ;
+		File randomLabelFile = new File("data/compare/en_randomLabels.txt") ;
+		
+		/*
 		File confFile = new File("configs/de.xml") ;
-		ComparisonDataSet set = new ComparisonDataSet(new File("data/gur350.csv"), 4) ;
-		File randomArticleFile = new File("data/de_randomArticles.txt") ;
-		File randomLabelFile = new File("data/de_randomLabels.txt") ;
+		ComparisonDataSet set = new ComparisonDataSet(new File("data/compare/gur350nn.csv"), 4) ;
+		File randomArticleFile = new File("data/compare/de_randomArticles.txt") ;
+		File randomLabelFile = new File("data/compare/de_randomLabels.txt") ;
+		*/
 		
-	
 		WikipediaConfiguration conf = new WikipediaConfiguration(confFile) ;
+		
+		
+		//Make absolutely sure no models are being used
 		conf.setArticleComparisonModel(null) ;
+		conf.setLabelComparisonModel(null) ;
+		conf.setLabelDisambiguationModel(null) ;
+		
+		//allow detection of obscure labels (which are unfortunately common in the 353 dataset
+		conf.setMinLinkProbability(0) ;
+		
+		//prepareRandomArticlesAndLabels(conf, randomArticleFile, randomLabelFile) ;
 		
 		Wikipedia wikipedia = new Wikipedia(conf, false) ;
-		
-		//saveRandomArticleSet(1000, randomArticleFile, wikipedia) ;
-		//saveRandomLabelSet(1000, randomLabelFile, wikipedia) ;
 		
 		ComparisonExperiments ce = new ComparisonExperiments(wikipedia, set, randomArticleFile, randomLabelFile) ;
 		wikipedia.close() ;
 		
+		
+		/*
+		
 		ArrayList<ArticleComparisonDataPoint> artCmpResults = new ArrayList<ArticleComparisonDataPoint>() ;
-		//ArrayList<LabelComparisonDataPoint> lblCmpResults = new ArrayList<LabelComparisonDataPoint>() ;
-		
-		
-		
 		
 		ArrayList<DataDependency> d = new ArrayList<DataDependency>() ;
 		
@@ -148,6 +157,50 @@ public class ComparisonExperiments {
 		for (ArticleComparisonDataPoint p:artCmpResults) {
 			System.out.println(p) ;
 		}
+		*/
+		
+		
+		ArrayList<LabelComparisonDataPoint> lblCmpResults = new ArrayList<LabelComparisonDataPoint>() ;
+		
+		ArrayList<DataDependency> d = new ArrayList<DataDependency>() ;
+		
+		boolean cacheLabels = true ;
+		boolean useML = true ;
+		
+		//pageLinksIn
+		d.add(DataDependency.pageLinksIn) ;
+		conf = configureConf(conf, d, cacheLabels) ;
+		lblCmpResults.add(ce.doLabelComparisonExperiment(conf, useML)) ;
+		
+		//pageLinksIn+linkCounts
+		d.add(DataDependency.linkCounts) ;
+		conf = configureConf(conf,d, cacheLabels) ;
+		lblCmpResults.add(ce.doLabelComparisonExperiment(conf, useML)) ;
+		
+		//pageLinksOut
+		d.clear();
+		d.add(DataDependency.pageLinksOut) ;
+		conf = configureConf(conf, d, cacheLabels) ;
+		lblCmpResults.add(ce.doLabelComparisonExperiment(conf, useML)) ;
+		
+		//pageLinksOut+linkCounts
+		d.add(DataDependency.linkCounts) ;
+		conf = configureConf(conf,d, cacheLabels) ;
+		lblCmpResults.add(ce.doLabelComparisonExperiment(conf, useML)) ;
+		
+		//pageLinksIn+pageLinksOut+linkCounts
+		d.add(DataDependency.pageLinksIn) ;
+		conf = configureConf(conf,d, cacheLabels) ;
+		lblCmpResults.add(ce.doLabelComparisonExperiment(conf, useML)) ;
+		
+		
+		System.out.println("\n\nFINAL RESULTS\n\n") ;
+		for (LabelComparisonDataPoint p:lblCmpResults) {
+			System.out.println(p) ;
+		}
+		
+		
+		
 		
 
 		//ce.testArticleComparisonWithCrossfoldValidation(true) ;
@@ -176,20 +229,48 @@ public class ComparisonExperiments {
 
 		//File randomLabelFile = new File("data/randomLabels.txt") ;
 		//ce.saveRandomLabelSet(1000, randomLabelFile) ;
-
-		//ce.testLabelComparisonWithCrossfoldValidation() ;
+		
+		//ArrayList<DataDependency> d = new ArrayList<DataDependency>() ;
+		//d.add(DataDependency.pageLinksIn) ;
+		//d.add(DataDependency.pageLinksOut) ;
+		//d.add(DataDependency.linkCounts) ;
+		
+		//conf = configureConf(conf, d, false) ;
+		
+		
+		
+		//LabelComparisonDataPoint p = ce.doLabelComparisonExperiment(conf, true, false, true) ;
+		//System.out.println(p) ;
+		
+		
+		
+		
+		
+		
 		//ce.saveLabelComparisonModelAndTrainingData(new File("models/labelDisamgiguation.model"), new File("models/labelComparison.model"), new File("data/labelDisambig.arff"), new File("data/labelComparison.arff")) ;
 
 		//ArrayList<Label> randomLabels = ce.loadLabelSet(randomLabelFile) ;
 		//ce.testLabelComparisonSpeed(randomLabels) ;
 
 
-		//Label labelA = new Label(wikipedia.getEnvironment(), "Kiwi") ;
-		//Label labelB = new Label(wikipedia.getEnvironment(), "Bird") ;
 
-		//ce.printLabelComparisonDetails(labelA, labelB) ;
 
 		//wikipedia.close();
+	}
+	
+	public static void prepareRandomArticlesAndLabels(WikipediaConfiguration conf, File randomArticleFile, File randomLabelFile) throws IOException {
+		
+		//need to cache appropriate databases to memory, to make sure selected articles and labels aren't thrown out because of conf settings
+		
+		conf.addDatabaseToCache(DatabaseType.label) ;
+		conf.addDatabaseToCache(DatabaseType.page) ;
+		
+		Wikipedia wikipedia = new Wikipedia(conf, false) ;
+		saveRandomArticleSet(1000, randomArticleFile, wikipedia) ;
+		saveRandomLabelSet(1000, randomLabelFile, wikipedia) ;
+		
+		wikipedia.close();
+		
 	}
 
 
@@ -215,10 +296,14 @@ public class ComparisonExperiments {
 
 		point.cacheTime = timeEnd-timeStart ;
 		point.cacheSpace = memEnd-memStart ;
+		
+		saveArticleComparisonModelAndTrainingData(point, wikipedia) ;
 
 		point = testArticleComparisonWithCrossfoldValidation(point, wikipedia) ;
 
 		point = testArticleComparisonSpeed(point, wikipedia) ;
+		
+		
 
 		wikipedia.close();
 		
@@ -244,11 +329,18 @@ public class ComparisonExperiments {
 
 		point.cacheTime = timeEnd-timeStart ;
 		point.cacheSpace = memEnd-memStart ;
-
+		
+		saveLabelComparisonModelAndTrainingData(point, wikipedia) ;
+		
 		point = testLabelComparisonWithCrossfoldValidation(point, wikipedia) ;
 
 		point = testLabelComparisonSpeed(point, wikipedia) ;
 
+		//Label labelA = new Label(wikipedia.getEnvironment(), "Kiwi") ;
+		//Label labelB = new Label(wikipedia.getEnvironment(), "Bird") ;
+
+		//printLabelComparisonDetails(labelA, labelB, wikipedia) ;
+		
 		wikipedia.close();
 		
 		return point ;
@@ -307,18 +399,21 @@ public class ComparisonExperiments {
 
 
 
-	public void saveArticleComparisonModelAndTrainingData(File modelFile, File arffFile, Wikipedia wikipedia) throws Exception {
+	public void saveArticleComparisonModelAndTrainingData(ArticleComparisonDataPoint p, Wikipedia wikipedia) throws Exception {
 
 		ArticleComparer cmp = new ArticleComparer(wikipedia) ;
 
 		cmp.train(_set) ;
 		cmp.buildDefaultClassifier() ;
+		
+		String fileNameChunk = getFileNameChunk(p) ;
+		
+		File model = new File("models/compare/artCompare_" + fileNameChunk + ".model") ;
+		cmp.saveClassifier(model) ;
+		
+		File arff = new File("data/compare/artCompare_" + fileNameChunk + ".arff") ;
+		cmp.saveTrainingData(arff) ;
 
-		if (modelFile != null)
-			cmp.saveClassifier(modelFile) ;
-
-		if (arffFile != null)
-			cmp.saveTrainingData(arffFile) ;
 	}
 
 	public static void saveRandomArticleSet(int size, File output, Wikipedia wikipedia) throws IOException {
@@ -432,28 +527,31 @@ public class ComparisonExperiments {
 		return point ;
 	}
 
-	public void saveLabelComparisonModelAndTrainingData(File disambigModel, File comparisonModel, File disambigArff, File comparisonArff, Wikipedia wikipedia) throws Exception {
+	public void saveLabelComparisonModelAndTrainingData(LabelComparisonDataPoint p, Wikipedia wikipedia) throws Exception {
 
 		ArticleComparer artCmp = new ArticleComparer(wikipedia) ;
-		//artCmp.loadClassifier(new File("../wm_hadoopAndBerkeleyDb/models/articleComparison_inLinks.model")) ;
-
-		LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
-
-		lblCmp.train(_set, "full 353") ;
+		artCmp.train(_set) ;
+		artCmp.buildDefaultClassifier() ;
+		
+		LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp)  ;
+		lblCmp.train(_set, "blah") ;
 
 		lblCmp.buildDefaultClassifiers() ;
-
-		if (disambigModel != null)
-			lblCmp.saveDisambiguationClassifier(disambigModel) ;
-
-		if (comparisonModel != null)
-			lblCmp.saveComparisonClassifier(comparisonModel) ;
-
-		if (disambigArff != null)
-			lblCmp.saveDisambiguationTrainingData(disambigArff) ;
-
-		if (comparisonArff != null)
-			lblCmp.saveComparisonTrainingData(comparisonArff) ;
+		
+		String fileNameChunk = getFileNameChunk(p) ;
+		
+		File disambigModel = new File("models/compare/labelDisambig_" + fileNameChunk + ".model") ;
+		lblCmp.saveDisambiguationClassifier(disambigModel) ;
+		
+		File disambigArff = new File("data/compare/labelDisambig_" + fileNameChunk + ".arff") ;
+		lblCmp.saveDisambiguationTrainingData(disambigArff) ;
+		
+		File comparisonModel = new File("models/compare/labelCompare_" + fileNameChunk + ".model") ;
+		lblCmp.saveComparisonClassifier(comparisonModel) ;
+		
+		File comparisonArff = new File("data/compare/labelCompare_" + fileNameChunk + ".arff") ;
+		lblCmp.saveComparisonTrainingData(comparisonArff) ;
+		
 	}
 
 	public static void saveRandomLabelSet(int size, File output, Wikipedia wikipedia) throws IOException {
@@ -521,7 +619,14 @@ public class ComparisonExperiments {
 		System.out.println("Testing label comparison speed") ;
 
 		ArticleComparer artCmp = new ArticleComparer(wikipedia) ;
+		if (point.usingML) {
+			artCmp.train(_set) ;
+			artCmp.buildDefaultClassifier() ;
+		}
+		
 		LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
+		lblCmp.train(_set, "BLAH") ;
+		lblCmp.buildDefaultClassifiers() ;
 
 		long startTime = System.currentTimeMillis() ;
 		int comparisons = 0 ;
@@ -552,7 +657,7 @@ public class ComparisonExperiments {
 		System.out.println(" - Relatedness: " + cd.getLabelRelatedness()) ;
 		System.out.println(" - Interpretations: " ) ;
 
-		for (SensePair sp:cd.getPlausableInterpretations()) {
+		for (SensePair sp:cd.getCandidateInterpretations()) {
 			System.out.println("   - " + sp.getSenseA() + " vs. " + sp.getSenseB() + ":" + sp.getSenseRelatedness()) ;
 		}
 	}
@@ -617,6 +722,26 @@ public class ComparisonExperiments {
 			return sb.toString() ;
 		}
 	}
+	
+	public String getFileNameChunk(ArticleComparisonDataPoint p) {
+		
+		StringBuffer sb = new StringBuffer() ;
+		
+		sb.append(p.lang) ;
+		sb.append("_") ;
+		
+		if (p.dependencies.contains(DataDependency.pageLinksIn)) 
+			sb.append("In") ;
+
+		if (p.dependencies.contains(DataDependency.pageLinksOut)) 
+			sb.append("Out") ;
+
+		if (p.dependencies.contains(DataDependency.linkCounts)) 
+			sb.append("Counts") ;
+		
+		return sb.toString() ;
+		
+	}
 
 	public String getDependencyString(EnumSet<DataDependency> dependencies) {
 
@@ -630,6 +755,8 @@ public class ComparisonExperiments {
 		if (dependencies.contains(DataDependency.linkCounts)) 
 			sb.append(DataDependency.linkCounts + "+") ;
 
+		
+		
 		sb.deleteCharAt(sb.length() -1) ;
 		return sb.toString() ;
 	}
