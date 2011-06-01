@@ -66,13 +66,15 @@ public class Disambiguator {
 	private Decider<Attributes, Boolean> decider ;
 	private Dataset<Attributes, Boolean> dataset ;
 	
+	private int sensesConsidered = 0 ;
+	
 	public Disambiguator(Wikipedia wikipedia) throws IOException, Exception {
 		
 		WikipediaConfiguration conf = wikipedia.getConfig() ;
 			
 		ArticleComparer comparer = new ArticleComparer(wikipedia) ;
 		
-		init(wikipedia, comparer, conf.getDefaultTextProcessor(), conf.getMinSenseProbability(), conf.getMinLinkProbability(), 50) ;
+		init(wikipedia, comparer, conf.getDefaultTextProcessor(), conf.getMinSenseProbability(), conf.getMinLinkProbability(), 20) ;
 
 		if (conf.getTopicDisambiguationModel() != null)
 			loadClassifier(conf.getTopicDisambiguationModel()) ;
@@ -93,7 +95,45 @@ public class Disambiguator {
 	public Disambiguator(Wikipedia wikipedia,  ArticleComparer comparer, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) throws Exception {
 		init(wikipedia, comparer, textProcessor, minSenseProbability, minLinkProbability, maxContextSize) ;
 	}
+	
 
+
+	//TODO: this should really be refactored as a separate filter
+	@SuppressWarnings("unchecked")
+	private void weightTrainingInstances() {
+
+		double positiveInstances = 0 ;
+		double negativeInstances = 0 ; 
+
+		Enumeration<Instance> e = dataset.enumerateInstances() ;
+
+		while (e.hasMoreElements()) {
+			Instance i = (Instance) e.nextElement() ;
+
+			double isValidSense = i.value(3) ;
+
+			if (isValidSense == 0) 
+				positiveInstances ++ ;
+			else
+				negativeInstances ++ ;
+		}
+
+		double p = (double) positiveInstances / (positiveInstances + negativeInstances) ;
+
+		e = dataset.enumerateInstances() ;
+
+		while (e.hasMoreElements()) {
+			Instance i = (Instance) e.nextElement() ;
+
+			double isValidSense = i.value(3) ;
+
+			if (isValidSense == 0) 
+				i.setWeight(0.5 * (1.0/p)) ;
+			else
+				i.setWeight(0.5 * (1.0/(1-p))) ;
+		}
+
+	}
 
 	private void init(Wikipedia wikipedia, ArticleComparer comparer, TextProcessor textProcessor, double minSenseProbability, double minLinkProbability, int maxContextSize) throws Exception {
 		this.wikipedia = wikipedia ;
@@ -153,6 +193,8 @@ public class Disambiguator {
 			.setAttribute(Attributes.contextQuality, (double)context.getQuality())
 			.build() ;
 		
+		sensesConsidered++ ;
+		
 		return decider.getDecisionDistribution(i).get(true) ;
 	}
 
@@ -176,6 +218,8 @@ public class Disambiguator {
 			train(art, snippetLength, rc) ;	
 			pn.update() ;
 		}
+		
+		weightTrainingInstances() ;
 		
 		//training data is very likely to be skewed. So lets resample to even out class values
 		//Resample resampleFilter = new Resample() ;
@@ -209,8 +253,13 @@ public class Disambiguator {
 	 */
 	public void loadTrainingData(File file) throws Exception{
 		Logger.getLogger(Disambiguator.class).info("loading training data") ;
-		
 		dataset.load(file) ;
+		
+		weightTrainingInstances() ;
+	}
+	
+	public void clearTrainingData() {
+		dataset = null ;
 	}
 
 	/**
@@ -448,19 +497,15 @@ public class Disambiguator {
 
 				if (sense.getPriorProbability() < minSenseProbability) break ;
 
-				Instance i = decider.getInstanceBuilder()
-					.setAttribute(Attributes.commonness, sense.getPriorProbability())
-					.setAttribute(Attributes.relatedness, context.getRelatednessTo(sense))
-					.setAttribute(Attributes.contextQuality, (double)context.getQuality())
-					.build() ;
-				
-				double prob = decider.getDecisionDistribution(i).get(true) ;
+				double prob = getProbabilityOfSense(sense.getPriorProbability(), context.getRelatednessTo(sense), context) ; 
 
 				if (prob>0.5) {
 					Article art = new Article(wikipedia.getEnvironment(), sense.getId()) ;
 					art.setWeight(prob) ;
 					validSenses.add(art) ;					
 				}
+				
+				sensesConsidered ++ ;
 			}
 
 			//use most valid sense
@@ -532,12 +577,21 @@ public class Disambiguator {
 	public double getMinLinkProbability() {
 		return minLinkProbability;
 	}	 
+	
+	public void setMinLinkProbability(double val) {
+		 minLinkProbability = val ;
+	}
+
 
 	/**
 	 * @return the lowest probability (as a destination for the ambiguous Label term) for which senses will be considered.
 	 */
 	public double getMinSenseProbability() {
 		return minSenseProbability;
+	}
+	
+	public void setMinSenseProbability(double val) {
+		minSenseProbability = val ;
 	}
 	
 	/**
@@ -552,6 +606,10 @@ public class Disambiguator {
 	 */
 	public TextProcessor getTextProcessor() {
 		return tp ;
+	}
+	
+	public int getSensesConsidered() {
+		return sensesConsidered ;
 	}
 
 	/**
