@@ -379,7 +379,7 @@ public class CompareService extends Service{
 		xmlInterpretations.setAttribute("term2Candidates", String.valueOf(senses2.length)) ;
 		
 		
-		for (LabelComparer.SensePair interpretation:details.getPlausableInterpretations()) {
+		for (LabelComparer.SensePair interpretation:details.getCandidateInterpretations()) {
 			
 			Element xmlInterpretation = getHub().createElement("Interpretation") ;
 			
