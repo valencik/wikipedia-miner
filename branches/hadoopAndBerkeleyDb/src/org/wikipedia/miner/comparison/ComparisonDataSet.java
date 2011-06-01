@@ -1,10 +1,6 @@
 package org.wikipedia.miner.comparison;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import org.apache.log4j.Logger;
@@ -24,8 +20,8 @@ public class ComparisonDataSet {
 		int articlePairs = 0 ;
 		int termPairs = 0 ;
 
-		BufferedReader input = new BufferedReader(new FileReader(file)) ;
-
+		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(file), "UTF-8"));
+		
 		String line ;
 		while ((line=input.readLine())!= null) {
 
@@ -56,6 +52,12 @@ public class ComparisonDataSet {
 
 				if (idA > 0 && idB > 0)
 					articlePairs ++ ;
+				
+				///if (!Character.isUpperCase(termA.charAt(0)))
+				//	continue ;
+				
+				//if (!Character.isUpperCase(termB.charAt(0)))
+				//	continue ;
 
 				items.add(new Item(termA, idA, termB, idB, relatedness)) ;
 				termPairs ++ ;
@@ -114,13 +116,13 @@ public class ComparisonDataSet {
 	
 	public void save(File file) throws Exception {
 		
-		BufferedWriter out = new BufferedWriter(new FileWriter(file)) ;
+		BufferedWriter out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file), "UTF-8"));
+		
+		//BufferedWriter out = new BufferedWriter(new FileWriter(file)) ;
 		
 		for (Item item:items) {
 			
 			String msg = item.termA + "," + item.idA + "," + item.termB + "," + item.idB + "," + item.relatedness + "\n" ;
-			
-			//byte[] bytes = UnicodeUtil.convert(msg.getBytes(), "UTF-8"); 
 			
 			out.write(msg) ;
 		}
@@ -175,6 +177,23 @@ public class ComparisonDataSet {
 
 		public double getRelatedness() {
 			return relatedness;
+		}
+		
+		@Override
+		public String toString() {
+			StringBuffer sb = new StringBuffer() ;
+			
+			sb.append(termA) ;
+			sb.append(",") ;
+			sb.append(idA) ;
+			sb.append(",") ;
+			sb.append(termB) ;
+			sb.append(",") ;
+			sb.append(idB) ;
+			sb.append(",") ;
+			sb.append(relatedness) ;
+			
+			return sb.toString() ;
 		}
 	}
 }
