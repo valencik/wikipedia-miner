@@ -216,8 +216,20 @@ public class Wikipedia {
 	 */
 	public boolean isLabel(String text, TextProcessor tp)  {
 		DbLabel lbl = env.getDbLabel(tp).retrieve(text) ; 
+		
 		return lbl != null ;
 	}
+	
+	public Label getLabel(String text)  {
+		
+		return new Label(env, text) ;
+	}
+	
+	public Label getLabel(String text, TextProcessor tp)  {
+		
+		return new Label(env, text, tp) ;
+	}
+	
 
 	/**
 	 * Returns an iterator for all pages in the database, in order of ascending ids.
