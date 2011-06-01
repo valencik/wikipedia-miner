@@ -68,11 +68,8 @@ public class ServiceHub {
 				Wikipedia wikipedia = new Wikipedia(wikiConfig, true) ;
 				wikipediasByName.put(wikiName, wikipedia) ;
 				
-				ArticleComparer artCmp = null ;
-				if (wikiConfig.getArticleComparisonModel() != null) {
-					artCmp = new ArticleComparer(wikipedia) ;
-					articleComparersByWikiName.put(wikiName, artCmp) ;
-				}
+				ArticleComparer artCmp = new ArticleComparer(wikipedia) ;
+				articleComparersByWikiName.put(wikiName, artCmp) ;
 				
 				if (artCmp != null && wikiConfig.getLabelDisambiguationModel() != null && wikiConfig.getLabelComparisonModel() != null) {
 					LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
