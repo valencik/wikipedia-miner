@@ -35,7 +35,7 @@ import org.wikipedia.miner.model.Page.PageType;
  *	A set of Wikipedia articles that can be used to train and test disambiguators, linkDetectors, etc. 
  * Can either be generated randomly from Wikipedia, or loaded from file.
  */
-public class ArticleSet extends TreeSet<Article> {
+public class ArticleSet extends ArrayList<Article> {
 	
 	//TODO: This screams out for the builder design pattern
 	
@@ -46,9 +46,6 @@ public class ArticleSet extends TreeSet<Article> {
 	
 	public ArticleSet() {
 		super() ;
-		
-		
-		
 	}
 	
 	/**
@@ -102,6 +99,32 @@ public class ArticleSet extends TreeSet<Article> {
 		buildFromRoughCandidates(wikipedia, roughCandidates, size, minInLinks, minOutLinks, minLinkProportion, maxLinkProportion, minWordCount, maxWordCount, maxListProportion, mustMatch, mustNotMatch, exclude) ;
 	}
 	
+	public ArticleSet getRandomSubset(int size) {
+		
+		if (size > this.size())
+			throw new IllegalArgumentException("requested size " + size + " is larger than " + size()) ;
+		
+		Random r = new Random() ;
+		HashSet<Integer> usedIds = new HashSet<Integer>() ;
+		
+		ArticleSet subset = new ArticleSet() ;
+		while (subset.size() < size) {
+			
+			int index = r.nextInt(size()) ;
+			
+			Article art = get(index) ;
+			
+			if (!usedIds.contains(art.getId())) {
+				subset.add(art) ;
+				usedIds.add(art.getId()) ;
+			}
+		}
+		
+		Collections.sort(subset) ;
+		
+		return subset ;
+	}
+	
 	protected void buildFromRoughCandidates(Wikipedia wikipedia, Vector<Article> roughCandidates, int size, int minInLinks, int minOutLinks, float minLinkProportion, float maxLinkProportion, int minWordCount, int maxWordCount, float maxListProportion, Pattern mustMatch, Pattern mustNotMatch, ArticleSet exclude) {
 		
 		DecimalFormat df = new DecimalFormat("#0.00 %") ;
@@ -145,6 +168,8 @@ public class ArticleSet extends TreeSet<Article> {
 		if (size() < size)
 			System.err.println("ArticleSet | Warning: we could only find " + size() + " suitable articles.") ;
 		
+		
+		Collections.sort(this) ;
 	}
 
 	/**
@@ -177,7 +202,7 @@ public class ArticleSet extends TreeSet<Article> {
 		
 		ProgressTracker pn = new ProgressTracker(totalArticles, "Gathering rough candidates", ArticleSet.class) ;
 		
-		Iterator<Page> i = wikipedia.getPageIterator(PageType.article) ;
+		PageIterator i = wikipedia.getPageIterator(PageType.article) ;
 		
 		while (i.hasNext()) {
 			Article art = (Article)i.next() ;
@@ -191,9 +216,22 @@ public class ArticleSet extends TreeSet<Article> {
 			
 			articles.add(art) ;
 		}
+		i.close();
 		
 		return articles ;
 	}
+	
+	@Override
+	public boolean contains(Object obj) {
+		
+		Article art = (Article)obj ;
+		
+		int index = Collections.binarySearch(this, art) ;
+		
+		return (index >= 0 ) ;
+		
+	}
+	
 		
 	private boolean isArticleValid(Article art, double minLinkProportion, double maxLinkProportion, int minWordCount, int maxWordCount, double maxListProportion, Pattern mustMatch, Pattern mustNotMatch, ArticleSet exclude) {
 			
@@ -208,7 +246,7 @@ public class ArticleSet extends TreeSet<Article> {
 			
 		}
 		
-		if (this.contains(art)) {
+		if (exclude.contains(art)) {
 			Logger.getLogger(ArticleSet.class).debug(" - rejected due to exclusion list") ;
 			return false ;	
 		}
