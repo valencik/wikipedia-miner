@@ -23,6 +23,9 @@ import org.wikipedia.miner.service.param.ParameterGroup;
 import org.wikipedia.miner.service.param.StringParameter;
 
 public class ExploreArticleService extends Service{
+	
+	//TODO:modify freebase image request to use article titles rather than ids
+	//TODO:if lang is not en, use languageLinks to translate article title to english.
 
 	private enum GroupName{id,title} ; 
 	public enum DefinitionLength{LONG, SHORT} ;
