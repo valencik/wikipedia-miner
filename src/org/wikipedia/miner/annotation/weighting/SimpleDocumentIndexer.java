@@ -23,6 +23,7 @@ package org.wikipedia.miner.annotation.weighting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 
 import org.wikipedia.miner.annotation.Topic;
 
@@ -38,15 +39,16 @@ import org.wikipedia.miner.annotation.Topic;
 public class SimpleDocumentIndexer extends TopicWeighter{
 
 	@Override
-	public ArrayList<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception {
+	public HashMap<Integer,Double> getTopicWeights(Collection<Topic> topics) throws Exception {
+		
+		HashMap<Integer, Double> topicWeights = new HashMap<Integer, Double>() ;
+		
 		
 		int maxOccurances = 0 ;
 		for (Topic topic:topics) {
 			if (topic.getOccurances()>maxOccurances)
 				maxOccurances = topic.getOccurances() ;
 		}
-		
-		ArrayList<Topic> weightedTopics = new ArrayList<Topic>() ;
 		for (Topic topic:topics) {
 			
 			double weight = topic.getRelatednessToOtherTopics() * 2 ; 
@@ -54,11 +56,9 @@ public class SimpleDocumentIndexer extends TopicWeighter{
 			weight = weight + topic.getSpread() ;
 			weight = weight/3 ;
 			
-			topic.setWeight(weight) ;
-			weightedTopics.add(topic) ;
+			topicWeights.put(topic.getId(), weight) ;
 		}
 		
-		Collections.sort(weightedTopics) ;
-		return weightedTopics ;
+		return topicWeights ;
 	}
 }
