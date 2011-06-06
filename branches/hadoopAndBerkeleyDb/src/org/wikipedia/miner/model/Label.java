@@ -126,10 +126,15 @@ public class Label {
 	public double getLinkProbability() {
 		if (!detailsSet) setDetails() ;
 		
-		if (textDocCount > 0)		
-			return (double) linkDocCount/textDocCount ;
-		else
+		if (textDocCount == 0)
 			return 0 ;
+		
+		double linkProb = (double) linkDocCount/textDocCount ;
+		
+		if (linkProb >1)
+			linkProb = 1 ;
+			
+		return linkProb ;
 	}
 
 	/**
