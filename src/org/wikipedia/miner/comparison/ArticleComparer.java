@@ -13,8 +13,6 @@ import org.apache.log4j.Logger;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.DbIntList;
-import org.wikipedia.miner.db.struct.DbLinkLocation;
-import org.wikipedia.miner.db.struct.DbLinkLocationList;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.ProgressTracker;
@@ -24,7 +22,6 @@ import weka.wrapper.*;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.functions.GaussianProcesses;
-import weka.classifiers.functions.IsotonicRegression;
 import weka.core.Instance;
 
 public class ArticleComparer {
