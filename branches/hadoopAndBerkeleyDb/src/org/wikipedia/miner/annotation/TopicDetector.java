@@ -50,7 +50,7 @@ public class TopicDetector {
 	private boolean strictDisambiguation ;
 	private boolean allowDisambiguations ;
 	
-	
+	private int maxTopicsForRelatedness = 25 ;
 	
 	
 	
@@ -145,16 +145,37 @@ public class TopicDetector {
 	
 	private void calculateRelatedness(Collection<Topic> topics, RelatednessCache cache) throws Exception{
 		
-		for (Topic topicA: topics) {
-			float avgRelatedness = 0 ;
+		TreeSet<Article> weightedTopics = new TreeSet<Article>() ;
+		
+		for (Topic t:topics) {
+			if (t.getType() != PageType.article)
+				continue ;
 			
-			for (Topic topicB: topics) {
-				if (!topicA.equals(topicB)) {
-					avgRelatedness += cache.getRelatedness(topicA, topicB) ; 
-				}
+			Article art = (Article)wikipedia.getPageById(t.getId()) ;
+			
+			art.setWeight(t.getAverageLinkProbability() * t.getOccurances()) ;
+			weightedTopics.add(art) ;
+		}
+		
+		for (Topic topic: topics) {
+			
+			double totalWeight = 0 ;
+			double totalWeightedRelatedness = 0 ;
+			
+			int count = 0 ;
+			
+			for (Article art: weightedTopics) {
+				if (count++ > maxTopicsForRelatedness)
+					break ;
+				
+				double weightedRelatedness = art.getWeight() * cache.getRelatedness(topic, art) ;
+				
+				totalWeight = totalWeight + art.getWeight();
+				totalWeightedRelatedness = totalWeightedRelatedness + weightedRelatedness;
+				
 			}
-			avgRelatedness = avgRelatedness / (topics.size()-1) ;
-			topicA.setRelatednessToOtherTopics(avgRelatedness) ;
+			
+			topic.setRelatednessToOtherTopics((float)(totalWeightedRelatedness/totalWeight)) ;
 		}
 	}
 	
@@ -201,7 +222,7 @@ public class TopicDetector {
 							TopicReference ref = new TopicReference(label, pos) ;
 							references.add(ref) ;
 							
-							//System.out.println(" - ref: " + ngram) ;
+							//System.out.println(" - ref: " + ngram + label.getLinkProbability()) ;
 						}
 					}
 				}
@@ -250,16 +271,16 @@ public class TopicDetector {
 		//unambig references are still processed here, because we need to calculate relatedness to context anyway.
 		
 		// build a cache of valid senses for each phrase, since the same phrase may occur more than once, but will always be disambiguated the same way
-		HashMap<String, TreeSet<CachedSense>> disambigCache = new HashMap<String, TreeSet<CachedSense>>() ;
+		HashMap<String, ArrayList<CachedSense>> disambigCache = new HashMap<String, ArrayList<CachedSense>>() ;
 
 		for (TopicReference ref:references) {
 			//System.out.println("disambiguating ref: " + ref.getLabel().getText()) ;
 
-			TreeSet<CachedSense> validSenses = disambigCache.get(ref.getLabel().getText()) ;
+			ArrayList<CachedSense> validSenses = disambigCache.get(ref.getLabel().getText()) ;
 
 			if (validSenses == null) {
 				// we havent seen this label in this document before
-				validSenses = new TreeSet<CachedSense>() ;
+				validSenses = new ArrayList<CachedSense>() ;
 
 				for (Label.Sense sense: ref.getLabel().getSenses()) {
 					
@@ -275,20 +296,23 @@ public class TopicDetector {
 
 					//System.out.println(" - sense " + sense + ", " + disambigProb) ;
 					
-					if (disambigProb > 0.5) {
-						// this is a valid sense for the link (there may be more than one)
+					if (disambigProb > 0.1) {
+						// there is at least a chance that this is a valid sense for the link (there may be more than one)
 						
 						CachedSense vs = new CachedSense(sense.getId(), commonness, relatedness, disambigProb) ;
 						validSenses.add(vs) ;
 					}
 				}
+				Collections.sort(validSenses) ;
+				
+				
 				disambigCache.put(ref.getLabel().getText(), validSenses) ;
 			}
 
 			if (strictDisambiguation) {
 				//just get top sense
 				if (!validSenses.isEmpty()) {
-					CachedSense sense = validSenses.first() ;
+					CachedSense sense = validSenses.get(0) ;
 					Topic topic = chosenTopics.get(sense.id) ;
 	
 					if (topic == null) {
