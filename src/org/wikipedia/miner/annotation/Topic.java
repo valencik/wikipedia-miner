@@ -99,6 +99,10 @@ public class Topic extends Article{
 	public int getOccurances() {
 		return positions.size() ;
 	}
+	
+	public double getNormalizedOccurances() {
+		return Math.log(positions.size() + 1) ;
+	}
 
 	/**
 	 * @return the extent to which this topic relates to surrounding unambiguous context.
@@ -135,12 +139,30 @@ public class Topic extends Article{
 	public double getMaxLinkProbability() {
 		return maxLinkProbability ;
 	}
+	
+	public double getNormalizedMaxLinkProbability() {
+		double mlp = getMaxLinkProbability() ;
+		
+		mlp = Math.log((mlp*1000) + 1) ;
+		mlp = mlp/4 ;
+		
+		return mlp ;
+	}
 
 	/** 
 	 * @return the average probability that the ngrams which refer to this topic would be links (rather than plain text) if found in a random wikipedia article.
 	 */
 	public double getAverageLinkProbability() {
 		return totalLinkProbability/positions.size() ;
+	}
+	
+	public double getNormalizedAverageLinkProbability() {
+		double alp = getAverageLinkProbability() ;
+		
+		alp = Math.log((alp*1000) + 1) ;
+		alp = alp/4 ;
+		
+		return alp ;
 	}
 
 	/** 
