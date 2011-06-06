@@ -55,7 +55,7 @@ public class LinkDetector extends TopicWeighter{
 	private ArticleCleaner cleaner ;
 	
 	
-	private enum Attributes {occurances,maxDisambigConfidence,avgDisambigConfidence,relatednessToOtherTopics,maxLinkProbability,avgLinkProbability,generality,firstOccurance,lastOccurance,spread} ;
+	private enum Attributes {occurances,maxDisambigConfidence,avgDisambigConfidence,relatednessToContext,relatednessToOtherTopics,maxLinkProbability,avgLinkProbability,generality,firstOccurance,lastOccurance,spread} ;
 	private Decider<Attributes, Boolean> decider ;
 	private Dataset<Attributes, Boolean> dataset ;
 	
@@ -124,41 +124,24 @@ public class LinkDetector extends TopicWeighter{
 	 * @return an ArrayList of the same topics, where the weight of each topic is the probability that it is a link. 
 	 * @throws Exception if the link detector has not yet been trained
 	 */
-	public ArrayList<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception  {
-
-		//if (classifier == null)
-		//	throw new Exception("You must train the link detector first.") ;
-
+	public HashMap<Integer,Double> getTopicWeights(Collection<Topic> topics) throws Exception {
+	
 		if (!decider.isReady()) 
 			throw new WekaException("You must build (or load) classifier first.") ;
 		
-		ArrayList<Topic> weightedTopics = new ArrayList<Topic>() ;
-
+		HashMap<Integer, Double> topicWeights = new HashMap<Integer, Double>() ;
+	
 		for (Topic topic: topics) {
 		
-			Instance i = decider.getInstanceBuilder()
-			.setAttribute(Attributes.occurances, topic.getOccurances())
-			.setAttribute(Attributes.maxDisambigConfidence, topic.getMaxDisambigConfidence())
-			.setAttribute(Attributes.avgDisambigConfidence, topic.getAverageDisambigConfidence())
-			.setAttribute(Attributes.relatednessToOtherTopics, topic.getRelatednessToOtherTopics())
-			.setAttribute(Attributes.maxLinkProbability, topic.getMaxLinkProbability())
-			.setAttribute(Attributes.avgLinkProbability, topic.getAverageLinkProbability())
-			.setAttribute(Attributes.generality, topic.getGenerality())
-			.setAttribute(Attributes.firstOccurance, topic.getFirstOccurance())
-			.setAttribute(Attributes.lastOccurance, topic.getLastOccurance())
-			.setAttribute(Attributes.spread, topic.getSpread())
-			.build() ;
+			Instance i = getInstance(topic, null) ;
 			
 			double prob = decider.getDecisionDistribution(i).get(true) ;
-			topic.setWeight(prob) ;
-			weightedTopics.add(topic) ;
+			topicWeights.put(topic.getId(), prob) ;
 			
 			linksConsidered++ ;
 		}
-
-		Collections.sort(weightedTopics) ;
 		
-		return weightedTopics ;
+		return topicWeights ;
 	}
 	
 	
@@ -324,21 +307,7 @@ public class LinkDetector extends TopicWeighter{
 
 		Collection<Topic> topics = td.getTopics(text, rc) ;
 		for (Topic topic: topics) {
-			
-			Instance i = decider.getInstanceBuilder()
-			.setAttribute(Attributes.occurances, topic.getOccurances())
-			.setAttribute(Attributes.maxDisambigConfidence, topic.getMaxDisambigConfidence())
-			.setAttribute(Attributes.avgDisambigConfidence, topic.getAverageDisambigConfidence())
-			.setAttribute(Attributes.relatednessToOtherTopics, topic.getRelatednessToOtherTopics())
-			.setAttribute(Attributes.maxLinkProbability, topic.getMaxLinkProbability())
-			.setAttribute(Attributes.avgLinkProbability, topic.getAverageLinkProbability())
-			.setAttribute(Attributes.generality, topic.getGenerality())
-			.setAttribute(Attributes.firstOccurance, topic.getFirstOccurance())
-			.setAttribute(Attributes.lastOccurance, topic.getLastOccurance())
-			.setAttribute(Attributes.spread, topic.getSpread())
-			.setClassAttribute(groundTruth.contains(topic.getId()))
-			.build() ;
-			
+			Instance i = getInstance(topic, groundTruth.contains(topic.getId())) ;
 			dataset.add(i) ;
 		}
 	}
@@ -428,6 +397,27 @@ public class LinkDetector extends TopicWeighter{
 				i.setWeight(0.5 * (1.0/(1-p))) ;
 		}
 
+	}
+	
+	private Instance getInstance(Topic topic, Boolean isValidLink) throws Exception {
+		
+		InstanceBuilder<Attributes,Boolean> ib = decider.getInstanceBuilder()
+		.setAttribute(Attributes.occurances, topic.getNormalizedOccurances())
+		.setAttribute(Attributes.maxDisambigConfidence, topic.getMaxDisambigConfidence())
+		.setAttribute(Attributes.avgDisambigConfidence, topic.getAverageDisambigConfidence())
+		.setAttribute(Attributes.relatednessToContext, topic.getRelatednessToContext())
+		.setAttribute(Attributes.relatednessToOtherTopics, topic.getRelatednessToOtherTopics())
+		.setAttribute(Attributes.maxLinkProbability, topic.getMaxLinkProbability())
+		.setAttribute(Attributes.avgLinkProbability, topic.getAverageLinkProbability())
+		.setAttribute(Attributes.generality, topic.getGenerality())
+		.setAttribute(Attributes.firstOccurance, topic.getFirstOccurance())
+		.setAttribute(Attributes.lastOccurance, topic.getLastOccurance())
+		.setAttribute(Attributes.spread, topic.getSpread()) ;
+		
+		if (isValidLink != null) 
+			ib = ib.setClassAttribute(isValidLink) ;
+		
+		return ib.build() ;
 	}
 
 	
@@ -519,6 +509,8 @@ public class LinkDetector extends TopicWeighter{
 		//Result<Integer> r = linkDetector.test(testSet, null, ArticleCleaner.ALL, topicDetector, null) ;
 		//System.out.println(r) ; 
 	}
+	
+	
 	
 
 }

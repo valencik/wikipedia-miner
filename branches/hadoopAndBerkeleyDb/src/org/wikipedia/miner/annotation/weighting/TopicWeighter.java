@@ -21,6 +21,9 @@ package org.wikipedia.miner.annotation.weighting;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+
 import org.wikipedia.miner.annotation.*;
 
 /**
@@ -38,7 +41,33 @@ public abstract class TopicWeighter {
 	 * @return the weighted topics.
 	 * @throws Exception depends on the implementing class
 	 */
-	public abstract ArrayList<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception ;
+	
+	
+	public abstract HashMap<Integer,Double> getTopicWeights(Collection<Topic> topics) throws Exception ;
+	
+	
+	public ArrayList<Topic> getWeightedTopics(Collection<Topic> topics) throws Exception {
+		
+		HashMap<Integer,Double> topicWeights = getTopicWeights(topics) ;
+		
+		
+		ArrayList<Topic> weightedTopics = new ArrayList<Topic>() ;
+
+		for (Topic topic: topics) {
+			
+			if (topicWeights.containsKey(topic.getId()))
+				topic.setWeight(topicWeights.get(topic.getId())) ;
+			else
+				topic.setWeight(0.0) ;
+				
+			weightedTopics.add(topic) ;
+		}
+		
+		Collections.sort(weightedTopics) ;
+		
+		return weightedTopics ;
+	}
+	
 	
 	/**
 	 * A convenience method that weights the given topics using getWeightedTopics(), and discards those below a certian weight. 
