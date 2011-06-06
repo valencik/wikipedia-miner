@@ -116,7 +116,7 @@ public class ComparisonExperiments {
 		wikipedia.close() ;
 		
 		
-		/*
+		
 		
 		ArrayList<ArticleComparisonDataPoint> artCmpResults = new ArrayList<ArticleComparisonDataPoint>() ;
 		
@@ -128,8 +128,8 @@ public class ComparisonExperiments {
 		d.add(DataDependency.pageLinksIn) ;
 		conf = configureConf(conf, d, false) ;
 		artCmpResults.add(ce.doArticleComparisonExperiment(conf, useML)) ;
-		//conf = configureConf(conf, d, true) ;
-		//lblCmpResults.add(ce.doLabelComparisonExperiment(conf, true)) ;
+		
+		/*
 		
 		//pageLinksIn+linkCounts
 		d.add(DataDependency.linkCounts) ;
@@ -162,16 +162,17 @@ public class ComparisonExperiments {
 		
 		ArrayList<LabelComparisonDataPoint> lblCmpResults = new ArrayList<LabelComparisonDataPoint>() ;
 		
-		ArrayList<DataDependency> d = new ArrayList<DataDependency>() ;
+		d = new ArrayList<DataDependency>() ;
 		
 		boolean cacheLabels = true ;
-		boolean useML = true ;
+		//boolean useML = true ;
 		
 		//pageLinksIn
 		d.add(DataDependency.pageLinksIn) ;
 		conf = configureConf(conf, d, cacheLabels) ;
 		lblCmpResults.add(ce.doLabelComparisonExperiment(conf, useML)) ;
 		
+		/*
 		//pageLinksIn+linkCounts
 		d.add(DataDependency.linkCounts) ;
 		conf = configureConf(conf,d, cacheLabels) ;
@@ -192,7 +193,7 @@ public class ComparisonExperiments {
 		d.add(DataDependency.pageLinksIn) ;
 		conf = configureConf(conf,d, cacheLabels) ;
 		lblCmpResults.add(ce.doLabelComparisonExperiment(conf, useML)) ;
-		
+		*/
 		
 		System.out.println("\n\nFINAL RESULTS\n\n") ;
 		for (LabelComparisonDataPoint p:lblCmpResults) {
