@@ -14,10 +14,27 @@ public class WikipediaBuilder {
 
 	public static void main(String args[]) throws ParserConfigurationException, SAXException, IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, XMLStreamException {
 		
-		WikipediaConfiguration conf = new WikipediaConfiguration(new File("configs/en.xml")) ;
+		if (args.length != 1) {
+			System.err.println("Invalid args: no path to wikipedia miner config file") ;
+			
+			return ;
+		}
 		
-		//WEnvironment.buildEnvironment(conf, conf.getDataDirectory(), true) ;
+		File confFile = new File(args[0]) ;
 		
-		WEnvironment.prepareTextProcessor(new PorterStemmer(), conf, new File("/tmp"), true, 2) ;
+		if (!confFile.canRead()) {
+			System.err.println(confFile + " is not readable") ;
+			return ;
+		}
+		
+		WikipediaConfiguration conf = new WikipediaConfiguration(confFile) ;
+		
+		File dataDir = conf.getDatabaseDirectory() ;
+		
+		if (dataDir == null) 
+			System.err.println(confFile + " does not specify a data directory") ;
+		
+		WEnvironment.buildEnvironment(conf, conf.getDataDirectory(), true) ;
+		
 	}
 }
