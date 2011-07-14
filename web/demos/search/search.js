@@ -251,7 +251,7 @@ function processArticleResponse(response) {
 		var id = result[1] ;
 		var anchor = result[2] ;
 		
-		newDefinition = newDefinition + "<a href=\"./search.html?artId=" + id + "\" pageId='" + id + "'>" + anchor + "</a>" ;
+		newDefinition = newDefinition + "<a href=\"./?artId=" + id + "\" pageId='" + id + "'>" + anchor + "</a>" ;
 		
 		lastIndex = pattern.lastIndex ;
 	}
@@ -332,7 +332,7 @@ function processArticleResponse(response) {
 		$.each(sortedCategories, function() {
 			var xmlCategory = $(this) ;
 			
-			var category = $("<a href='search.html?catId=" + xmlCategory.attr('id') + "'>" + xmlCategory.attr('title') + "</a>") ;
+			var category = $("<a href='?catId=" + xmlCategory.attr('id') + "'>" + xmlCategory.attr('title') + "</a>") ;
 			
 			var li = $("<li></li>") ;
 			li.append(category) ;
@@ -369,7 +369,7 @@ function processArticleResponse(response) {
 		$.each(sortedOutLinks, function() {
 			var xmlLink = $(this) ;
 			
-			var link = $("<a pageId='" + xmlLink.attr('id') + "' href='search.html?artId=" + xmlLink.attr('id') + "' relatedness='" + xmlLink.attr('relatedness') + "'>" + xmlLink.attr('title') + "</a>") ;
+			var link = $("<a pageId='" + xmlLink.attr('id') + "' href='./?artId=" + xmlLink.attr('id') + "' relatedness='" + xmlLink.attr('relatedness') + "'>" + xmlLink.attr('title') + "</a>") ;
 			var weight = Number(xmlLink.attr('relatedness')) ;
 			weight = normalize(weight, minWeight, maxWeight) ;
 			link.css('font-size', getFontSize(weight) + "px") ;
@@ -407,7 +407,7 @@ function processArticleResponse(response) {
 		$.each(sortedInLinks, function() {
 			var xmlLink = $(this) ;
 			
-			var link = $("<a pageId='" + xmlLink.attr('id') + "' href='search.html?artId=" + xmlLink.attr('id') + "' relatedness='" + xmlLink.attr('relatedness') + "'>" + xmlLink.attr('title') + "</a>") ;
+			var link = $("<a pageId='" + xmlLink.attr('id') + "' href='./?artId=" + xmlLink.attr('id') + "' relatedness='" + xmlLink.attr('relatedness') + "'>" + xmlLink.attr('title') + "</a>") ;
 			var weight = Number(xmlLink.attr('relatedness')) ;
 			weight = normalize(weight, minWeight, maxWeight) ;
 			link.css('font-size', getFontSize(weight) + "px") ;
