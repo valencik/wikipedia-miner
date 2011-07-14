@@ -30,7 +30,7 @@ import org.xml.sax.SAXException;
 
 public class WikipediaConfiguration {
 	
-	private enum ParamName{langCode,databaseDirectory,dataDirectory, defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
+	private enum ParamName{langCode,databaseDirectory,dataDirectory, defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, comparisonSnippetModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
 	
 	private String langCode ;
 
@@ -46,6 +46,8 @@ public class WikipediaConfiguration {
 	private File articleComparisonModel ;
 	private File labelDisambiguationModel ;
 	private File labelComparisonModel ;
+	
+	private File comparisonSnippetModel ;
 	
 	private File topicDisambiguationModel ;
 	private File linkDetectionModel ;
@@ -208,6 +210,14 @@ public class WikipediaConfiguration {
 		labelComparisonModel = model;
 	}
 	
+	public File getComparisonSnippetModel() {
+		return comparisonSnippetModel;
+	}
+
+	public void setComparisonSnippetModel(File model) {
+		comparisonSnippetModel = model;
+	}
+	
 	public File getLinkDetectionModel() {
 		return linkDetectionModel;
 	}
@@ -315,6 +325,9 @@ public class WikipediaConfiguration {
 					break ;
 				case labelComparisonModel:
 					labelComparisonModel = new File(paramValue) ;
+					break ;
+				case comparisonSnippetModel:
+					comparisonSnippetModel = new File(paramValue) ;
 					break ;
 				case topicDisambiguationModel:
 					topicDisambiguationModel = new File(paramValue) ;
