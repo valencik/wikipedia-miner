@@ -26,7 +26,7 @@
 		This can be used to exclude obscure or unpopular pages and labels.
 		This param is ignored unless the 'page' or 'label' database is cached to memory.
 	-->
-	<minLinksIn></minLinksIn>
+	<minLinksIn>3</minLinksIn>
 
 
 	<!--
@@ -36,7 +36,7 @@
 		to memory and can be used to exclude unlikely senses. 
 		This param is ignored unless the 'label' database is cached to memory.
 	-->
-	<minSenseProbability></minSenseProbability>
+	<minSenseProbability>0.01</minSenseProbability>
 
 	
 	<!--
@@ -46,7 +46,7 @@
  		and can be used to exclude labels that are unlikely to refer to useful concepts. 
 		This param is ignored unless the 'label' database is cached to memory.
 	-->
-	<minLinkProbability></minLinkProbability>
+	<minLinkProbability>0.005</minLinkProbability>
 
 
 	<!--
