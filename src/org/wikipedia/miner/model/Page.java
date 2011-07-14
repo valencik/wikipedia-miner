@@ -262,8 +262,10 @@ public class Page implements Comparable<Page> {
 			sentence = markup.substring(0, splits[0]) ;
 		else if (index < splits.length) 
 			sentence = markup.substring(splits[index-1], splits[index]) ;
-		else
+		else if (index == splits.length)
 			sentence = markup.substring(splits[index-1]) ;
+		else
+			sentence = "" ;
 
 		sentence = sentence.replaceAll("\\s+", " ") ;
 
