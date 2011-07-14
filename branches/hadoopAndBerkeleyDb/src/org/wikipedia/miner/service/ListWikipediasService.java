@@ -7,7 +7,7 @@ import org.w3c.dom.Element;
 public class ListWikipediasService extends Service{
 
 	public ListWikipediasService() {
-		super("Lists available editions of Wikipedia", 
+		super("meta","Lists available editions of Wikipedia", 
 				"<p>This service lists the different editions of Wikipedia that are available</p>",
 				false,false
 				);

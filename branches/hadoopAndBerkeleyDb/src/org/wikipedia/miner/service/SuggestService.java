@@ -43,7 +43,7 @@ public class SuggestService extends Service {
 	private FloatParameter prmMinAverageRelatedness ;
 	
 	public SuggestService() {
-		super("Suggests alternative topics that are related to a set of seed topics",
+		super("query","Suggests alternative topics that are related to a set of seed topics",
 				"<p>This service takes a set of seed topics, and suggests articles that relate to them. These suggestions are weighted by thier relatedness to the query, and organized by the categories they belong to.</p>" +
 				"<p>It is designed to be used in conjunction with the <a href='services.html?search'>search</a> service</p>",
 				true, false);

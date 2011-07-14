@@ -16,7 +16,7 @@ public class StatsService extends Service{
 	DateFormat df ;
 
 	public StatsService() {
-		super("Provides statistics of a specific wikipedia version",
+		super("meta","Provides statistics of a specific wikipedia version",
 				"<p>Retrieves statistics (article counts, last edit date, etc.) for a wikipedia dump.</p>",
 				true, false
 				);

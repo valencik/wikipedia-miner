@@ -47,9 +47,8 @@ public class WikifyService extends Service {
 	
 	private String linkClassName = "wm_wikifiedLink" ;
 	
-	
 	public WikifyService() {
-		super("Augments textual documents with links to the appropriate Wikipedia articles",
+		super("core","Augments textual documents with links to the appropriate Wikipedia articles",
 				"<p>This service automatically detects the topics mentioned in the given document, and provides links to the appropriate Wikipedia articles. </p>" 
 				+ "<p> It doesn't just use Wikipedia as a source of information to link to, but also as training data for how best to do it. In other words, it has been trained to make the same decisions as the people who edit Wikipedia. </p>"
 				+ "<p> It may not work very well if the document does not fit the model of what it has been trained on. Documents should not be too short, and should be dedicated to a particular topic.</p>",
@@ -141,6 +140,10 @@ public class WikifyService extends Service {
 			return buildErrorResponse("You must specify a source document to wikify", xmlResponse) ;
 		}
 		
+		SourceMode sourceMode = prmSourceMode.getValue(request) ;
+		if (sourceMode == SourceMode.AUTO)
+			sourceMode = resolveSourceMode(source) ;
+		
 		ArrayList<Topic> detectedTopics = new ArrayList<Topic>() ;
 		String wikifiedDoc = wikifyAndGatherTopics(request, detectedTopics, wikipedia) ;
 		
@@ -149,6 +152,7 @@ public class WikifyService extends Service {
 			docScore = docScore + t.getRelatednessToOtherTopics() ;
 		
 		Element xmlWikifiedDoc = getHub().createCDATAElement("WikifiedDocument", wikifiedDoc) ;
+		xmlWikifiedDoc.setAttribute("sourceMode", sourceMode.toString()) ;
 		xmlWikifiedDoc.setAttribute("documentScore", getHub().format(docScore)) ;
 		xmlResponse.appendChild(xmlWikifiedDoc) ;
 		
@@ -210,7 +214,7 @@ public class WikifyService extends Service {
 			if (sourceMode == SourceMode.WIKI)
 				linkFormat = LinkFormat.WIKI ;
 			else
-				linkFormat = LinkFormat.HTML ;
+				linkFormat = LinkFormat.HTML_ID_WEIGHT ;
 		}
 		
 		//Vector<Article> bannedTopicList = resolveTopicList(bannedTopics) ;

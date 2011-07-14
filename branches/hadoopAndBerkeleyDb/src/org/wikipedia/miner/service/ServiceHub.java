@@ -19,6 +19,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Text;
 import org.wikipedia.miner.comparison.ArticleComparer;
+import org.wikipedia.miner.comparison.ConnectionSnippetWeighter;
 import org.wikipedia.miner.comparison.LabelComparer;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.WikipediaConfiguration;
@@ -35,6 +36,7 @@ public class ServiceHub {
 	
 	private HashMap<String, ArticleComparer> articleComparersByWikiName ;
 	private HashMap<String, LabelComparer> labelComparersByWikiName ;
+	private HashMap<String, ConnectionSnippetWeighter> snippetWeightersByWikiName ;
 	
 	
 	private HashMap<String,Service> registeredServices ;
@@ -53,7 +55,7 @@ public class ServiceHub {
 		wikipediasByName = new HashMap<String, Wikipedia>() ;
 		articleComparersByWikiName = new HashMap<String, ArticleComparer>()  ;
 		labelComparersByWikiName = new HashMap<String, LabelComparer>()  ;
-		
+		snippetWeightersByWikiName = new HashMap<String, ConnectionSnippetWeighter>() ;
 		
 		registeredServices = new HashMap<String,Service>() ;
 				
@@ -75,6 +77,9 @@ public class ServiceHub {
 					LabelComparer lblCmp = new LabelComparer(wikipedia, artCmp) ;
 					labelComparersByWikiName.put(wikiName, lblCmp) ;
 				}
+				
+				ConnectionSnippetWeighter sw = new ConnectionSnippetWeighter(wikipedia, artCmp) ;
+				snippetWeightersByWikiName.put(wikiName, sw) ;
 			}
 		
 		
@@ -141,6 +146,10 @@ public class ServiceHub {
 	
 	public LabelComparer getLabelComparer(String wikiName) {
 		return labelComparersByWikiName.get(wikiName) ;
+	}
+	
+	public ConnectionSnippetWeighter getConnectionSnippetWeighter(String wikiName) {
+		return snippetWeightersByWikiName.get(wikiName) ;
 	}
 	
 	public MarkupFormatter getFormatter() {
