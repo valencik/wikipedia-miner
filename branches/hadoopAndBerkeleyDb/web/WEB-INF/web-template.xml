@@ -43,7 +43,7 @@
     
     <servlet-mapping>
       <servlet-name>getProgress</servlet-name>
-      <url-pattern>/getProgress</url-pattern>
+      <url-pattern>/services/getProgress</url-pattern>
     </servlet-mapping>
 
 
@@ -61,7 +61,7 @@
     
     <servlet-mapping>
       <servlet-name>search</servlet-name>
-      <url-pattern>/search</url-pattern>
+      <url-pattern>/services/search</url-pattern>
     </servlet-mapping>
 
 
@@ -78,7 +78,7 @@
     
     <servlet-mapping>
       <servlet-name>exploreArticle</servlet-name>
-      <url-pattern>/exploreArticle</url-pattern>
+      <url-pattern>/services/exploreArticle</url-pattern>
     </servlet-mapping>
 
 
@@ -95,7 +95,7 @@
     
     <servlet-mapping>
       <servlet-name>exploreCategory</servlet-name>
-      <url-pattern>/exploreCategory</url-pattern>
+      <url-pattern>/services/exploreCategory</url-pattern>
     </servlet-mapping>
 
     <servlet>
@@ -111,7 +111,7 @@
     
     <servlet-mapping>
       <servlet-name>compare</servlet-name>
-      <url-pattern>/compare</url-pattern>
+      <url-pattern>/services/compare</url-pattern>
     </servlet-mapping>
 
 
@@ -129,7 +129,7 @@
     
     <servlet-mapping>
       <servlet-name>wikify</servlet-name>
-      <url-pattern>/wikify</url-pattern>
+      <url-pattern>/services/wikify</url-pattern>
     </servlet-mapping>
 
 
@@ -147,7 +147,7 @@
     
     <servlet-mapping>
       <servlet-name>suggest</servlet-name>
-      <url-pattern>/suggest</url-pattern>
+      <url-pattern>/services/suggest</url-pattern>
     </servlet-mapping>
 
     <servlet>
@@ -163,7 +163,7 @@
     
     <servlet-mapping>
       <servlet-name>correct</servlet-name>
-      <url-pattern>/correct</url-pattern>
+      <url-pattern>/services/correct</url-pattern>
     </servlet-mapping>
 
     
@@ -180,7 +180,7 @@
     
     <servlet-mapping>
       <servlet-name>getStats</servlet-name>
-      <url-pattern>/getStats</url-pattern>
+      <url-pattern>/services/getStats</url-pattern>
     </servlet-mapping>
 
 
@@ -197,7 +197,7 @@
     
     <servlet-mapping>
       <servlet-name>listWikipedias</servlet-name>
-      <url-pattern>/listWikipedias</url-pattern>
+      <url-pattern>/services/listWikipedias</url-pattern>
     </servlet-mapping>
 
 
@@ -214,7 +214,7 @@
     
     <servlet-mapping>
       <servlet-name>listServices</servlet-name>
-      <url-pattern>/listServices</url-pattern>
+      <url-pattern>/services/listServices</url-pattern>
     </servlet-mapping>
 
 
