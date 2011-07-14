@@ -151,7 +151,7 @@ function processAnnotationResponse(response) {
 		$.each(sortedTopics, function() {
 			var xmlLink = $(this) ;
 			
-			var link = $("<a pageId='" + xmlLink.attr('id') + "' linkProb='" + xmlLink.attr('weight') + "' href='search.html?artId=" + xmlLink.attr('id') + "'>" + xmlLink.attr('title') + "</a>") ;
+			var link = $("<a pageId='" + xmlLink.attr('id') + "' linkProb='" + xmlLink.attr('weight') + "' href='../search/?artId=" + xmlLink.attr('id') + "'>" + xmlLink.attr('title') + "</a>") ;
 			var weight = Number(xmlLink.attr('weight')) ;
 			weight = normalize(weight, minWeight, maxWeight) ;
 			link.css('font-size', getFontSize(weight) + "px") ;
@@ -184,7 +184,7 @@ function processAnnotationResponse(response) {
 			var dest = getDestination(result[0]) ;
 			var topic = topicsByTitle[dest.toLowerCase()] ;
 			
-			newMarkup = newMarkup + "<a href=\"./search.html?artId=" + topic.id + "\" pageId='" + topic.id + "' linkProb='" + topic.weight + "' \">" + result[0] + "</a>" ;
+			newMarkup = newMarkup + "<a href=\"../search/?artId=" + topic.id + "\" pageId='" + topic.id + "' linkProb='" + topic.weight + "' \">" + result[0] + "</a>" ;
 			
 			lastIndex = pattern.lastIndex ;
 		}

@@ -125,8 +125,8 @@ function processRelatednessResponse(response) {
 	
 	if (xmlInterpretation.attr('id1') != undefined && xmlInterpretation.attr('id2')) {
 	
-		$('#sense1').html("<a pageId='" + xmlInterpretation.attr('id1') + "' href='search.html?artId=" + xmlInterpretation.attr('id1') + "'>" + xmlInterpretation.attr('title1') + "</a>") ;
-		$('#sense2').html("<a pageId='" + xmlInterpretation.attr('id2') + "' href='search.html?artId=" + xmlInterpretation.attr('id2') + "'>" + xmlInterpretation.attr('title2') + "</a>") ;
+		$('#sense1').html("<a pageId='" + xmlInterpretation.attr('id1') + "' href='../search/?artId=" + xmlInterpretation.attr('id1') + "'>" + xmlInterpretation.attr('title1') + "</a>") ;
+		$('#sense2').html("<a pageId='" + xmlInterpretation.attr('id2') + "' href='../search/?artId=" + xmlInterpretation.attr('id2') + "'>" + xmlInterpretation.attr('title2') + "</a>") ;
 	
 		wm_addDefinitionTooltipsToAllLinks($('#sense1')) ;
 		wm_addDefinitionTooltipsToAllLinks($('#sense2')) ;
@@ -146,7 +146,7 @@ function processRelatednessResponse(response) {
 		$.each(sortedConnections, function() {
 			var xmlConnection = $(this) ;
 			
-			var connection = $("<a pageId='" + xmlConnection.attr('id') + "' href='search.html?artId=" + xmlConnection.attr('id') + "'>" + xmlConnection.attr('title') + "</a>") ;
+			var connection = $("<a pageId='" + xmlConnection.attr('id') + "' href='../search/?artId=" + xmlConnection.attr('id') + "'>" + xmlConnection.attr('title') + "</a>") ;
 			var weight = (Number(xmlConnection.attr('relatedness1')) + Number(xmlConnection.attr('relatedness2'))) / 2 ;
 			connection.css('font-size', getFontSize(weight) + "px") ;
 			connection.css('color', getFontColor(weight)) ;
@@ -168,7 +168,7 @@ function processRelatednessResponse(response) {
 		
 		$.each(response.find("Snippet"), function() {
 			var xmlSnippet = $(this) ;
-			var snippet = $("<ul class='snippet ui-corner-all'><p>" + xmlSnippet.text() + " </p> <p class='source'>from <a pageId='" + xmlSnippet.attr('sourceId') + "' href='search.html?artId=" + xmlSnippet.attr('sourceId') + "'>" + xmlSnippet.attr('sourceTitle') + "</a></ul>") ;
+			var snippet = $("<ul class='snippet ui-corner-all'><p>" + xmlSnippet.text() + " </p> <p class='source'>from <a pageId='" + xmlSnippet.attr('sourceId') + "' href='../search/?artId=" + xmlSnippet.attr('sourceId') + "'>" + xmlSnippet.attr('sourceTitle') + "</a></ul>") ;
 			$("#snippets").append(snippet) ;
 		}) ;
 	} else {
