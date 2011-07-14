@@ -1,3 +1,4 @@
 User-agent: *
-Disallow: /service
+Disallow: /demos/
+Disallow: /demos
 Disallow: /wikifier 

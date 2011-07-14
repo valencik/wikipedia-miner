@@ -28,15 +28,17 @@ function wm_addDefinitionTooltipsToAllLinks(container, className) {
                 var dest = link.attr("href");
 				var pageId = link.attr("pageId");
                 var linkProb = link.attr("linkProb") ;
+                var relatedness = link.attr("relatedness") ;
                 
                 
                 if (pageId != null) {
                         link.bind("mouseover", {
                                 id: pageId,
                                 object: link,
-                                linkProb: linkProb
+                                linkProb: linkProb,
+                                relatedness: relatedness
                         }, function(event){
-                                wm_showDefinitionTooltip(event.data.id, event.data.object, event.data.linkProb);
+                                wm_showDefinitionTooltip(event.data.id, event.data.object, event.data.linkProb, event.data.relatedness);
                         });
                         
                         link.bind("mouseout", function(event){
@@ -70,7 +72,7 @@ function wm_showMessageTooltip(message, object) {
 }
 
 
-function wm_showDefinitionTooltip(topicId, object, linkProb) {
+function wm_showDefinitionTooltip(topicId, object, linkProb, relatedness) {
                 
     if(wm_tooltip == null) {
 		wm_tooltip = $("<div id='wm_tooltip' class='ui-corner-all'></div>") ;
@@ -94,10 +96,10 @@ function wm_showDefinitionTooltip(topicId, object, linkProb) {
 
 	var xml = wm_tooltipXmlCache[topicId] ;
         if (xml != null) {
-                wm_setTooltipContent(topicId, xml, linkProb) ;
+                wm_setTooltipContent(topicId, xml, linkProb, relatedness) ;
 	} else {
 
-		$.get(wm_host+"/exploreArticle", {
+		$.get(wm_host+"services/exploreArticle", {
 			id: topicId,
 			definition: true,
 			emphasisFormat: "HTML",
@@ -110,7 +112,7 @@ function wm_showDefinitionTooltip(topicId, object, linkProb) {
 			wm_tooltipXmlCache[topicId] = response ;
 
 			if (wm_requestedId == null || wm_requestedId == topicId)
-				wm_setTooltipContent(topicId, response, linkProb);
+				wm_setTooltipContent(topicId, response, linkProb, relatedness);
 		});
 	}
 }
@@ -119,7 +121,7 @@ function wm_showDefinitionTooltip(topicId, object, linkProb) {
 
 
 
-function wm_setTooltipContent(topicId, xml, linkProb) {
+function wm_setTooltipContent(topicId, xml, linkProb, relatedness) {
                 
 	
 	wm_requestedId = null ;
@@ -138,7 +140,10 @@ function wm_setTooltipContent(topicId, xml, linkProb) {
                 wm_tooltip.append("no definition avaliable") ;
         
         if (linkProb != null) 
-                wm_tooltip.append("<p><b>" + Math.round(linkProb*100) + "%</b> probability of being a link") ;
+              wm_tooltip.append("<p><b>" + Math.round(linkProb*100) + "%</b> probability of being a link") ;
+                
+        if (relatedness != null) 
+              wm_tooltip.append("<p><b>" + Math.round(relatedness*100) + "%</b> related") ;
         
         $(wm_tooltip).append("<div class='break'/>") ;
 }
