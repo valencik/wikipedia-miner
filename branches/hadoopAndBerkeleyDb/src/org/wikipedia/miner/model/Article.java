@@ -364,11 +364,11 @@ public class Article extends Page {
 		//associate sentence indexes with number of arts mentioned.
 		for (Article art:arts) {
 
-			System.out.println(" - Checking art " + art) ;
+			//System.out.println(" - Checking art " + art) ;
 
 			for (Integer sentenceIndex: getSentenceIndexesMentioning(art)) {
 
-				System.out.println(" - - Adding sentence " + sentenceIndex) ;
+				//System.out.println(" - - Adding sentence " + sentenceIndex) ;
 
 				Integer count = sentenceCounts.get(sentenceIndex) ;
 				if (count == null)
@@ -385,7 +385,7 @@ public class Article extends Page {
 		while (iter.hasNext()) {
 			Map.Entry<Integer, Integer> e = iter.next();
 
-			System.out.println(" - " + e.getKey() + ", " + e.getValue()) ;
+			//System.out.println(" - " + e.getKey() + ", " + e.getValue()) ;
 
 			if (e.getValue() == arts.size())
 				validSentences.add(e.getKey()) ;
