@@ -21,7 +21,7 @@ public class CorrectService extends Service {
 	private StringParameter prmTerm ;
 
 	public CorrectService() {
-		super("Provides alternatives for misspelt words",
+		super("query","Provides alternatives for misspelt words",
 				"<p></p>",
 				true, false);
 		

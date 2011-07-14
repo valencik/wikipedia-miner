@@ -5,6 +5,8 @@ import gnu.trove.TLongHashSet;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -12,6 +14,8 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.w3c.dom.Element;
 import org.wikipedia.miner.comparison.ArticleComparer;
+import org.wikipedia.miner.comparison.ConnectionSnippet;
+import org.wikipedia.miner.comparison.ConnectionSnippetWeighter;
 import org.wikipedia.miner.comparison.LabelComparer;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Label;
@@ -68,8 +72,8 @@ public class CompareService extends Service{
 	
 	private IntParameter prmMaxConsConsidered ;
 	private IntParameter prmMaxConsReturned ;
-	private IntParameter prmMaxConsForSnippets ;
-	private IntParameter prmMaxSnippets ;
+	private IntParameter prmMaxSnippetsConsidered ;
+	private IntParameter prmMaxSnippetsReturned ;
 	
 	//private BooleanParameter prmEscape ;
 	
@@ -83,7 +87,7 @@ public class CompareService extends Service{
 	 */
 	public CompareService() {
 		
-		super("Measures and explains the connections between Wikipedia articles ",
+		super("core","Measures and explains the connections between Wikipedia articles ",
 				"<p>This service measures the semantic relatedness between pairs of terms, pairs of article ids, or sets of article ids.</p>" + 
 				"<p>The relatedness measures are calculated from the links going into and out of each page. Links that are common to both pages are used as evidence that they are related, while links that are unique to one or the other indicate the opposite.</p>",
 				true, true 
@@ -131,11 +135,11 @@ public class CompareService extends Service{
 		prmSnippets = new BooleanParameter("snippets", "if <b>true</b>, then the service will list sentences that either mention both of the articles being compared, or come from one of the articles and mention the other. This parameter is ignored if comparing lists of ids.", false) ;
 		addGlobalParameter(prmSnippets) ;
 		
-		prmMaxConsForSnippets = new IntParameter("maxConnectionsForSnippets", "The maximum number of connections that will be used to gather snippets from. This parameter is ignored if comparing lists of ids.", 100) ;
-		addGlobalParameter(prmMaxConsForSnippets) ;
+		prmMaxSnippetsConsidered = new IntParameter("maxSnippetsConsidered", "The maximum number of snippets that will be gathered and weighted. This parameter is ignored if comparing lists of ids.", 30) ;
+		addGlobalParameter(prmMaxSnippetsConsidered) ;
 		
-		prmMaxSnippets = new IntParameter("maxSnippets", "The maximum number of connections that will be used to gather snippets from. This parameter is ignored if comparing lists of ids.", 10) ;
-		addGlobalParameter(prmMaxSnippets) ;
+		prmMaxSnippetsReturned = new IntParameter("maxSnippets", "The maximum number of snippets that will be returned. These will be the highest weighted snippets. This parameter is ignored if comparing lists of ids.", 10) ;
+		addGlobalParameter(prmMaxSnippetsReturned) ;
 		
 		prmTitles = new BooleanParameter("titles", "if <b>true</b>, then the corresponding titles for article ids will be returned. This parameter is ignored if comparing terms", false) ;
 		addGlobalParameter(prmTitles) ;
@@ -320,6 +324,10 @@ public class CompareService extends Service{
 			for (Article a1:articles1) {
 				for (Article a2:articles2) {
 					
+					if (a1.equals(a2))
+						continue ;
+							
+					
 					//relatedness is symmetric, so create a unique key for this pair of ids were order doesnt matter 
 					Article min, max ;
 					
@@ -479,71 +487,121 @@ public class CompareService extends Service{
 			response.appendChild(xmlSnippets) ;
 
 			int snippetsCollected=0 ;
-			int maxSnippets = prmMaxSnippets.getValue(request) ;
+			int maxSnippetsConsidered = prmMaxSnippetsConsidered.getValue(request) ;
+			
+			
+			//gather and weight snippets
+			
+			ConnectionSnippetWeighter snippetWeighter = getHub().getConnectionSnippetWeighter(getWikipediaName(request)) ;
+			
+			TreeSet<ConnectionSnippet> snippets = new TreeSet<ConnectionSnippet>() ;
 
 			//look for snippets in art1 which mention art2
 			for (int sentenceIndex:art1.getSentenceIndexesMentioning(art2)) {
-				if (snippetsCollected >= maxSnippets) break ;
-				
-				String sentence = art1.getSentenceMarkup(sentenceIndex) ;
-				xmlSnippets.appendChild(getSnippetXML(sentence, art1, art2, art1, request, wikipedia)) ;
-				snippetsCollected ++ ;
+				ConnectionSnippet s = new ConnectionSnippet(sentenceIndex, art1, art1, art2) ;
+				s.setWeight(snippetWeighter.getWeight(s)) ;
+				snippets.add(s) ;
 			}
 			
 			//look for snippets in art2 which mention art1
 			for (int sentenceIndex:art2.getSentenceIndexesMentioning(art1)) {
-				if (snippetsCollected >= maxSnippets) break ;
-				
-				String sentence = art2.getSentenceMarkup(sentenceIndex) ;
-				xmlSnippets.appendChild(getSnippetXML(sentence, art1, art2, art2, request, wikipedia)) ;
-				snippetsCollected ++ ;
+				ConnectionSnippet s = new ConnectionSnippet(sentenceIndex, art2, art1, art2) ;
+				s.setWeight(snippetWeighter.getWeight(s)) ;
+				snippets.add(s) ;
 			}
 
 			ArrayList<Article> articlesOfInterest = new ArrayList<Article>() ;
 			articlesOfInterest.add(art1) ;
 			articlesOfInterest.add(art2) ;
 			
-			int consConsidered = 0 ;
-			int maxConsForSnippets = prmMaxConsForSnippets.getValue(request) ;
-			
 			for (Article connection:connections) {
 				
-				consConsidered++ ;
-				if (consConsidered >= maxConsForSnippets) break ;
-				if (snippetsCollected >= maxSnippets) break ;
+				if (snippets.size() >= maxSnippetsConsidered)
+					break ;
 				
 				for (int sentenceIndex:connection.getSentenceIndexesMentioning(articlesOfInterest)) {
-					if (snippetsCollected >= maxSnippets) break ;
+					if (snippets.size() >= maxSnippetsConsidered)
+						break ;
 					
-					String sentence = connection.getSentenceMarkup(sentenceIndex) ;
-					xmlSnippets.appendChild(getSnippetXML(sentence, art1, art2, connection, request, wikipedia)) ;
-					snippetsCollected ++ ;
+					ConnectionSnippet s = new ConnectionSnippet(sentenceIndex, connection, art1, art2) ;
+					s.setWeight(snippetWeighter.getWeight(s)) ;
+					snippets.add(s) ;
 				}
 			}
 			
+			Pattern labelPattern = getLabelMatchingPattern(art1, art2) ;
+			
+			int maxSnippetsReturned = prmMaxSnippetsReturned.getValue(request) ;
+			
+			int snippetsReturned = 0 ;
+			for (ConnectionSnippet snippet:snippets) {
+				snippetsReturned ++ ;
+				if (snippetsReturned > maxSnippetsReturned)
+					break ;
+				
+				String sentence = snippet.getPlainText() ;
+				sentence = emphasizePatternMatches(sentence, labelPattern) ;
+				sentence = getHub().getFormatter().format(sentence, request, wikipedia) ;
+
+				Element xmlSnippet = getHub().createCDATAElement("Snippet", sentence);
+				xmlSnippet.setAttribute("sourceId", String.valueOf(snippet.getSource().getId())) ;
+				xmlSnippet.setAttribute("sourceTitle", snippet.getSource().getTitle()) ;
+				xmlSnippet.setAttribute("sentenceIndex", String.valueOf(snippet.getSentenceIndex())) ;
+				xmlSnippet.setAttribute("weight", getHub().format(snippet.getWeight())) ;
+				
+				xmlSnippets.appendChild(xmlSnippet) ;
+				snippetsCollected ++ ;
+			}
+
 			response.appendChild(xmlSnippets) ;
 		}
 
 		return response ;
 	}
 	
-	private Element getSnippetXML(String sentence, Article art1, Article art2, Article source, HttpServletRequest request, Wikipedia wikipedia) {
+	private String emphasizePatternMatches(String sentence, Pattern pattern) {
 		
-		if (!source.equals(art1) && !source.equals(art2)) {
-			//remove emphasis markup
-			sentence = sentence.replaceAll("'{2,}", "") ;
+		String sentence2 = " " + sentence + " " ;
+		
+		Matcher m = pattern.matcher(sentence2) ;
+		
+		StringBuffer sb = new StringBuffer() ;
+		int lastCopyIndex = 0 ;
+		
+		while (m.find()) {
+			sb.append(sentence2.substring(lastCopyIndex, m.start())) ;
+			sb.append("'''") ;
+			sb.append(m.group()) ;
+			sb.append("'''") ;
+			lastCopyIndex = m.end() ;
+		}
+		sb.append(sentence2.substring(lastCopyIndex)) ;
+		
+		return sb.toString().trim();
+	}
+	
+	private Pattern getLabelMatchingPattern(Article art1, Article art2) {
+		StringBuffer labelRegex = new StringBuffer("(?<=\\W)(") ;
+		
+		for (Article.Label lbl:art1.getLabels()) {
+			
+			if (lbl.getLinkOccCount() > 3) {
+				labelRegex.append(lbl.getText()) ;
+				labelRegex.append("|") ;
+			}
 		}
 		
-		HashSet<Integer> topicIds = new HashSet<Integer>() ;
-		topicIds.add(art1.getId()) ;
-		topicIds.add(art2.getId()) ;
+		for (Article.Label lbl:art2.getLabels()) {
+			
+			if (lbl.getLinkOccCount() > 3) {
+				labelRegex.append(lbl.getText()) ;
+				labelRegex.append("|") ;
+			}
+		}
 		
-		sentence = getHub().getFormatter().highlightTopics(sentence, topicIds, wikipedia) ;
-		sentence = getHub().getFormatter().format(sentence, request, wikipedia) ;
-
-		Element xmlSnippet = getHub().createCDATAElement("Snippet", sentence);
-		xmlSnippet.setAttribute("sourceId", String.valueOf(source.getId())) ;
-		xmlSnippet.setAttribute("sourceTitle", source.getTitle()) ;
-		return xmlSnippet ;
+		labelRegex.deleteCharAt(labelRegex.length()-1) ;
+		labelRegex.append(")(?=\\W)") ;
+		
+		return Pattern.compile(labelRegex.toString(), Pattern.CASE_INSENSITIVE) ;
 	}
 }

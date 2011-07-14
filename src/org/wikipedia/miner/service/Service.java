@@ -40,6 +40,8 @@ public abstract class Service extends HttpServlet {
 	public enum ResponseFormat {XML,DIRECT} ; 
 
 	private ServiceHub hub ;
+	
+	private String groupName ;
 	private String shortDescription ;
 	private String detailsMarkup ;
 
@@ -64,9 +66,10 @@ public abstract class Service extends HttpServlet {
 	private DecimalFormat progressFormat = new DecimalFormat("#0%") ;
 
 	@SuppressWarnings("unchecked")
-	public Service(String shortDescription, String detailsMarkup, boolean wikipediaSpecific, boolean supportsDirectResponse) {
+	public Service(String groupName, String shortDescription, String detailsMarkup, boolean wikipediaSpecific, boolean supportsDirectResponse) {
 
 		//this.name = name ;
+		this.groupName = groupName ;
 		this.shortDescription = shortDescription ;
 		this.detailsMarkup = detailsMarkup ;
 		this.parameterGroups = new Vector<ParameterGroup>() ;
@@ -270,6 +273,13 @@ public abstract class Service extends HttpServlet {
 		return path.toString() ;
 	}
 	
+	public String getGroupName() {
+		if (groupName != null)
+			return groupName ;
+		else 
+			return "ungrouped" ;
+	}
+	
 	public String getShortDescription() {
 		return shortDescription ;
 	}
@@ -280,6 +290,7 @@ public abstract class Service extends HttpServlet {
 		Element xmlResponse = hub.createElement("Response") ;
 		
 		Element xmlDescription = hub.createElement("ServiceDescription") ;
+		xmlDescription.setAttribute("groupName", groupName) ;
 		xmlDescription.setAttribute("serviceName", getServletName()) ;
 		xmlDescription.setAttribute("description", shortDescription) ;
 		

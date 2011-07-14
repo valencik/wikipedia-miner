@@ -65,7 +65,7 @@ public class ExploreArticleService extends Service{
 	
 	public ExploreArticleService() {
 		
-		super("Provides details of individual articles",
+		super("core","Provides details of individual articles",
 				
 				"<p></p>",
 				true, false
@@ -187,6 +187,9 @@ public class ExploreArticleService extends Service{
 				return buildErrorResponse("'" + title + "' is an unknown article title", xmlResponse) ;
 			break ;
 		}
+		
+		xmlResponse.setAttribute("id", String.valueOf(art.getId()));
+		xmlResponse.setAttribute("title", String.valueOf(art.getTitle()));
 		
 		
 		if (prmDefinition.getValue(request)) {

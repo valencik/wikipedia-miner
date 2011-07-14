@@ -35,7 +35,7 @@ public class ExploreCategoryService extends Service{
 	private IntParameter prmChildArticleStart ;
 	
 	public ExploreCategoryService() {
-		super("Provides details of individual categories",
+		super("core","Provides details of individual categories",
 			
 			"<p></p>",
 			true, false
@@ -123,7 +123,8 @@ public class ExploreCategoryService extends Service{
 			break ;
 		}
 		
-		
+		xmlResponse.setAttribute("id", String.valueOf(cat.getId()));
+		xmlResponse.setAttribute("title", String.valueOf(cat.getTitle()));
 		
 		if (prmParentCategories.getValue(request)) {
 			

@@ -45,7 +45,7 @@ public class SearchService extends Service {
 
 
 	public SearchService() {
-		super("Lists the senses (wikipedia articles) of terms and phrases",
+		super("core","Lists the senses (wikipedia articles) of terms and phrases",
 				"<p>This service takes a term or phrase, and returns the different Wikipedia articles that these could refer to.</p>" +
 				"<p>By default, it will treat the entire query as one term, but it can be made to break it down into its components " +
 				"(to recognize, for example, that <i>hiking new zealand</i> contains two terms: <i>hiking</i> and <i>new zealand</i>)</p>" +
