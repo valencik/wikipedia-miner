@@ -346,6 +346,11 @@ public class ArticleComparer {
 		ArrayList<Integer> linksA = getLinks(cmp.getArticleA().getId(), dir) ;
 		ArrayList<Integer> linksB = getLinks(cmp.getArticleB().getId(), dir) ;
 
+		//we can't do anything if there are no links
+		if (linksA.isEmpty() || linksB.isEmpty()) 
+			return cmp ;
+		
+
 		int intersection = 0 ;
 		//int sentenceIntersection = 0 ;
 		int union = 0 ;
