@@ -37,3 +37,5 @@ function normalize(val, min, max) {
 	
 	return (val-min) * (1/(max-min)) ;
 }
+
+
