@@ -217,6 +217,8 @@ public class WikifyService extends Service {
 				linkFormat = LinkFormat.HTML_ID_WEIGHT ;
 		}
 		
+		String linkStyle = prmLinkStyle.getValue(request) ;
+		
 		//Vector<Article> bannedTopicList = resolveTopicList(bannedTopics) ;
 		
 		DocumentPreprocessor dp ;
@@ -227,7 +229,7 @@ public class WikifyService extends Service {
 		
 		DocumentTagger dt ;
 		if (linkFormat == LinkFormat.HTML || linkFormat == LinkFormat.HTML_ID || linkFormat == LinkFormat.HTML_ID_WEIGHT)
-			dt = new MyHtmlTagger(linkFormat, wikipedia) ; 
+			dt = new MyHtmlTagger(linkFormat, linkStyle, wikipedia) ; 
 		else
 			dt = new MyWikiTagger(linkFormat) ;
 		
@@ -279,21 +281,24 @@ public class WikifyService extends Service {
 				
 				String basePath = getBasePath(request) ;
 				
+				if (!basePath.endsWith("/"))
+					basePath = basePath + "/" ;
+				
 				StringBuffer newHeaderStuff = new StringBuffer();
 				newHeaderStuff.append("<link type=\"text/css\" rel=\"stylesheet\" href=\"" + basePath + "/css/tooltips.css\"/>\n") ;
-				newHeaderStuff.append("<link type=\"text/css\" rel=\"stylesheet\" href=\"" + basePath + "/css/smoothness/jquery-ui-1.7.1.custom.css\"/>\n") ;
+				newHeaderStuff.append("<link type=\"text/css\" rel=\"stylesheet\" href=\"" + basePath + "/css/jquery-ui/jquery-ui-1.8.14.custom.css\"/>\n") ;
 				
 				String style = prmLinkStyle.getValue(request) ;
 				if (style != null && style.trim().length() > 0) 
 					newHeaderStuff.append("<style type='text/css'> ." + linkClassName + "{" + style + ";}</style>\n") ;
 				
 				
-				newHeaderStuff.append("<script type=\"text/javascript\" src=\"" + basePath + "/js/jquery.min.js\"></script>\n") ;
+				newHeaderStuff.append("<script type=\"text/javascript\" src=\"" + basePath + "/js/jquery-1.5.1.min.js\"></script>\n") ;
 				newHeaderStuff.append("<script type=\"text/javascript\" src=\"" + basePath + "/js/tooltips.js\"></script>\n") ;
 				newHeaderStuff.append("<script type=\"text/javascript\"> \n") ;
 				newHeaderStuff.append("  var wm_host=\"" + basePath + "\" ; \n") ;
 				newHeaderStuff.append("  $(document).ready(function() { \n") ;
-				newHeaderStuff.append("    wm_addTooltipsToAllLinks(null, \"" + linkClassName + "\") ; \n") ;
+				newHeaderStuff.append("    wm_addDefinitionTooltipsToAllLinks(null, \"" + linkClassName + "\") ; \n") ;
 				newHeaderStuff.append("  });\n") ;
 				newHeaderStuff.append("</script>\n") ;
 				
@@ -348,10 +353,15 @@ public class WikifyService extends Service {
 	private class MyHtmlTagger extends HtmlTagger{
 
 		LinkFormat linkFormat ;
+		String linkStyle ;
 		Wikipedia wikipedia ;
 
-		protected MyHtmlTagger(LinkFormat linkFormat, Wikipedia wikipedia) {		
+		protected MyHtmlTagger(LinkFormat linkFormat, String linkStyle, Wikipedia wikipedia) {		
 			this.linkFormat = linkFormat ;
+			this.linkStyle = linkStyle ;
+			if (this.linkStyle != null)
+				this.linkStyle = this.linkStyle.trim();
+			
 			this.wikipedia = wikipedia ;
 		}
 				
@@ -368,6 +378,8 @@ public class WikifyService extends Service {
 			if (linkFormat == LinkFormat.HTML_ID_WEIGHT) 
 				tag.append(" linkProb=\"" + getHub().format(topic.getWeight()) + "\"") ; 
 			
+			if (linkStyle != null && linkStyle.length() > 0) 
+				tag.append(" style=\"" + linkStyle + "\"") ;
 			
 			tag.append(">") ;
 			tag.append(anchor) ;
