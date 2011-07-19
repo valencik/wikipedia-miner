@@ -189,7 +189,7 @@ h2 {
 	font-size: 18px ;
 	text-align: right ;
 	
-	color: white ;
+	color: #999999 ;
 	background-color: #373737 ;
 	
 }
@@ -221,7 +221,6 @@ h2 {
 
 #subnav .header {
 	font-size: 16px ;
-	color: #888888 ;
 	padding-top: 20px ;
 }
 
@@ -259,6 +258,10 @@ h2 {
 	margin-bottom: 10px ;
 }
 
+#subnav .minor {
+	font-size: smaller ;
+}
+
 #inner2 {
 	padding-left: 15px ;
 	
@@ -285,6 +288,8 @@ h2 {
 	padding-bottom: 0px ;
 	
 	font-size: 15px;
+	
+	border: 1px solid #d5a422 ;
 }
 
 .note .ui-icon {
