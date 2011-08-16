@@ -38,6 +38,11 @@ public class Page implements Comparable<Page> {
 		disambiguation, 
 		
 		/**
+		 * A page that can be transcluded into other pages
+		 */
+		template,
+		
+		/**
 		 * A type of page that we don't currently deal with (e.g templates)
 		 */
 		invalid
@@ -288,6 +293,7 @@ public class Page implements Comparable<Page> {
 
 		markup = markup.replaceAll("={2,}(.+)={2,}", "\n") ; //clear section headings completely - not just formating, but content as well.			
 		markup = stripper.stripAllButInternalLinksAndEmphasis(markup, null) ;
+		markup = stripper.stripNonArticleInternalLinks(markup, null) ;
 		markup = stripper.stripExcessNewlines(markup) ;
 
 		String fp = "" ;
