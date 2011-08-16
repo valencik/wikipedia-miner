@@ -74,7 +74,7 @@ public class DumpExtractor {
 
 
 
-	public DumpExtractor(String[] args) throws IOException, IllegalArgumentException {
+	public DumpExtractor(String[] args) throws Exception {
 
 
 		GenericOptionsParser gop = new GenericOptionsParser(args) ;
@@ -127,67 +127,40 @@ public class DumpExtractor {
 
 
 
-	private void configure() throws IllegalArgumentException {
+	private void configure() throws Exception {
 
 		if (args.length != 5) 
 			throw new IllegalArgumentException("Please specify a xml dump of wikipedia, a language.xml config file, a language code, an openNLP sentence detection model, and a writable output directory") ;
 
 		//check input file
 		inputFile = new Path(args[0]) ;
-		try {
-			FileStatus fs = dfs.getFileStatus(inputFile) ;
-			if (fs.isDir() || !fs.getPermission().getUserAction().implies(FsAction.READ)) 
-				throw new Exception() ;
-		} catch (Exception e) {
-			throw new IllegalArgumentException("'" +inputFile + " is not readable or does not exist") ;
-		}
+		FileStatus fs = dfs.getFileStatus(inputFile) ;
+		if (fs.isDir() || !fs.getPermission().getUserAction().implies(FsAction.READ)) 
+			throw new IOException("'" +inputFile + " is not readable or does not exist") ;
+
 
 		//check lang file and language
 		langFile = new Path(args[1]) ;
 		lang = args[2] ;
-		try {
-			lc = new LanguageConfiguration(dfs, lang, langFile) ;
-			if (lc == null)
-				throw new IOException() ;
-		} catch (Exception e) {
-			throw new IllegalArgumentException("Could not load language configuration for '" + lang + "' from '" + langFile + "'") ;
-		}
+		lc = new LanguageConfiguration(dfs, lang, langFile) ;
+		if (lc == null)
+			throw new IOException("Could not load language configuration for '" + lang + "' from '" + langFile + "'") ;
 		
 		sentenceModel = new Path(args[3]) ;
-		try {
-			FileStatus fs = dfs.getFileStatus(sentenceModel) ;
-			if (fs.isDir() || !fs.getPermission().getUserAction().implies(FsAction.READ)) 
-				throw new Exception() ;
-		} catch (Exception e) {
-			throw new IllegalArgumentException("'" + sentenceModel + " is not readable or does not exist") ;
-		}
+		fs = dfs.getFileStatus(sentenceModel) ;
+		if (fs.isDir() || !fs.getPermission().getUserAction().implies(FsAction.READ)) 
+			throw new IOException("'" + sentenceModel + " is not readable or does not exist") ;
 		
-
 		//check output directory
 		outputDir = new Path(args[4]) ;
-		try {
-			FileStatus fs = dfs.getFileStatus(outputDir) ; 
-			if (!fs.isDir() || !fs.getPermission().getUserAction().implies(FsAction.WRITE)) {
-				throw new Exception() ;
-			}
-		} catch (Exception e) {
-			throw new IllegalArgumentException("'" +outputDir + " is not a writable directory") ;
-		}
-
-
+		fs = dfs.getFileStatus(outputDir) ; 
+		if (!fs.isDir() || !fs.getPermission().getUserAction().implies(FsAction.WRITE)) 
+			throw new IOException("'" +outputDir + " is not a writable directory") ;
+		
 		//set up directory where final data will be placed
 		finalDir = new Path(outputDir + "/final") ;
 		
-		try {
-			dfs.mkdirs(finalDir) ;
-		} catch (Exception e) {
-			throw new IllegalArgumentException("Could not create '" + finalDir + "'") ;
-		}
-
-
-
-
-
+		dfs.mkdirs(finalDir) ;
 	}
 
 	private void configureLogging() throws IOException {

@@ -31,6 +31,8 @@ import java.util.regex.*;
 public class MarkupStripper {
 
 	private Pattern linkPattern = Pattern.compile("\\[\\[(.*?:)?(.*?)(\\|.*?)?\\]\\]") ;
+	
+	private EmphasisResolver emphasisResolver = new EmphasisResolver() ;
 
 	/**
 	 * Returns a copy of the given markup, where all markup has been removed except for 
@@ -63,6 +65,9 @@ public class MarkupStripper {
 
 		//ignore these regions now (they need to be blanked before we can correctly identify the remaining regions)
 		clearedMarkup = stripRegions(clearedMarkup, regions, replacement) ;
+		
+		//System.out.println("Prior to removing misformatted start: ") ;
+		//System.out.println(" - " + clearedMarkup) ;
 
 		regions = gatherMisformattedStarts(clearedMarkup) ;
 		clearedMarkup = stripRegions(clearedMarkup, regions, replacement) ;
@@ -155,6 +160,60 @@ public class MarkupStripper {
 		return strippedMarkup.toString() ; 	
 	}
 	
+	
+	
+	public String stripEmphasis(String markup, Character replacement) {
+		
+		String resolvedMarkup = emphasisResolver.resolveEmphasis(markup) ;
+		
+		Vector<int[]> regions = gatherSimpleRegions(resolvedMarkup, "\\<\\/?[bi]\\>") ;
+		
+		StringBuffer clearedMarkup = new StringBuffer() ;
+		int lastPos = 0 ;
+		
+		int i = regions.size() ;
+
+		while (i > 0) {
+			i -- ;
+
+			int[] region = regions.elementAt(i) ;
+
+
+			//only deal with this region is not within a region we have already dealt with. 
+			if (region[0] < lastPos) {
+
+				//print (" - - dealing with it\n") ;
+
+				//copy markup after this region and before beginning of the last region we dealt with
+				if (region[1] < lastPos) 
+					clearedMarkup.insert(0, resolvedMarkup.substring(region[1], lastPos)) ;
+
+				if (replacement != null) {
+					
+					String tag = resolvedMarkup.substring(region[0], region[1]) ;
+					String fill ;
+					if (tag.matches("\\<\\/?b\\>"))
+						fill = "'''" ;
+					else
+						fill = "''" ;
+					
+					fill.replaceAll(".", replacement.toString()) ;
+					
+					clearedMarkup.insert(0, fill) ;
+				}
+
+				lastPos = region[0] ;
+			} else {
+				//print (" - - already dealt with\n") ;
+
+			}
+		}
+
+		clearedMarkup.insert(0, resolvedMarkup.substring(0, lastPos)) ;	
+		return clearedMarkup.toString() ;
+
+	}
+	
 
 	/**
 	 * Returns a copy of the given markup, where all links to wikipedia pages
@@ -180,6 +239,8 @@ public class MarkupStripper {
 			i -- ;
 
 			int[] region = regions.elementAt(i) ;
+			
+			//System.out.println(" - - REGION: " + markup.substring(region[0], region[1])) ;
 
 			//only deal with this region is not within a region we have already delt with. 
 			if (region[0] < lastPos) {
@@ -336,6 +397,8 @@ public class MarkupStripper {
 
 		return gatherComplexRegions(markup, "\\[\\[", "\\]\\]") ;
 	}
+	
+
 
 	/**
 	 * Gathers areas within the markup which correspond to templates (as identified by {{ and }} pairs). 
@@ -492,6 +555,23 @@ public class MarkupStripper {
 		regions = mergeRegionLists(regions, gatherSimpleRegions(markup, "^( *)([//*:]+)")) ;
 		return regions ;
 	}
+	
+	private boolean isEntirelyItalicised(String line) {
+		
+		String resolvedLine = emphasisResolver.resolveEmphasis(line) ;
+		
+		Pattern p = Pattern.compile("(\\s*)\\<i\\>(.*?)\\<\\/i\\>\\.?(\\s*)") ;
+		
+		Matcher m = p.matcher(resolvedLine) ;
+		if (m.matches()) {
+			if (m.group(1).contains("</i>"))
+				return false ;
+			else
+				return true ;
+		} else {
+			return false ;
+		}
+	}
 
 	/**
 	 * Gathers paragraphs within the markup referred to by the given pointer, which are at the 
@@ -513,8 +593,9 @@ public class MarkupStripper {
 
 			boolean isWhitespace = line.matches("^(\\s*)$") ;
 			boolean isIndented = line.matches("^(\\s*):.*") ;
-			boolean isItalicised = line.matches("^(\\s*)'{2,}(.*?)'{2,}\\.?(\\s*)") ;
+			boolean isItalicised = isEntirelyItalicised(line)  ;
 			boolean isImage = line.matches("^(\\s*)\\[\\[Image\\:(.*?)\\]\\](\\s*)") ;
+			
 			
 			
 			//System.out.println(" - - '" + line + "' " + isIndented + "," + isItalicised) ;

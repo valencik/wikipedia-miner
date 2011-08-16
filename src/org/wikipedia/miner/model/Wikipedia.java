@@ -19,6 +19,11 @@
 
 package org.wikipedia.miner.model;
 
+import java.io.File;
+import java.io.IOException;
+
+import javax.xml.parsers.ParserConfigurationException;
+
 import org.apache.log4j.Logger;
 import org.wikipedia.miner.db.WEnvironment;
 import org.wikipedia.miner.db.WIterator;
@@ -30,6 +35,7 @@ import org.wikipedia.miner.util.PageIterator;
 import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.wikipedia.miner.util.text.TextProcessor;
+import org.xml.sax.SAXException;
 
 import com.sleepycat.je.EnvironmentLockedException;
 
@@ -55,6 +61,23 @@ public class Wikipedia {
 	public Wikipedia(WikipediaConfiguration conf, boolean threadedPreparation) throws EnvironmentLockedException{
 		this.env = new WEnvironment(conf, threadedPreparation) ; 
 	}
+	
+	/**
+	 * Initialises a newly created Wikipedia according to the given configuration file. 
+	 * 
+	 * This can be a time consuming process if the given configuration specifies databases that need to be cached to memory.
+	 * 
+	 * This preparation can be done in a separate thread if required, in which case progress can be tracked using {@link #getProgress()}, {@link #getPreparationTracker()} and {@link #isReady()}.
+	 *  
+	 * @param confFile an xml file that describes where the databases are located, etc. 
+	 * @param threadedPreparation true if preparation (connecting to databases, caching data to memory) should be done in a separate thread, otherwise false
+	 * @throws EnvironmentLockedException if the underlying database environment is unavailable.
+	 */
+	public Wikipedia(File confFile, boolean threadedPreparation) throws EnvironmentLockedException, ParserConfigurationException, SAXException, IOException, ClassNotFoundException, InstantiationException, IllegalAccessException{
+		WikipediaConfiguration conf = new WikipediaConfiguration(confFile) ;
+		this.env = new WEnvironment(conf, threadedPreparation) ; 
+	}
+	
 
 	/**
 	 * Returns the environment that this is connected to

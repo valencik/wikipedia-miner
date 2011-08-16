@@ -106,8 +106,8 @@ public class DumpPageParser {
 		}
 		
 		
-		//ignore anything that isn't in main or category namespace
-		if (namespaceKey != SiteInfo.CATEGORY_KEY && namespaceKey != SiteInfo.MAIN_KEY) {
+		//ignore anything that isn't in main, category or template namespace
+		if (namespaceKey != SiteInfo.CATEGORY_KEY && namespaceKey != SiteInfo.MAIN_KEY && namespaceKey != SiteInfo.TEMPLATE_KEY) {
 			Logger.getLogger(DumpPageParser.class).info("Ignoring page " + id + ":" + title) ;
 			return null ;
 		}
@@ -118,6 +118,8 @@ public class DumpPageParser {
 		
 		if (namespaceKey == SiteInfo.CATEGORY_KEY) {
 			type = PageType.category ;
+		} else if (namespaceKey == SiteInfo.TEMPLATE_KEY) {
+			type = PageType.template ;
 		} else {
 			type = PageType.article ;
 			

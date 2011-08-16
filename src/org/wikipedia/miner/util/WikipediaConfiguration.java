@@ -25,12 +25,13 @@ import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.comparison.ArticleComparer.DataDependency;
 import org.wikipedia.miner.db.WDatabase.CachePriority;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
+import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.util.text.TextProcessor;
 import org.xml.sax.SAXException;
 
 public class WikipediaConfiguration {
 	
-	private enum ParamName{langCode,databaseDirectory,dataDirectory, defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability,databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, comparisonSnippetModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
+	private enum ParamName{langCode,databaseDirectory,dataDirectory, defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability, articlesOfInterest, databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, comparisonSnippetModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
 	
 	private String langCode ;
 
@@ -55,7 +56,6 @@ public class WikipediaConfiguration {
 	private int minLinksIn = 0;
 	private float minLinkProbability = 0 ;
 	private float minSenseProbability = 0 ;
-	
 	
 	private TIntHashSet articlesOfInterest ;
 	
@@ -305,6 +305,9 @@ public class WikipediaConfiguration {
 				case minLinkProbability:
 					this.minLinkProbability = Float.valueOf(paramValue) ;
 					break ;
+				case articlesOfInterest:
+					this.articlesOfInterest = gatherArticles(new File(paramValue)) ;
+					break ;
 				case databaseToCache: 
 					if (xmlParam.hasAttribute("priority"))
 						addDatabaseToCache(DatabaseType.valueOf(paramValue), CachePriority.valueOf(xmlParam.getAttribute("priority"))) ;
@@ -372,6 +375,24 @@ public class WikipediaConfiguration {
 		} catch (Exception e) {
 			return ParamName.unknown ;
 		}
+	}
+	
+	private TIntHashSet gatherArticles(File file) throws NumberFormatException, IOException {
+		
+		TIntHashSet artIds = new TIntHashSet() ;
+		
+		BufferedReader reader = new BufferedReader(new FileReader(file)) ;
+		String line  ;
+
+		while ((line = reader.readLine()) != null) {
+			String[] values = line.split("\t") ;
+			int id = new Integer(values[0].trim()) ;
+			artIds.add(id) ;
+		}
+
+		reader.close();		
+		
+		return artIds ;
 	}
 	
 }

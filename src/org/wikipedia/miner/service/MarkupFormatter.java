@@ -112,11 +112,15 @@ public class MarkupFormatter {
 		
 		//deal with emphasis formatting
 		
-		switch(prmEmphasisFormat.getValue(request)) {
+		EmphasisFormat emphasisFormat = prmEmphasisFormat.getDefaultValue() ;
+		if (request != null)
+			emphasisFormat = prmEmphasisFormat.getValue(request) ;
+		
+		
+		switch(emphasisFormat) {
 		
 		case PLAIN :
-			markup = markup.replaceAll("'{2,}", "") ; 
-			break ;
+			markup = stripper.stripEmphasis(markup, null) ;
 		case HTML :
 			markup = emphasisResolver.resolveEmphasis(markup) ;
 			break ;
@@ -124,7 +128,9 @@ public class MarkupFormatter {
 		
 		// deal with links
 		
-		LinkFormat linkFormat = prmLinkFormat.getValue(request) ;
+		LinkFormat linkFormat = prmLinkFormat.getDefaultValue() ;
+		if (request != null)
+			linkFormat = prmLinkFormat.getValue(request) ;
 		
 		if (linkFormat == LinkFormat.WIKI) 
 			return markup ;

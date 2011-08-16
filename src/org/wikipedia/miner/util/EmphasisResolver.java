@@ -19,6 +19,7 @@
 
 package org.wikipedia.miner.util;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Vector;
@@ -31,238 +32,269 @@ import java.util.regex.Pattern;
  * @author David Milne
  */
 public class EmphasisResolver {
-	
-	
-	private static final int ITALIC = 2 ;
-	private static final int BOLD = 3 ;
-	private static final int BOLD_ITALIC = 5 ;
 
-	private static final int START = 0 ;
-	private static final int END = 1 ;
-	private static final int TYPE = 2 ;
-	
-	private Pattern pattern = Pattern.compile("'{2,}") ;
-	
+	public String resolveEmphasis(String text) {
+		
+		StringBuffer sb = new StringBuffer() ;
+		
+		for (String line:text.split("\n")) {
+			sb.append(resolveLine(line)) ;
+			sb.append("\n") ;
+		}
+		
+		sb.deleteCharAt(sb.length()-1) ;
+		
+		return sb.toString() ;
+	}
+
 	/**
-	 * Returns a copy of the given markup, where all MediaWiki bold and italic marks 
-	 * have been replaced with their html equivalents. 
+	 * This is a direct translation of the php function doAllQuotes used by the original MediaWiki software.
 	 * 
-	 * @param markup the text with MediaWiki markup
-	 * @return the text with html markup
+	 * @param line the line to resolve emphasis within
+	 * @return the line, with all emphasis markup resolved to html tags
 	 */
-	public String resolveEmphasis(String markup) {
+	private String resolveLine(String line) {
 		
-		//NOTE: this definitely feels like the hard way to solve the problem. Surely there is a simpler way?
-		
-		//gather a list of tokens, with start and end positions, type, and whether it is a start or end token.
-		//each token is int array in the form {startOffset, endOffset, type, startOrEnd}
-		Vector<int[]> resolvedTokens = new Vector<int[]>() ;
-		
-		//keep stack of token starts, where each token is a 3 integer array
-		//{startOffset,endOffset,type}
-		Vector<int[]> unresolvedTokenStack = new Vector<int[]>() ;
-		
-		Matcher m = pattern.matcher(markup) ;
-		while (m.find()) {
+		//System.out.println("Resolving line '" + line + "'") ;
 
-			int[] curr = {m.start(), m.end(), m.end()-m.start()} ;
+		String[] arr = getSplits("$"+line) ;
 
-			switch(curr[TYPE]) {
+		if (arr.length <= 1)
+			return line ;
 
-			case ITALIC:
-				if (!unresolvedTokenStack.isEmpty()) {
-					int[] prev = unresolvedTokenStack.firstElement() ;
-					unresolvedTokenStack.remove(0) ;
+		//First, do some preliminary work. This may shift some apostrophes from
+		//being mark-up to being text. It also counts the number of occurrences
+		//of bold and italics mark-ups.
 
-					if (prev[TYPE]==ITALIC || prev[TYPE]==BOLD_ITALIC) {
-												
-						//this was the end of an italic region
-						int[] startToken = {prev[START], prev[END], ITALIC, START} ;
-						int[] endToken = {curr[START], curr[END], ITALIC, END} ;
-						
-						if (prev[TYPE]==BOLD_ITALIC) {
-							startToken[START] += BOLD ;
-							
-							int[] token = {prev[START], prev[END]-ITALIC, BOLD} ;
-							unresolvedTokenStack.add(0, token) ;
-						}
-						resolvedTokens.add(startToken) ;
-						resolvedTokens.add(endToken) ;
+		int numBold = 0 ;
+		int numItalics = 0 ;
 
-					} else {
-						unresolvedTokenStack.add(0,prev) ;
-						unresolvedTokenStack.add(0, curr) ;
-					}
-				} else {
-					unresolvedTokenStack.add(0, curr) ;
+		for (int i=0 ; i<arr.length ; i++) {
+			if (i % 2 == 1) {
+				//If there are ever four apostrophes, assume the first is supposed to
+				// be text, and the remaining three constitute mark-up for bold text.
+				if (arr[i].length() == 4) {
+					arr[i-1] = arr[i-1] + "'" ;
+					arr[i] = getFilledString(3) ;
+				} else if (arr[i].length() > 5) {
+					//If there are more than 5 apostrophes in a row, assume they're all
+					//text except for the last 5.
+					arr[i-1] = arr[i-1] + getFilledString(arr[i].length()-5) ;
+					arr[i] = getFilledString(5) ;
 				}
 
-				break ;
-
-			case BOLD: 
-				if (!unresolvedTokenStack.isEmpty()) {
-					int[] prev = unresolvedTokenStack.firstElement() ;
-					unresolvedTokenStack.remove(0) ;
-
-					if (prev[TYPE]==BOLD || prev[TYPE]==BOLD_ITALIC) {
-						//this was the end of a bold region
-						
-						int[] startToken = {prev[START], prev[END], BOLD, START} ;
-						int[] endToken = {curr[START], curr[END], BOLD, END} ;
-						
-						if (prev[TYPE]==BOLD_ITALIC) {
-							startToken[START] += ITALIC ;
-							int[] token = {prev[START], prev[END]-BOLD, ITALIC} ;
-							unresolvedTokenStack.add(0, token) ;
-						}
-						resolvedTokens.add(startToken) ;
-						resolvedTokens.add(endToken) ;
-						
-					} else {
-						unresolvedTokenStack.add(0, prev) ;
-						unresolvedTokenStack.add(0, curr) ;
-					}
-				} else {
-					unresolvedTokenStack.add(0, curr) ;
+				switch(arr[i].length()) {
+				case 2:
+					numItalics++ ;
+					break ;
+				case 3:
+					numBold++ ;
+					break ;
+				case 5:
+					numItalics++ ;
+					numBold++ ;
 				}
-				break ;
-				
-			case BOLD_ITALIC:
-				
-				if (!unresolvedTokenStack.isEmpty()) {
-					int[] prev = unresolvedTokenStack.firstElement() ;
-					unresolvedTokenStack.remove(0) ;
-					
-					switch (prev[TYPE]) {
-					
-					case BOLD:
-			
-						int[] s1 = {prev[START], prev[END], BOLD, START} ;
-						int[] e1 = {curr[START], curr[END]-ITALIC, BOLD, END} ;
-						
-						resolvedTokens.add(s1) ;
-						resolvedTokens.add(e1) ;
-						
-						if (!unresolvedTokenStack.isEmpty()) {
-							
-							int[] prev2 = unresolvedTokenStack.firstElement() ;
-							unresolvedTokenStack.remove(0) ;
-							
-							if (prev2[TYPE] == ITALIC) {
-								
-								int[] s2 = {prev2[START], prev2[END], ITALIC, START} ;
-								int[] e2 = {curr[START]+BOLD, curr[END], ITALIC, END} ;
-								
-								resolvedTokens.add(s2) ;
-								resolvedTokens.add(e2) ;
-							} 						
-						}
-						
-						break ;
-						
-					case ITALIC:
-						
-						int[] s3 = {prev[START], prev[END], ITALIC, START} ;
-						int[] e3 = {curr[START], curr[END]-BOLD, ITALIC, END} ;
-						
-						resolvedTokens.add(s3) ;
-						resolvedTokens.add(e3) ;
-						
-						if (!unresolvedTokenStack.isEmpty()) {
-							int[] prev2 = unresolvedTokenStack.firstElement() ;
-							unresolvedTokenStack.remove(0) ;
-							
-							if (prev2[TYPE] == BOLD) {
-								
-								int[] s4 = {prev2[START], prev2[END], BOLD, START} ;
-								int[] e4 = {curr[START]+ITALIC, curr[END], BOLD, END} ;
-								
-								resolvedTokens.add(s4) ;
-								resolvedTokens.add(e4) ;
-							} 						
-						}
-						break ;
-					
-					case BOLD_ITALIC:
-						
-						int[] s5 = {prev[START], prev[END], BOLD_ITALIC, START} ;
-						int[] e5 = {curr[START], curr[END], BOLD_ITALIC, END} ;
-						
-						resolvedTokens.add(s5) ;
-						resolvedTokens.add(e5) ;
-						
-						break ;
-					}
-				} else {
-					unresolvedTokenStack.add(0, curr) ;
-				}
-				break ;
 			}
 		}
-		
-		//gathered tokens aren't sorted
-		int[][] sortedTokens = resolvedTokens.toArray(new int[resolvedTokens.size()][]) ;
-		Arrays.sort(sortedTokens, new Comparator<int[]>() {
-			public int compare(int[] a, int[] b) {
-				return new Integer(a[START]).compareTo(b[START]) ;
-			}
-		}) ;
-		
-		//now finaly ready to resolve markup
-		
-		StringBuffer resolvedMarkup = new StringBuffer() ;
-		int lastCopyPos = 0 ;
-		
-		for (int[] token:sortedTokens) {
-			
-			resolvedMarkup.append(markup.substring(lastCopyPos, token[START])) ;
-			
-			if (token[3] == START) {
-				
-				switch(token[TYPE]) {
-				case BOLD:
-					resolvedMarkup.append("<b>") ;
-					break;
-				case ITALIC:
-					resolvedMarkup.append("<i>") ;
-					break ;
-				case BOLD_ITALIC:
-					resolvedMarkup.append("<b><i>") ;
-					break ;
+
+		//If there is an odd number of both bold and italics, it is likely
+		//that one of the bold ones was meant to be an apostrophe followed
+		//by italics. Which one we cannot know for certain, but it is more
+		//likely to be one that has a single-letter word before it.
+
+		if ((numBold%2==1) && (numItalics%2==1)) {
+			int i= 0;
+			int firstSingleLetterWord = -1 ;
+			int firstMultiLetterWord = -1 ;
+			int firstSpace = -1 ;
+
+			for (String r:arr) {
+				if ((i%2==1) && r.length()==3) {
+
+					char x1 = arr[i-1].charAt(arr[i-1].length()-1) ;
+					char x2 = arr[i-1].charAt(arr[i-1].length()-2) ;
+
+					if (x1==' ') {
+						if (firstSpace == -1)
+							firstSpace = i ;
+					} else if (x2==' ') {
+						if (firstSingleLetterWord == -1)
+							firstSingleLetterWord = i ;
+					} else {
+						if (firstMultiLetterWord == -1)
+							firstMultiLetterWord = i ;
+					}
 				}
+				i++ ;
+			}
+
+			// If there is a single-letter word, use it!
+			if (firstSingleLetterWord > -1) {
+				arr[firstSingleLetterWord] = "''" ;
+				arr[firstSingleLetterWord-1] = arr[firstSingleLetterWord] + "'" ;
+			} else if (firstMultiLetterWord > -1) {
+				// If not, but there's a multi-letter word, use that one.
+				arr[firstMultiLetterWord] = "''" ;
+				arr[firstMultiLetterWord-1] = arr[firstMultiLetterWord] + "'" ;
+			} else if (firstSpace > -1) {
+				// ... otherwise use the first one that has neither.
+				// (notice that it is possible for all three to be -1 if, for example,
+				// there is only one pentuple-apostrophe in the line)
+				arr[firstSpace] = "''" ;
+				arr[firstSpace-1] = arr[firstSpace] + "'" ;
+			}
+
+		}
+
+		// Now let's actually convert our apostrophic mush to HTML!
+
+		StringBuffer output = new StringBuffer() ;
+		StringBuffer buffer = new StringBuffer() ;
+		String state = "" ;
+		int i = 0 ;
+		for (String r:arr) {
+			if (i%2==0) {
+				if (state.equals("both")) 
+					buffer.append(r) ;
+				else
+					output.append(r) ;
 			} else {
-				switch(token[TYPE]) {
-				case BOLD:
-					resolvedMarkup.append("</b>") ;
-					break;
-				case ITALIC:
-					resolvedMarkup.append("</i>") ;
-					break ;
-				case BOLD_ITALIC:
-					resolvedMarkup.append("</i></b>") ;
-					break ;
+				if (r.length() == 2 ) {
+					if ( state.equals("i")) {
+						output.append("</i>"); 
+						state = "";
+					} else if (state.equals("bi")) {
+						output.append("</i>"); 
+						state = "b";
+					} else if ( state.equals("ib")) {
+						output.append("</b></i><b>"); 
+						state = "b";
+					} else if ( state.equals("both")) {
+						output.append("<b><i>") ;
+						output.append(buffer.toString()) ;
+						output.append("</i>") ;
+						state = "b";
+					} else { 
+						//$state can be "b" or ""
+						output.append("<i>") ; 
+						state = state + "i";
+					}
+				} else if ( r.length() == 3 ) {
+					if ( state.equals("b") ) {
+						output.append("</b>"); 
+						state = "";
+					} else if ( state.equals("bi")) {
+						output.append("</i></b><i>"); 
+						state = "i";
+					} else if ( state.equals("ib")) {
+						output.append("</b>"); 
+						state = "i";
+					} else if ( state.equals("both")) {
+						output.append("<i><b>") ;
+						output.append(buffer) ;
+						output.append("</b>") ;
+						state = "i";
+					} else { 
+						//$state can be "i" or ""
+						output.append("<b>"); 
+						state = state + "b";
+					}
+				} else if ( r.length() == 5 ) {
+					if ( state.equals("b")) {
+						output.append("</b><i>");
+						state = "i";
+					} else if ( state.equals("i")) {
+						output.append("</i><b>"); 
+						state = "b";
+					} else if ( state.equals("bi")) {
+						output.append("</i></b>"); 
+						state = "";
+					} else if ( state.equals("ib")) {
+						output.append("</b></i>"); 
+						state = "";
+					} else if ( state.equals("both")) {
+						output.append("<i><b>") ;
+						output.append(buffer) ;
+						output.append("</b></i>"); 
+						state = "";
+					} else { 
+						// ($state == "")
+						buffer = new StringBuffer() ;
+						state = "both";
+					}
 				}
 			}
-			
-			lastCopyPos = token[END] ;
+			i++ ;
 		}
-			
-		resolvedMarkup.append(markup.substring(lastCopyPos)) ;
-		return resolvedMarkup.toString() ;
+
+		//Now close all remaining tags.  Notice that the order is important.
+		if ( state.equals("b") || state.equals("ib")) {
+			output.append("</b>") ;
+		}
+		if ( state.equals("i") || state.equals("bi") || state.equals("ib") ) {
+			output.append("</i>");
+		}
+		if ( state.equals("bi") ) {
+			output.append("</b>");
+		}
+		// There might be lonely ''''', so make sure we have a buffer
+		if ( state.equals("both") && buffer.length() > 0 ) {
+			output.append("<b><i>") ;
+			output.append(buffer) ;
+			output.append("</i></b>");
+		}
+		
+		//remove leading $
+		output.deleteCharAt(0) ;
+
+		return output.toString() ;
+
 	}
 	
-	
-	
-	
-	
+	/*
+	 * Does the same job as php function preg_split 
+	 */
+	private String[] getSplits(String text) {
+
+		ArrayList<String> splits = new ArrayList<String>()  ;
+
+		Pattern p = Pattern.compile("\\'{2,}") ;
+
+		Matcher m = p.matcher(text) ;
+		int lastCopyIndex = 0 ;
+		while (m.find()) {
+			if (m.start() > lastCopyIndex)
+				splits.add(text.substring(lastCopyIndex, m.start())) ;
+
+			splits.add(m.group()) ;
+
+			lastCopyIndex = m.end();
+		}
+
+		if (lastCopyIndex < text.length()-1) {
+			splits.add(text.substring(lastCopyIndex)) ;
+		}
+
+		return splits.toArray(new String[splits.size()]);
+	}
+
+
+	private String getFilledString(int length) {
+		StringBuffer sb = new StringBuffer() ;
+		for (int i=0 ; i<length ; i++)
+			sb.append("'") ;
+
+		return sb.toString() ;
+	}
+
 	public static void main(String[] args) {
-		
+
 		EmphasisResolver er = new EmphasisResolver() ;
-		
-		//String markup = "Google PowerMeter is a software application being developed by '''Google''''s philanthropic arm, '''Google.org''' to help consumers track their home electricity usage." ;
-		
-		String markup = "Parsing '''MediaWiki''''s syntax for '''bold''' and ''italic'' markup is a '''''deceptively''' difficult'' task. Whoever came up with the markup scheme should be '''shot'''." ; 
-		
+
+		String markup = "'''War''' is an openly declared state of organized [[violent]] [[Group conflict|conflict]], typified by extreme [[aggression]], [[societal]] disruption, and high [[Mortality rate|mortality]]. As a behavior pattern, warlike tendencies are found in many [[primate]] species, including [[humans]], and also found in many [[ant]] species. The set of techniques used by a group to carry out war is known as '''warfare'''." ;
+
+		//String markup = "Parsing '''MediaWiki''''s syntax for '''bold''' and ''italic'' markup is a '''''deceptively''' difficult'' task. Whoever came up with the markup scheme should be '''shot'''." ; 
+
 		System.out.println(er.resolveEmphasis(markup)) ;
 	}
 }

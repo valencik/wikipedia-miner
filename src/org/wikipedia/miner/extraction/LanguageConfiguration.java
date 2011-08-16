@@ -216,11 +216,10 @@ public class LanguageConfiguration {
 		
 		Configuration conf = new Configuration() ;
 		
-		Path p = new Path("/research/dmilne/wikipedia/temp/context/languages.xml") ;
+		Path p = new Path("configs/languages.xml") ;
 		
 		FileSystem fs = FileSystem.getLocal(conf) ;
 		
 		LanguageConfiguration lc = new LanguageConfiguration(fs, "en", p) ;
-		
 	}
 }

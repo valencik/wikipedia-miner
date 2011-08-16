@@ -419,10 +419,10 @@ public class LabelSensesStep extends Configured implements Tool {
 			TreeSet<Integer> sentenceSplits = new TreeSet<Integer> () ;
 
 			//mask links so that it is impossible to split on any punctuation within a link.
-			String markup_linksMasked = stripper.stripRegions(markup, stripper.gatherComplexRegions(markup, "\\[\\[", "\\]\\]"), 'A') ;
+			String markup_linksMasked = stripper.stripRegions(markup, stripper.gatherComplexRegions(markup, "\\[\\[", "\\]\\]"), 'a') ;
 
 			//also mask content in brackets, so it is impossible to split within these. 
-			markup_linksMasked = stripper.stripRegions(markup_linksMasked, stripper.gatherComplexRegions(markup_linksMasked, "\\(", "\\)"), 'A') ;
+			markup_linksMasked = stripper.stripRegions(markup_linksMasked, stripper.gatherComplexRegions(markup_linksMasked, "\\(", "\\)"), 'a') ;
 
 			//add all splits detected by OpenNLP sentenceDetector
 			for(Span span:sentenceDetector.sentPosDetect(markup_linksMasked))
