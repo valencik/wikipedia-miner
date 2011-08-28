@@ -18,7 +18,8 @@ import org.xml.sax.SAXException;
 
 public class HubConfiguration {
 	
-	private enum ParamName{proxy, wikipedia, unknown} ;
+	
+	private enum ParamName{proxy, wikipedia, client, authentication, unknown} ;
 	
 	private String proxyHost ;
 	private String proxyPort ;
@@ -29,6 +30,11 @@ public class HubConfiguration {
 	private HashMap<String,String> wikiDescriptions ;
 	private HashMap<String,String> wikiConfigs ;
 	
+	private HashMap<String,Client> clients ;
+	private Client defaultClient = null ;
+	
+	private String cookieUserName ;
+	private String cookiePassword ;
 	
 	
 	
@@ -48,6 +54,14 @@ public class HubConfiguration {
 		return proxyPassword;
 	}
 
+	public String getCookieForUsername() {
+		return cookieUserName ;
+	}
+	
+	public String getCookieForPassword() {
+		return cookiePassword ;
+	}
+	
 	public String getDefaultWikipediaName() {
 		return defaultWikipedia;
 	}
@@ -63,6 +77,23 @@ public class HubConfiguration {
 	
 	public String getWikipediaDescription(String wikiName) {
 		return wikiDescriptions.get(wikiName) ;
+	}
+	
+	public String[] getClientNames() {
+		Set<String> clientNames = clients.keySet() ;
+		return clientNames.toArray(new String[clientNames.size()]) ;
+	}
+	
+	public Client getClient(String name) {
+		return clients.get(name) ;
+	}
+	
+	public Client getDefaultClient() {
+		return defaultClient ;
+	}
+	
+	public HashMap<String, Client> getClientsByName() {
+		return clients ;
 	}
 
 	public HubConfiguration(File configFile) throws ParserConfigurationException, IOException, ClassNotFoundException, InstantiationException, IllegalAccessException, SAXException {
@@ -80,6 +111,7 @@ public class HubConfiguration {
 		
 		wikiDescriptions = new HashMap<String,String>() ;
 		wikiConfigs = new HashMap<String,String>() ;
+		clients = new HashMap<String, Client>() ;
 		
 		String firstWikipedia = null ;
 		
@@ -106,7 +138,7 @@ public class HubConfiguration {
 					break ;
 				case wikipedia:
 					
-					String name = xmlParam.getAttribute("name") ;
+					String wikiName = xmlParam.getAttribute("name") ;
 					String description = xmlParam.getAttribute("description") ;
 					
 					boolean isDefault = false ;
@@ -114,15 +146,39 @@ public class HubConfiguration {
 						isDefault = Boolean.parseBoolean(xmlParam.getAttribute("default")) ;
 					
 					if (firstWikipedia == null)
-						firstWikipedia = name ;
+						firstWikipedia = wikiName ;
 					
 					if (isDefault)
-						defaultWikipedia = name ;
+						defaultWikipedia = wikiName ;
 					
-					wikiDescriptions.put(name, description) ;
-					wikiConfigs.put(name, paramValue) ;
+					wikiDescriptions.put(wikiName, description) ;
+					wikiConfigs.put(wikiName, paramValue) ;
 					break ;
-		
+				case client:
+					String clientName = xmlParam.getAttribute("name") ;
+					String password = xmlParam.getAttribute("password") ;
+					
+					int minLimit = 0 ;
+					if (xmlParam.hasAttribute("minLimit")) 
+						minLimit = Integer.parseInt(xmlParam.getAttribute("minLimit"));
+					
+					int hourLimit = 0 ;
+					if (xmlParam.hasAttribute("hourLimit")) 
+						hourLimit = Integer.parseInt(xmlParam.getAttribute("hourLimit"));
+					
+					int dayLimit = 0 ;
+					if (xmlParam.hasAttribute("dayLimit")) 
+						dayLimit = Integer.parseInt(xmlParam.getAttribute("dayLimit"));	
+					
+					if (clientName == null)
+						defaultClient = new Client("anonymous", password, minLimit, hourLimit, dayLimit) ;
+					else
+						this.clients.put(clientName, new Client(clientName, password, minLimit, hourLimit, dayLimit)) ;	
+					break ;
+				case authentication:
+					cookieUserName = xmlParam.getAttribute("nameCookie") ;
+					cookiePassword = xmlParam.getAttribute("passwordCookie") ;
+					break ;
 				default:
 					Logger.getLogger(HubConfiguration.class).warn("Ignoring unknown parameter: '" + paramName + "'") ;
 				} ;
@@ -131,6 +187,9 @@ public class HubConfiguration {
 			if (defaultWikipedia == null)
 				defaultWikipedia = firstWikipedia ;
 			
+			//if there is no default client, make one with no access limits
+			if (defaultClient == null)
+				defaultClient = new Client("anonymous", null, 0,0,0) ;
 		
 			//TODO: throw fit if mandatory params (at least one wikipedia) are missing. 	
 		}

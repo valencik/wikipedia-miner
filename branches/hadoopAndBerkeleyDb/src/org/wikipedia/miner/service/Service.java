@@ -237,9 +237,21 @@ public abstract class Service extends HttpServlet {
 
 	public abstract Element buildWrappedResponse(HttpServletRequest request, Element response) throws Exception;
 
-
 	public void buildUnwrappedResponse(HttpServletRequest request, HttpServletResponse response) throws Exception{
 		throw new UnsupportedOperationException() ;
+	}
+	
+	public int getUsageCost(HttpServletRequest request) {
+		return 1 ;
+	}
+	
+	public boolean isWithinUsageLimits(HttpServletRequest request) {
+		Client client = getHub().identifyClient(request) ;
+		
+		if (client == null)
+			return false ;
+		
+		return client.update(getUsageCost(request)) ; 
 	}
 
 	public boolean requiresWikipedia() {
