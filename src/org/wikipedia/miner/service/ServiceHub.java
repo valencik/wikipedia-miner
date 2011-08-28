@@ -13,6 +13,8 @@ import java.util.Set;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.xerces.parsers.DOMParser;
 import org.w3c.dom.Document;
@@ -38,6 +40,7 @@ public class ServiceHub {
 	private HashMap<String, LabelComparer> labelComparersByWikiName ;
 	private HashMap<String, ConnectionSnippetWeighter> snippetWeightersByWikiName ;
 	
+	private HashMap<String, Client> clientsByName ;
 	
 	private HashMap<String,Service> registeredServices ;
 	
@@ -82,6 +85,7 @@ public class ServiceHub {
 				snippetWeightersByWikiName.put(wikiName, sw) ;
 			}
 		
+			clientsByName = config.getClientsByName() ;
 		
 			retriever = new WebContentRetriever(config) ;
 		} catch (Exception e) {
@@ -184,7 +188,47 @@ public class ServiceHub {
 		return decimalFormat.format(number) ;
 	}
 	
-	
+	public Client identifyClient(HttpServletRequest request) {
+		
+		String username = null ;
+		String password = null ;
+		
+		//first, look for the cookie name ;
+		if (config.getCookieForUsername() != null) {
+
+			for (Cookie cookie:request.getCookies()) {
+				
+				if (cookie.getName().equals(config.getCookieForUsername()))
+					username = cookie.getValue() ;
+				
+				if (cookie.getName().equals(config.getCookieForPassword()))
+					password = cookie.getValue() ;
+			}
+		}
+		if (username != null) {
+			Client client = clientsByName.get(username) ;
+			if (client == null)
+				return null ;
+			
+			if (client.passwordMatches(password))
+				return null ;
+			
+			return client ;
+		}
+		
+		//failing that, use the remote host ;
+		username = request.getRemoteHost() ;
+		
+		Client client = clientsByName.get(username) ;
+		if (client != null)
+			return client ;
+		
+		//if there is no client with that name, create a new one with no password, and same limits as default.
+		client = new Client(username, null, config.getDefaultClient()) ;
+ 		
+		return client ;
+		
+	}
 	
 	
 }

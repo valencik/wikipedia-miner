@@ -468,7 +468,7 @@ public class CompareService extends Service{
 			int c = 0 ;
 
 			for (Article connection:connections) {
-				if (c++ > maxConsReturned) break ;
+				if (c++ >= maxConsReturned) break ;
 
 				Element xmlCon = getHub().createElement("Connection");
 				xmlCon.setAttribute("title", connection.getTitle()) ;
