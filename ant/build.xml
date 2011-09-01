@@ -1,18 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ====================================================================== 
-     Aug 31, 2011 5:20:10 PM                                                        
-
-     project    
-     description
-                   
-     dmilne                                                                
+     Aug 31, 2011 5:20:10 PM                                                                                                                      
      ====================================================================== -->
 <project name="wikipedia-miner" default="deploy" basedir="..">
 	<property file="ant/build.properties"/>
-    <description>
-			
-            description
-    </description>
 
 	<path id="classpath">
 		<fileset dir="${lib.dir}" />
@@ -38,7 +29,20 @@
 		</javac>
     </target>
 
-
+   <!-- ================================= 
+          target: build-database             
+         ================================= -->
+	<target name="build-database" depends="build" description="constructs a database using the wikipedia configuration specified by wiki.conf property">
+    		<echo>Creating the database</echo>
+			<java classname="org.wikipedia.miner.util.EnvironmentBuilder" fork="true">
+				<classpath>
+					<path location="${build.dir}/classes/"/>
+					<path refid="classpath"/>
+				</classpath>
+				<arg value="${wiki.conf}" />
+				<jvmarg value="-Xmx2G" />
+			</java>
+    </target>
 
     <!-- ================================= 
           target: package              
@@ -71,12 +75,11 @@
     		</jar>
        
     </target>
-
-
+	
 	<!-- ================================= 
           target: deploy              
          ================================= -->
-    <target name="deploy" depends="package" description="asdasd">
+    <target name="deploy" depends="package" description="creates a war file for deploying wikipedia miner website and services">
     		<echo>Deploying WAR file</echo>
 	    	<war destfile="${build.dir}/wikipedia-miner.war" webxml="${conf.dir}/web.xml">
 	    	  <fileset dir="${web.content}"/>
@@ -89,7 +92,10 @@
     	    	
     </target>
 
-	<target name="deploy-expanded" depends="package" description="dasdasd">
+	<!-- ================================= 
+          target: deploy-expanded              
+         ================================= -->
+	<target name="deploy-expanded" depends="package" description="creates an unpacked directory (build/web) for deploying wikipedia miner website and services">
 		<copy todir="${build.dir}">
 			<fileset dir=".">
 			<include name="${web.content}/*"/>
@@ -111,7 +117,7 @@
     <!-- ================================= 
           target: doc              
          ================================= -->
-    <target name="doc" description="compiles documentation to 'javadoc' directory">
+    <target name="doc" description="compiles documentation to ${doc.dir} directory">
 		<echo>Creating java documentation</echo>
         <javadoc sourcepath="${src.dir}" destdir="${doc.dir}">
 		</javadoc>
