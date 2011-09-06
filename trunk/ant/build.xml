@@ -84,7 +84,6 @@
 	    	<war destfile="${build.dir}/wikipedia-miner.war" webxml="${conf.dir}/web.xml">
 	    	  <fileset dir="${web.content}"/>
 	    	  <lib dir="${lib.dir}">
-	    	  	<exclude name="hadoop*.jar"/>
 	    	  	<exclude name="servlet-api.jar"/>
 	    	  </lib>
 	    	  <classes dir="${build.dir}/classes"/>
@@ -104,11 +103,9 @@
 		<mkdir dir="${build.dir}/${web.content}/WEB-INF/lib"/>
 		<copy file="${conf.dir}/web.xml" todir="${build.dir}/${web.content}/WEB-INF/"/>
 		<copy file="${build.dir}/jar/${jar.mainModule}" todir="${build.dir}/${web.content}/WEB-INF/lib"/>
-		<copy file="${build.dir}/jar/${jar.mainModule}" todir="${build.dir}/${web.content}/WEB-INF/lib"/>
-	    	
+    	
 	    	<copy todir="${build.dir}/${web.content}/WEB-INF/lib">
 		    	<fileset dir="${lib.dir}">
-		    		<exclude name="hadoop*.jar"/>
 		    		<exclude name="servlet-api.jar"/>
 		    	</fileset>
 		 </copy>
