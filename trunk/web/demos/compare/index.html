@@ -5,6 +5,7 @@
 		<title>wikipediaminer - compare demo</title>
 		<link rel="stylesheet" href="../../css/wm.css" type="text/css">
 		<link rel="stylesheet" href="compare.css" type="text/css">
+		<link rel="stylesheet" href="../demos.css" type="text/css">
 		<link rel="stylesheet" href="../../css/tooltips.css" type="text/css">
 		<link rel="stylesheet" href="../../css/tagcloud.css" type="text/css">
 		<link type="text/css" href="../../css/jquery-ui/jquery-ui-1.8.14.custom.css" rel="stylesheet" />
@@ -30,7 +31,6 @@
 				<a href='../../index.html'>home</a>
 				<em>demos</em>
 				<a href='../../services'>services</a>
-				<a href='../../downloads'>downloads</a>
 				<a href='../../help'>help</a>
 				
 				<div class='corner l'></div>
@@ -73,80 +73,98 @@
 					</div>
 					
 					
-					
-					<form method='get'>
-						<input type='text' id='term1' name='term1' class='ui-widget ui-corner-all'> </input>
+					<div id='initializing'>
 						
-						<span id='relation'>
-							is
-							<span id='relationWeight'>
-								<img src="../../images/loading.gif"></img>
-							</span>
-							 to
-						</span>
+						<p>Sorry, the toolkit needs a little while to ready itself.</p>
 						
-						<input type='text' id='term2' name='term2' class='ui-widget ui-corner-all'></input>
+						<div id='progress'></div>
 						
-						<input type='submit' id='cmdCompare' class='ui-widget ui-corner-all' value='Compare'></input>
-						
-					</form>
-					
-					
-					<div id='loadingSpacer'></div>
-					
-					<div id='error'>
-						<h2>Sorry!</h2>
-						
-						I have no idea what <em id='unkownTerm'>blah</em> means.
+						<div class='ui-state-highlight ui-corner-all note'>
+							
+							<div class='ui-icon ui-icon-info'></div>
+								
+							<p>
+								Don't worry, you won't have to wait through this delay every time you want to use one of these demos; 
+								it only occurs when the server has been restarted.
+							</p>
+						</div>
+
 					</div>
-				
-					<div id='details'>
-						
-						<h2>Disambiguated topics <span id='disambiguationHelp' class='help'>?</span></h2>
-						
-						<p id='noSenses'>
-							No plausable senses could be found for these terms
-						</p>
-						
-						<table id='senses'>
-							<tr>
-								<td>By <span id='byTerm1'>Blah</span> we assume you mean</td>
-								<td>By <span id='byTerm2'>Blah</span> we assume you mean</td>
-							</tr>
+					<div id='ready'>
+						<form method='get'>
+							<input type='text' id='term1' name='term1' class='ui-widget ui-corner-all'> </input>
 							
-							<tr>
-								<td id='sense1'></td>
-								<td id='sense2'></td>
-							</tr>
-						</table>
-						
-						<h2>Connective topics <span id='connectionHelp' class='help'>?</span></h2>				
-		
-						<p id='noConnections'>
-							No connections could be found between these terms
-						</p>
-		
-						<ul id='connections' class='tagcloud'>
+							<span id='relation'>
+								is
+								<span id='relationWeight'>
+									<img src="../../images/loading.gif"></img>
+								</span>
+								 to
+							</span>
 							
-						</ul>
-						
-						<br/>
-		
-						<h2>Explanatory snippets <span id='snippetHelp' class='help'>?</span></h2>
-						
-						<p id='noSnippets'>
-							No snippets could be found to explain this relation
-						</p>
-						
-						<ul id='snippets'>
+							<input type='text' id='term2' name='term2' class='ui-widget ui-corner-all'></input>
 							
-						</ul>
-					</div>	
+							<input type='submit' id='cmdCompare' class='ui-widget ui-corner-all' value='Compare'></input>
+							
+						</form>
+						
+						
+						<div id='loadingSpacer'></div>
+						
+						<div id='error'>
+							<h2>Sorry!</h2>
+							
+							I have no idea what <em id='unkownTerm'>blah</em> means.
+						</div>
+					
+						<div id='details'>
+							
+							<h2>Disambiguated topics <span id='disambiguationHelp' class='help'>?</span></h2>
+							
+							<p id='noSenses'>
+								No plausable senses could be found for these terms
+							</p>
+							
+							<table id='senses'>
+								<tr>
+									<td>By <span id='byTerm1'>Blah</span> we assume you mean</td>
+									<td>By <span id='byTerm2'>Blah</span> we assume you mean</td>
+								</tr>
+								
+								<tr>
+									<td id='sense1'></td>
+									<td id='sense2'></td>
+								</tr>
+							</table>
+							
+							<h2>Connective topics <span id='connectionHelp' class='help'>?</span></h2>				
+			
+							<p id='noConnections'>
+								No connections could be found between these terms
+							</p>
+			
+							<ul id='connections' class='tagcloud'>
+								
+							</ul>
+							
+							<br/>
+			
+							<h2>Explanatory snippets <span id='snippetHelp' class='help'>?</span></h2>
+							
+							<p id='noSnippets'>
+								No snippets could be found to explain this relation
+							</p>
+							
+							<ul id='snippets'>
+								
+							</ul>
+						</div>	
+					</div>
 				</div>
 			</div>
 			
 			<div id='footer'>
-				Hosted by <a>SourceForge</a> and the <a>University of Waikato</a>
+				Hosted by <a href='http://sourceforge.net/projects/wikipedia-miner/'>SourceForge</a> and the <a href='http://www.scms.waikato.ac.nz/'>University of Waikato</a>
 				
 				<div class='corner l'></div>
 				<div class='corner r'></div>

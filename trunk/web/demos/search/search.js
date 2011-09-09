@@ -57,6 +57,42 @@ $(document).ready(function() {
 	doTooltipBindings() ;
 	
 	
+
+	checkProgress() ;
+}) ;
+
+function checkProgress() {
+	
+	$.get(
+		"../../services/getProgress",
+		function(data) {
+			
+			var xmlResponse = $(data).find("Response") ;
+			var progress = Number(xmlResponse.attr("progress")) ;
+
+			if (progress >= 1) {
+				ready() ;
+			} else {
+		
+				$('#progress').progressbar(
+					{value: Math.floor(progress*100)}
+				) ;
+		
+				setTimeout(
+					checkProgress,
+					500
+				) ;
+			}
+		}
+	) ;	
+}
+
+
+function ready() {
+	
+	$("#initializing").hide() ;
+	$("#ready").show() ;
+	
 	var query = urlParams["query"];
 	var artId = urlParams["artId"];
 	var catId = urlParams["catId"];
@@ -67,7 +103,6 @@ $(document).ready(function() {
 		$('#searchbox').addClass('minorSearch') ;
 	}
 		
-	
 	if (artId != undefined) {
 		
 		$('#instructions').hide() ;
@@ -122,7 +157,7 @@ $(document).ready(function() {
 		
 	}
 	
-}) ;
+}
 
 
 function processSearchResponse(response) {
