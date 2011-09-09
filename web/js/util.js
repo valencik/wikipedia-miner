@@ -1,5 +1,7 @@
 //default tooltip style
 
+$.jGoogleAnalytics( 'UA-611266-11');
+
 $.fn.qtip.styles.wmstyle = { // Last part is the name of the style
    color: 'white',
    background: '#373737' ,
@@ -37,5 +39,4 @@ function normalize(val, min, max) {
 	
 	return (val-min) * (1/(max-min)) ;
 }
-
 
