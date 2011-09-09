@@ -4,9 +4,10 @@
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 		
-		<title>wikipediaminer - search demo</title>
+		<title>wikipediaminer - annotate demo</title>
 		<link rel="stylesheet" href="../../css/wm.css" type="text/css">
 		<link rel="stylesheet" href="annotate.css" type="text/css">
+		<link rel="stylesheet" href="../demos.css" type="text/css">
 		<link rel="stylesheet" href="../../css/tooltips.css" type="text/css">
 		<link rel="stylesheet" href="../../css/tagcloud.css" type="text/css">
 		<link type="text/css" href="../../css/jquery-ui/jquery-ui-1.8.14.custom.css" rel="stylesheet" />
@@ -32,7 +33,6 @@
 				<a href='../../index.html'>home</a>
 				<em>demos</em>
 				<a href='../../services'>services</a>
-				<a href='../../downloads'>downloads</a>
 				<a href='../../help'>help</a>
 				
 				<div class='corner l'></div>
@@ -78,93 +78,114 @@
 						</p>
 					</div>
 					
-					<h2>Text to annotate</h2>
-					
-					
-					<form>
-						<div class="ui-widget-content ui-corner-all" style="padding: 5px ;">
-							<textarea id='txtSource' name='source' class='inputBox'>
-							
-							</textarea>
+					<div id='initializing'>
 						
-							<div id='options'>
-								<fieldset title="What should happen when the same topic is mentioned multiple times?">
-									<legend>Markup</legend>
-									<input id="sourceMode_html" name="sourceMode" type="radio" value="HTML"><label for="sourceMode_html">HTML</label>
-									<input id="sourceMode_wiki" name="sourceMode" type="radio" value="WIKI"><label for="sourceMode_wiki">MediaWiki</label>
-									<input id="sourceMode_auto" name="sourceMode" type="radio" value="AUTO"><label for="sourceMode_auto">detect automatically</label>
-								</fieldset>
-								<fieldset title="What should happen when the same topic is mentioned multiple times?">
-									<legend>Repeat occurences</legend>
-									<input id="repeatMode_all" name="repeatMode" type="radio" value="ALL"><label for="repeatMode_all">mark all</label>
-									<input id="repeatMode_first" name="repeatMode" type="radio" value="FIRST"><label for="repeatMode_first">mark first</label>
-									<input id="repeatMode_fis" name="repeatMode" type="radio" value="FIRST_IN_REGION"><label for="repeatMode_fis">mark first in each section</label>
-								</fieldset>
-								<fieldset title="How strict should we be when deciding which topics to link to?">
-									<legend>Link density</legend>
-									<table>
-										<tr>
-											<td style="vertical-align:middle; padding-left:20px">few links</td>
-											<td><div id="slider" style="width:150px"></div></td>
-											<td style="vertical-align:middle">many links</td>
-										</tr>
-									</table>
-									<input id="minProbability" name="minProbability" type="hidden">
-								</fieldset>
-							</div>
+						<p>Sorry, the toolkit needs a little while to ready itself.</p>
+						
+						<div id='progress'></div>
+						
+						<div class='ui-state-highlight ui-corner-all note'>
 							
-							<div style="margin-top: 10px ; text-align: right ;">
-								<a id="showOptions" onclick="showOptions()">show options</a>
-								<a id="hideOptions" onclick="hideOptions()">hide options</a>
-								<input id="cmdAnnotate" type="submit" value="Annotate"></input>
-							</div>
-
+							<div class='ui-icon ui-icon-info'></div>
+								
+							<p>
+								Don't worry, you won't have to wait through this delay every time you want to use one of these demos; 
+								it only occurs when the server has been restarted.
+							</p>
 						</div>
-					</form>
+
+					</div>
 					
-					<div id="results">
-						<h2>Annotated text</h2>
+					<div id="ready">
+					
+						<h2>Text to annotate</h2>
 						
-						<div id='loading'></div>
 						
-						<div id="tabs" style="margin-bottom: 20px">
-							<ul>
-								<li>
-									<a href="#tab_wikiMarkup">MediaWiki Markup</a>
-								</li>
-								<li>
-									<a href="#tab_renderedHtml">Rendered HTML</a>
-								</li>
-								<li>
-									<a href="#tab_rawHtml">Raw HTML</a>
-								</li>
-								<li>
-									<a href="#tab_topics">Detected Topics</a>
-								</li>
-							</ul>
+						<form>
+							<div class="ui-widget-content ui-corner-all" style="padding: 5px ;">
+								<textarea id='txtSource' name='source' class='inputBox'>
+								
+								</textarea>
 							
-							<div id="tab_wikiMarkup">
-								<div id='wikiMarkup'>
-									
+								<div id='options'>
+									<fieldset title="What should happen when the same topic is mentioned multiple times?">
+										<legend>Markup</legend>
+										<input id="sourceMode_html" name="sourceMode" type="radio" value="HTML"><label for="sourceMode_html">HTML</label>
+										<input id="sourceMode_wiki" name="sourceMode" type="radio" value="WIKI"><label for="sourceMode_wiki">MediaWiki</label>
+										<input id="sourceMode_auto" name="sourceMode" type="radio" value="AUTO"><label for="sourceMode_auto">detect automatically</label>
+									</fieldset>
+									<fieldset title="What should happen when the same topic is mentioned multiple times?">
+										<legend>Repeat occurences</legend>
+										<input id="repeatMode_all" name="repeatMode" type="radio" value="ALL"><label for="repeatMode_all">mark all</label>
+										<input id="repeatMode_first" name="repeatMode" type="radio" value="FIRST"><label for="repeatMode_first">mark first</label>
+										<input id="repeatMode_fis" name="repeatMode" type="radio" value="FIRST_IN_REGION"><label for="repeatMode_fis">mark first in each section</label>
+									</fieldset>
+									<fieldset title="How strict should we be when deciding which topics to link to?">
+										<legend>Link density</legend>
+										<table>
+											<tr>
+												<td style="vertical-align:middle; padding-left:20px">few links</td>
+												<td><div id="slider" style="width:150px"></div></td>
+												<td style="vertical-align:middle">many links</td>
+											</tr>
+										</table>
+										<input id="minProbability" name="minProbability" type="hidden">
+									</fieldset>
 								</div>
-							</div>
-							<div id="tab_renderedHtml">
-								<div id='renderedHtml'>
-									
+								
+								<div style="margin-top: 10px ; text-align: right ;">
+									<a id="showOptions" onclick="showOptions()">show options</a>
+									<a id="hideOptions" onclick="hideOptions()">hide options</a>
+									<input id="cmdAnnotate" type="submit" value="Annotate"></input>
 								</div>
+	
 							</div>
-							<div id="tab_rawHtml">
-								<div id='rawHtml' >
-									
-								</div>
-							</div>
-							<div id="tab_topics">
-								<p class="explanation">
-							    	The size of the topics below shows how well they fit the model of what a Wikipedian would link to. 
-							    </p>
-							    
-								<ul id='topics' class="tagcloud">	
+						</form>
+						
+						<div id="results">
+							<h2>Annotated text</h2>
+							
+							<div id='loading'></div>
+							
+							<div id="tabs" style="margin-bottom: 20px">
+								<ul>
+									<li>
+										<a href="#tab_wikiMarkup">MediaWiki Markup</a>
+									</li>
+									<li>
+										<a href="#tab_renderedHtml">Rendered HTML</a>
+									</li>
+									<li>
+										<a href="#tab_rawHtml">Raw HTML</a>
+									</li>
+									<li>
+										<a href="#tab_topics">Detected Topics</a>
+									</li>
 								</ul>
+								
+								<div id="tab_wikiMarkup">
+									<div id='wikiMarkup'>
+										
+									</div>
+								</div>
+								<div id="tab_renderedHtml">
+									<div id='renderedHtml'>
+										
+									</div>
+								</div>
+								<div id="tab_rawHtml">
+									<div id='rawHtml' >
+										
+									</div>
+								</div>
+								<div id="tab_topics">
+									<p class="explanation">
+								    	The size of the topics below shows how well they fit the model of what a Wikipedian would link to. 
+								    </p>
+								    
+									<ul id='topics' class="tagcloud">	
+									</ul>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -172,7 +193,7 @@
 			</div>	
 					
 			<div id='footer'>
-				Hosted by <a>SourceForge</a> and the <a>University of Waikato</a>
+				Hosted by <a href='http://sourceforge.net/projects/wikipedia-miner/'>SourceForge</a> and the <a href='http://www.scms.waikato.ac.nz/'>University of Waikato</a>
 				
 				<div class='corner l'></div>
 				<div class='corner r'></div>

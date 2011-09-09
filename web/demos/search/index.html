@@ -7,6 +7,7 @@
 		<title>wikipediaminer - search demo</title>
 		<link rel="stylesheet" href="../../css/wm.css" type="text/css">
 		<link rel="stylesheet" href="search.css" type="text/css">
+		<link rel="stylesheet" href="../demos.css" type="text/css">
 		<link rel="stylesheet" href="../../css/tooltips.css" type="text/css">
 		<link rel="stylesheet" href="../../css/tagcloud.css" type="text/css">
 		<link type="text/css" href="../../css/jquery-ui/jquery-ui-1.8.14.custom.css" rel="stylesheet" />
@@ -32,7 +33,6 @@
 				<a href='../../index.html'>home</a>
 				<em>demos</em>
 				<a href='../../services'>services</a>
-				<a href='../../downloads'>downloads</a>
 				<a href='../../help'>help</a>
 				
 				<div class='corner l'></div>
@@ -74,65 +74,85 @@
 						</p>
 					</div>
 					
-					<form method='get' >
-						<div id='searchbox' class='majorSearch'>
-							<input type='text' id='query' name='query' class='ui-widget ui-corner-all search-text'> </input>
+					
+					<div id='initializing'>
+						
+						<p>Sorry, the toolkit needs a little while to ready itself.</p>
+						
+						<div id='progress'></div>
+						
+						<div class='ui-state-highlight ui-corner-all note'>
 							
-							<input type='submit' id='cmdSearch' class='ui-widget ui-corner-all search-button' value='Search'></input>
+							<div class='ui-icon ui-icon-info'></div>
+								
+							<p>
+								Don't worry, you won't have to wait through this delay every time you want to use one of these demos; 
+								it only occurs when the server has been restarted.
+							</p>
 						</div>
-					</form>
-					
-					<div id='loading'></div>
-					
-					<div id='error'>
-						<h2>Sorry!</h2>
-						
-						I have no idea what <em id='unkownTerm'>blah</em> means.
+
 					</div>
-				
-					<div id='senseDetails'>
-						<ul id='senses'></ul>
-					</div>	
+					<div id='ready'>
+						<form method='get' >
+							<div id='searchbox' class='majorSearch'>
+								<input type='text' id='query' name='query' class='ui-widget ui-corner-all search-text'> </input>
+								
+								<input type='submit' id='cmdSearch' class='ui-widget ui-corner-all search-button' value='Search'></input>
+							</div>
+						</form>
+						
+						<div id='loading'></div>
+							
+						<div id='error'>
+							<h2>Sorry!</h2>
+							
+							I have no idea what <em id='unkownTerm'>blah</em> means.
+						</div>
 					
-					<div id='articleDetails'>
+						<div id='senseDetails'>
+							<ul id='senses'></ul>
+						</div>	
 						
-						<h1 id="artTitle">Article Title</h1>
+						<div id='articleDetails'>
+							
+							<h1 id="artTitle">Article Title</h1>
+							
+							<div id='artDefinition'></div>
+							
+							<h2>Labels <span id='labelHelp' class='help'>?</span></h2>
+							<div id='noLabels'>No labels found</div>
+							<ul id='labels' class='tagcloud'></ul>
+							<br/>
+							
+							<h2>Translations <span id='translationHelp' class='help'>?</span></h2>
+							<div id='noTranslations'>No translations found</div>
+							<ul id='translations' class='tagcloud'></ul>
+							<br/>
+							
+							<h2>Parent categories <span id='categoryHelp' class='help'>?</span></h2>
+							<div id='noCategories'>No categories found</div>
+							<ul id='categories' class='tagcloud'></ul>
+							<br/>
+							
+							<h2>Links out <span id='linksOutHelp' class='help'>?</span></h2>
+							<div id='noLinksOut'>No links found</div>
+							<ul id='linksOut' class='tagcloud'></ul>
+							<br/>
+							
+							<h2>Links in <span id='linksInHelp' class='help'>?</span></h2>
+							<div id='noLinksIn'>No links found</div>
+							<ul id='linksIn' class='tagcloud'></ul>
+							<br/>
+						</div>
 						
-						<div id='artDefinition'></div>
-						
-						<h2>Labels <span id='labelHelp' class='help'>?</span></h2>
-						<div id='noLabels'>No labels found</div>
-						<ul id='labels' class='tagcloud'></ul>
-						<br/>
-						
-						<h2>Translations <span id='translationHelp' class='help'>?</span></h2>
-						<div id='noTranslations'>No translations found</div>
-						<ul id='translations' class='tagcloud'></ul>
-						<br/>
-						
-						<h2>Parent categories <span id='categoryHelp' class='help'>?</span></h2>
-						<div id='noCategories'>No categories found</div>
-						<ul id='categories' class='tagcloud'></ul>
-						<br/>
-						
-						<h2>Links out <span id='linksOutHelp' class='help'>?</span></h2>
-						<div id='noLinksOut'>No links found</div>
-						<ul id='linksOut' class='tagcloud'></ul>
-						<br/>
-						
-						<h2>Links in <span id='linksInHelp' class='help'>?</span></h2>
-						<div id='noLinksIn'>No links found</div>
-						<ul id='linksIn' class='tagcloud'></ul>
-						<br/>
+						<div id='categoryDetails'>
+							blah
+						</div>	
 					</div>
-					
-					<div id='categoryDetails'>
-						blah
-					</div>	
 				</div>
 			</div>
 			<div id='footer'>
-				Hosted by <a>SourceForge</a> and the <a>University of Waikato</a>
+				Hosted by <a href='http://sourceforge.net/projects/wikipedia-miner/'>SourceForge</a> and the <a href='http://www.scms.waikato.ac.nz/'>University of Waikato</a>
 				
 				<div class='corner l'></div>
 				<div class='corner r'></div>

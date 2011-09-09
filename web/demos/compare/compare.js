@@ -59,6 +59,42 @@ $(document).ready(function() {
 	doTooltipBindings() ;
 	
 	
+	checkProgress() ;
+	
+}) ;
+
+function checkProgress() {
+	
+	$.get(
+		"../../services/getProgress",
+		function(data) {
+			
+			var xmlResponse = $(data).find("Response") ;
+			var progress = Number(xmlResponse.attr("progress")) ;
+
+			if (progress >= 1) {
+				ready() ;
+			} else {
+		
+				$('#progress').progressbar(
+					{value: Math.floor(progress*100)}
+				) ;
+		
+				setTimeout(
+					checkProgress,
+					500
+				) ;
+			}
+		}
+	) ;	
+}
+
+
+function ready() {
+	
+	$("#initializing").hide() ;
+	$("#ready").show() ;	
+	
 	var term1 = urlParams["term1"];
 	var term2 = urlParams["term2"];
 	
@@ -89,10 +125,7 @@ $(document).ready(function() {
 		$('#relation').hide() ;
 		$('#cmdCompare').show() ;
 	}
-	
-}) ;
-
-
+}
 
 
 function processRelatednessResponse(response) {

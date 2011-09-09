@@ -276,6 +276,33 @@ h2 {
 	clear: left ;
 }
 
+.downloads {
+	background-color: #fde4b8 ;
+	border: 2px solid #d5a422 ;
+	padding: 0px ;
+	float: right ;
+	text-align: center ;
+	
+	margin-left: 20px ;
+}
+
+.downloads p {
+	padding: 10px 15px ;
+	margin: 0px ;
+}
+
+.downloads .major {
+	background-color: #d5a422 ;
+	font-size: larger ;
+	
+	padding: 10px 5px ;
+}
+
+.downloads .major a {
+	color: white ;
+}
+
+
 .help {
 	cursor: help ;
 	font-size: 0.8em ;
