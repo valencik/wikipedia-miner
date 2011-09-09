@@ -576,6 +576,8 @@ public class WEnvironment  {
 			
 			boolean mustGatherIds = (conf.getMinLinksIn() > 0 && !conf.getDatabasesToCache().isEmpty()) && conf.getArticlesOfInterest() == null ;
 			
+			System.out.println("Must gather ids: " + mustGatherIds) ;
+			
 			int taskCount = conf.getDatabasesToCache().size() + 1;
 			if (mustGatherIds)
 				taskCount++ ;
@@ -611,6 +613,14 @@ public class WEnvironment  {
 
 			completed = true ;
 		}
+	}
+	
+	public Exception getCachingFailureReason() {
+		
+		if (this.prepThread == null)
+			return null ;
+	
+		return this.prepThread.failureCause ;
 	}
 	
 	/**

@@ -155,18 +155,24 @@ public class HubConfiguration {
 					wikiConfigs.put(wikiName, paramValue) ;
 					break ;
 				case client:
-					String clientName = xmlParam.getAttribute("name") ;
-					String password = xmlParam.getAttribute("password") ;
+
+					String clientName = null ;
+					if (xmlParam.hasAttribute("name")) 
+						clientName = xmlParam.getAttribute("name") ;
 					
-					int minLimit = 0 ;
+					String password = null ;
+					if (xmlParam.hasAttribute("password")) 
+						password = xmlParam.getAttribute("password") ;
+					
+					int minLimit = -1 ;
 					if (xmlParam.hasAttribute("minLimit")) 
 						minLimit = Integer.parseInt(xmlParam.getAttribute("minLimit"));
 					
-					int hourLimit = 0 ;
+					int hourLimit = -1 ;
 					if (xmlParam.hasAttribute("hourLimit")) 
 						hourLimit = Integer.parseInt(xmlParam.getAttribute("hourLimit"));
 					
-					int dayLimit = 0 ;
+					int dayLimit = -1 ;
 					if (xmlParam.hasAttribute("dayLimit")) 
 						dayLimit = Integer.parseInt(xmlParam.getAttribute("dayLimit"));	
 					
