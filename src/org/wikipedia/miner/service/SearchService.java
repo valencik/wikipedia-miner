@@ -92,7 +92,6 @@ public class SearchService extends Service {
 			return xmlResponse ;
 		}
 
-
 		if (prmComplex.getValue(request))
 			return resolveComplexQuery(query, request, xmlResponse) ;
 		else

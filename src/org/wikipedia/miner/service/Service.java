@@ -182,6 +182,7 @@ public abstract class Service extends HttpServlet {
 				loadProgress = 1 ;
 			}
 			
+			boolean usageExceeded = isUsageLimitExceeded(request) ;
 			
 			if (supportsDirectResponse) {
 				ResponseFormat responseFormat = prmResponseFormat.getValue(request) ;
@@ -191,6 +192,9 @@ public abstract class Service extends HttpServlet {
 					if (requiresWikipedia() && loadProgress < 1)
 						throw new ServletException("Wikipedia is not yet ready. Current progress is " + progressFormat.format(loadProgress)) ;
 	
+					if (usageExceeded)
+						throw new ServletException("You have exceeded your usage limits.") ;
+					
 					try {
 						buildUnwrappedResponse(request, response) ;
 					} catch (Exception e) {
@@ -207,9 +211,12 @@ public abstract class Service extends HttpServlet {
 
 			Element xmlResponse = getHub().createElement("Response") ;
 
-			if (requiresWikipedia() && loadProgress < 1) 
+			if (requiresWikipedia() && loadProgress < 1) {
 				xmlResponse = buildErrorResponse("Wikipedia is not yet ready. Current progress is " + progressFormat.format(loadProgress), xmlResponse) ;
-			else {
+			} else if (usageExceeded) {
+				xmlResponse = buildErrorResponse("Usage limits exceeded", xmlResponse) ;
+				xmlResponse = buildUsageResponse(request, xmlResponse) ;			
+			} else {
 				try {
 					xmlResponse = buildWrappedResponse(request, xmlResponse) ;
 				} catch (Exception e) {
@@ -245,13 +252,23 @@ public abstract class Service extends HttpServlet {
 		return 1 ;
 	}
 	
-	public boolean isWithinUsageLimits(HttpServletRequest request) {
+	private boolean isUsageLimitExceeded(HttpServletRequest request) {
 		Client client = getHub().identifyClient(request) ;
 		
 		if (client == null)
 			return false ;
 		
 		return client.update(getUsageCost(request)) ; 
+	}
+	
+	protected Element buildUsageResponse(HttpServletRequest request, Element xmlResponse) {
+		
+		Client client = getHub().identifyClient(request) ;
+		
+		
+		xmlResponse.appendChild(client.getXML(hub)) ;
+		return xmlResponse ;
+		
 	}
 
 	public boolean requiresWikipedia() {

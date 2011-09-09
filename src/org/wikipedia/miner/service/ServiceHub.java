@@ -23,6 +23,7 @@ import org.w3c.dom.Text;
 import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.comparison.ConnectionSnippetWeighter;
 import org.wikipedia.miner.comparison.LabelComparer;
+import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.WikipediaConfiguration;
 import org.xml.sax.InputSource;
@@ -69,6 +70,8 @@ public class ServiceHub {
 			for (String wikiName:config.getWikipediaNames()) {
 				File wikiConfigFile = new File(config.getWikipediaConfig(wikiName)) ;
 				WikipediaConfiguration wikiConfig = new WikipediaConfiguration(wikiConfigFile);
+				
+				
 				
 				Wikipedia wikipedia = new Wikipedia(wikiConfig, true) ;
 				wikipediasByName.put(wikiName, wikipedia) ;
@@ -225,6 +228,8 @@ public class ServiceHub {
 		
 		//if there is no client with that name, create a new one with no password, and same limits as default.
 		client = new Client(username, null, config.getDefaultClient()) ;
+		
+		clientsByName.put(username, client) ;
  		
 		return client ;
 		
