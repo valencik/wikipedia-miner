@@ -1,10 +1,4 @@
 //default tooltip style
-
-(function () {
-    $.jGoogleAnalytics('UA-611266-11');
-})();
-
-
 $.fn.qtip.styles.wmstyle = { // Last part is the name of the style
    color: 'white',
    background: '#373737' ,
