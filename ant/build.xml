@@ -52,9 +52,7 @@
     		<mkdir dir="${build.dir}/jar"/>
     	
     		<jar destfile="${build.dir}/jar/${jar.mainModule}" >
-    			<fileset dir="${build.dir}">
-    				<include name="**/*.class"/>
-    			</fileset>
+    			<fileset dir="${build.dir}/classes"/>
     		</jar>
     </target>
 
@@ -65,9 +63,7 @@
 		<echo>Creating the jar file suitable for hadoop jobs</echo>
     	
     		<jar destfile="${build.dir}/jar/${jar.hadoopModule}" >
-    			<fileset dir="${build.dir}">
-    				<include name="**/*.class"/>
-    			</fileset>
+    			<fileset dir="${build.dir}/classes" />
     			<fileset dir=".">
 				<include name="${lib.dir}/*"/>
     				<exclude name="${lib.dir}/hadoop*.jar"/>
