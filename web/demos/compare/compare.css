@@ -51,6 +51,11 @@
 	width: 100% ;
 }
 
+#alternatives1, #alternatives2 {
+	padding: 0px 20px ;
+	font-size: small ;
+} 
+
 
 #senses td {
 	text-align: center ;

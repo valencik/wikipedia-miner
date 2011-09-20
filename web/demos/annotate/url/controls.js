@@ -68,5 +68,12 @@ $(document).ready(function() {
 
 	doUiBindings() ;
 	setOptionValues() ;
-		
+	
+	$(window).trigger('resize') ;
+}) ;
+
+$(window).resize(function() {
+	var w = $(window).width() ;
+	
+	$('#txtSource').width(w-790) ;
 }) ;
