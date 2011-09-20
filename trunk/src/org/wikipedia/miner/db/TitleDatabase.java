@@ -30,8 +30,9 @@ public class TitleDatabase extends WDatabase<String,Integer>{
 	public TitleDatabase(WEnvironment env, DatabaseType type) {
 		super(env, type, new StringBinding(), new IntegerBinding());
 
-		if (type != DatabaseType.articlesByTitle && type != DatabaseType.categoriesByTitle) 
-			throw new IllegalArgumentException("type must be either DatabaseType.articlesByTitle or DatabaseType.categoriesByTitle") ;
+		if (type != DatabaseType.articlesByTitle && type != DatabaseType.categoriesByTitle && type != DatabaseType.templatesByTitle) 
+			throw new IllegalArgumentException("type must be either DatabaseType.articlesByTitle, DatabaseType.categoriesByTitle or DatabaseType.templatesByTitle") ;
+
 	}
 
 	@Override
@@ -51,6 +52,10 @@ public class TitleDatabase extends WDatabase<String,Integer>{
 		if (dbType == DatabaseType.categoriesByTitle && pageType != PageType.category)
 			return null ;
 
+		if (dbType == DatabaseType.templatesByTitle && pageType != PageType.template)
+			return null ;
+
+
 		return new WEntry<String,Integer>(p.getTitle(), id) ;
 	}
 
@@ -59,10 +64,12 @@ public class TitleDatabase extends WDatabase<String,Integer>{
 			WikipediaConfiguration conf) {
 
 		TIntHashSet validIds = conf.getArticlesOfInterest() ;
-		
+
 		if (getType() == DatabaseType.articlesByTitle) {
 			if (validIds != null && !validIds.contains(e.getValue()))
 				return null ;
+
+
 		}
 
 		return e.getValue();
@@ -77,7 +84,7 @@ public class TitleDatabase extends WDatabase<String,Integer>{
 		if (tracker == null) tracker = new ProgressTracker(1, WDatabase.class) ;
 		tracker.startTask(dataFile.length(), "Loading " + getName()) ;
 
-		
+
 		BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(dataFile), "UTF-8")) ;
 
 		long bytesRead = 0 ;
@@ -100,9 +107,9 @@ public class TitleDatabase extends WDatabase<String,Integer>{
 			}
 		}
 		input.close();
-		
-		
-		
+
+
+
 		Database db = getDatabase(false) ;
 
 		for (Map.Entry<String, Integer> entry: tmp.entrySet()) {

@@ -94,10 +94,10 @@ public class WDatabaseFactory {
 	}
 
 	/**
-	 * Returns a database associating either article or category titles with their ids.
+	 * Returns a database associating article, category or template titles with their ids.
 	 * 
-	 * @param type either {@link DatabaseType#articlesByTitle} or {@link DatabaseType#categoriesByTitle}.
-	 * @return a database associating either article or category titles with their ids.
+	 * @param {@link DatabaseType#articlesByTitle}, {@link DatabaseType#templatesByTitle} or {@link DatabaseType#categoriesByTitle}.
+	 * @return a database associating article, category or template titles with their ids.
 	 */
 	public WDatabase<String,Integer> buildTitleDatabase(DatabaseType type) {
 

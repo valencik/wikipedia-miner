@@ -82,6 +82,7 @@ public class WEnvironment  {
 	
 	private WDatabase<String,Integer> dbArticlesByTitle ;
 	private WDatabase<String,Integer> dbCategoriesByTitle ;
+	private WDatabase<String,Integer> dbTemplatesByTitle ;
 	
 	private WDatabase<Integer,Integer> dbRedirectTargetBySource ;
 	private WDatabase<Integer,DbIntList> dbRedirectSourcesByTarget ;
@@ -175,6 +176,16 @@ public class WEnvironment  {
 	public WDatabase<String, Integer> getDbCategoriesByTitle() {
 		return dbCategoriesByTitle ;
 	}
+	
+	/**
+	 * Returns the {@link DatabaseType#templatesByTitle} database
+	 * 
+	 * @return see {@link DatabaseType#templatesByTitle} 
+	 */
+	public WDatabase<String, Integer> getDbTemplatesByTitle() {
+		return dbTemplatesByTitle ;
+	}
+
 	
 	/**
 	 * Returns the {@link DatabaseType#redirectTargetBySource} database
@@ -377,6 +388,8 @@ public class WEnvironment  {
 		databasesByType.put(DatabaseType.articlesByTitle, dbArticlesByTitle) ;
 		dbCategoriesByTitle = dbFactory.buildTitleDatabase(DatabaseType.categoriesByTitle) ;
 		databasesByType.put(DatabaseType.categoriesByTitle, dbCategoriesByTitle) ;
+		dbTemplatesByTitle = dbFactory.buildTitleDatabase(DatabaseType.templatesByTitle) ;
+		databasesByType.put(DatabaseType.templatesByTitle, dbTemplatesByTitle) ;
 		
 		dbPageLinkIn = dbFactory.buildPageLinkDatabase(DatabaseType.pageLinksIn) ; 
 		databasesByType.put(DatabaseType.pageLinksIn, dbPageLinkIn) ;
@@ -704,6 +717,7 @@ public class WEnvironment  {
 		
 		env.dbArticlesByTitle.loadFromCsvFile(page, overwrite, null) ;
 		env.dbCategoriesByTitle.loadFromCsvFile(page, overwrite, null) ;
+		env.dbTemplatesByTitle.loadFromCsvFile(page, overwrite, null) ;
 		
 		env.dbRedirectTargetBySource.loadFromCsvFile(redirectTargetBySource, overwrite, null) ;
 		env.dbRedirectSourcesByTarget.loadFromCsvFile(redirectSourcesByTarget, overwrite, null) ;
