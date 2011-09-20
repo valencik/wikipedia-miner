@@ -210,7 +210,7 @@ public class LabelComparer {
 		relatednessMeasurer.save(file) ;
 	}
 	
-
+	//TODO: saving and loading arff files?
 	
 	public void buildDefaultClassifiers() throws Exception {
 		

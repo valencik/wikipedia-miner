@@ -196,7 +196,7 @@ public class LinkDetector extends TopicWeighter{
 	 */
 	public void loadTrainingData(File file) throws Exception{
 		Logger.getLogger(LinkDetector.class).info("loading training data") ;
-		
+		dataset = decider.createNewDataset();
 		dataset.load(file) ;
 		weightTrainingInstances() ;
 	}
