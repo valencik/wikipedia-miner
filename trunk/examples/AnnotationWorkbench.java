@@ -162,6 +162,9 @@ public class AnnotationWorkbench {
 			
 			String line = input.readLine() ;
 			
+			if (line.trim().length() == 0)
+				break ;
+			
 			Integer choice = 0 ;
 			try {
 				choice = Integer.parseInt(line) ;
