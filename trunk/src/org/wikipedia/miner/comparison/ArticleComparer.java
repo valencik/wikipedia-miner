@@ -218,6 +218,7 @@ public class ArticleComparer {
 	 * @throws Exception if the file does not contain valid training data.
 	 */
 	public void loadTrainingData(File file) throws IOException, Exception{
+		trainingDataset = relatednessMeasurer.createNewDataset() ;
 		trainingDataset.load(file) ;
 	}
 

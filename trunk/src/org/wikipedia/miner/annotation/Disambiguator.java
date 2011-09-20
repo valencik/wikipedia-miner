@@ -254,6 +254,7 @@ public class Disambiguator {
 	 */
 	public void loadTrainingData(File file) throws Exception{
 		Logger.getLogger(Disambiguator.class).info("loading training data") ;
+		dataset = decider.createNewDataset();
 		dataset.load(file) ;
 		
 		weightTrainingInstances() ;
