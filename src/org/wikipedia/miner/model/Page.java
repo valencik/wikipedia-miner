@@ -11,37 +11,37 @@ import org.wikipedia.miner.util.MarkupStripper;
  * Represents pages of any type in Wikipedia
  */
 public class Page implements Comparable<Page> {
-	
+
 	/**
 	 * Types that wikipedia pages can be.
 	 */
 	public enum PageType {
-		
+
 		/**
 		 * A page that provides informative text about a topic.
 		 */
 		article, 
-		
+
 		/**
 		 * A page that hierarchically organises other pages
 		 */
 		category, 
-		
+
 		/**
 		 * A page that exists only to connect an alternative title to an article
 		 */
 		redirect, 
-	
+
 		/**
 		 * A page that lists possible senses of an ambiguous word
 		 */
 		disambiguation, 
-		
+
 		/**
 		 * A page that can be transcluded into other pages
 		 */
 		template,
-		
+
 		/**
 		 * A type of page that we don't currently deal with (e.g templates)
 		 */
@@ -125,7 +125,7 @@ public class Page implements Comparable<Page> {
 		return weight ;
 	}
 
-	
+
 	/**
 	 * @param p the page to compare to
 	 * @return true if this page has the same id as the given one, otherwise false
@@ -145,17 +145,17 @@ public class Page implements Comparable<Page> {
 
 		if (p.id == id)
 			return 0 ;
-		
+
 		int cmp = 0 ;
-		
+
 		if (p.weight != null && weight != null && p.weight != weight)
 			cmp =  p.weight.compareTo(weight) ; 
-		
+
 		if (cmp == 0)
 			cmp = new Integer(id).compareTo(p.id) ;
-			
+
 		return cmp ;
-		
+
 	}
 
 	/**
@@ -334,7 +334,7 @@ public class Page implements Comparable<Page> {
 			return createPage(env, id, pd) ;
 		else {
 			pd = new DbPage("Invalid id or excluded via caching", PageType.invalid.ordinal(), -1) ;
-			
+
 			return new Page(env, id, pd) ;
 		}
 	}
@@ -366,6 +366,11 @@ public class Page implements Comparable<Page> {
 		case category:
 			p = new Category(env, id, pd) ;
 			break ;
+		case template:
+			p = new Template(env, id, pd) ;
+			break ;
+		default:
+			p = new Page(env, id, pd) ;
 		}
 
 		return p ;

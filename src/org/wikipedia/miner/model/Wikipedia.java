@@ -61,7 +61,7 @@ public class Wikipedia {
 	public Wikipedia(WikipediaConfiguration conf, boolean threadedPreparation) throws EnvironmentLockedException{
 		this.env = new WEnvironment(conf, threadedPreparation) ; 
 	}
-	
+
 	/**
 	 * Initialises a newly created Wikipedia according to the given configuration file. 
 	 * 
@@ -77,7 +77,7 @@ public class Wikipedia {
 		WikipediaConfiguration conf = new WikipediaConfiguration(confFile) ;
 		this.env = new WEnvironment(conf, threadedPreparation) ; 
 	}
-	
+
 
 	/**
 	 * Returns the environment that this is connected to
@@ -96,7 +96,7 @@ public class Wikipedia {
 	public WikipediaConfiguration getConfig() {
 		return env.getConfiguration() ;
 	}
-	
+
 	/**
 	 * Returns true if the preparation work has been completed, otherwise false
 	 * 
@@ -104,9 +104,9 @@ public class Wikipedia {
 	 */
 	public boolean isReady() {
 		return env.isReady() ;
-		
+
 	}
-	
+
 	/**
 	 * Returns a number between 0 (just started) and 1 (completed) indicating progress of the preparation work.
 	 * 
@@ -115,7 +115,7 @@ public class Wikipedia {
 	public double getProgress() {
 		return env.getProgress() ;
 	}
-	
+
 	/**
 	 * Returns a tracker for progress of the preparation work. 
 	 * 
@@ -157,7 +157,7 @@ public class Wikipedia {
 	 * @return the Article referenced by the given title, or null if one does not exist
 	 */
 	public Article getArticleByTitle(String title) {
-		
+
 		if (title == null || title.length() == 0)
 			return null ;
 
@@ -204,6 +204,33 @@ public class Wikipedia {
 	}
 
 	/**
+	 * Returns the Template referenced by the given (case sensitive) title. 
+	 * 
+	 * The given title must be matched exactly to return a Template. 
+	 *  
+	 * @param title the title of a Template.
+	 * @return the Template referenced by the given title, or null if one does not exist
+	 */
+	public Template getTemplateByTitle(String title) {
+
+		title = title.substring(0,1).toUpperCase() + title.substring(1) ;
+
+		Integer id = env.getDbTemplatesByTitle().retrieve(title) ;
+
+		if (id == null)
+			return null ;
+
+		Page page = Page.createPage(env, id) ;
+
+		if (page.getType() == PageType.template)
+			return (Template) page ;
+		else
+			return null ;
+	}
+
+
+
+	/**
 	 * Returns the most likely article for a given term. For example, searching for "tree" will return
 	 * the article "30579: Tree", rather than "30806: Tree (data structure)" or "7770: Christmas tree"
 	 * This is defined by the number of times the term is used as an anchor for links to each of these 
@@ -239,20 +266,20 @@ public class Wikipedia {
 	 */
 	public boolean isLabel(String text, TextProcessor tp)  {
 		DbLabel lbl = env.getDbLabel(tp).retrieve(text) ; 
-		
+
 		return lbl != null ;
 	}
-	
+
 	public Label getLabel(String text)  {
-		
+
 		return new Label(env, text) ;
 	}
-	
+
 	public Label getLabel(String text, TextProcessor tp)  {
-		
+
 		return new Label(env, text, tp) ;
 	}
-	
+
 
 	/**
 	 * Returns an iterator for all pages in the database, in order of ascending ids.
@@ -272,7 +299,7 @@ public class Wikipedia {
 	public PageIterator getPageIterator(PageType type) {
 		return new PageIterator(env, type) ;		
 	}
-	
+
 	/**
 	 * Returns an iterator for all labels in the database, processed according to the given text processor (may be null), in alphabetical order.
 	 * 
