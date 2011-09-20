@@ -151,10 +151,14 @@ function processRelatednessResponse(response) {
 	
 	$('#relationWeight').html(Math.round(response.attr("relatedness")*100) + "% related") ;
 	
-	$('#byTerm1').html(urlParams["term1"]) ;
-	$('#byTerm2').html(urlParams["term2"]) ;
+	var term1 = urlParams["term1"] ;
+	var term2 = urlParams["term2"] ;
 	
-	var xmlInterpretation = $(response.children("Interpretations").children("Interpretation")[0]) ;
+	$('#byTerm1').html(term1) ;
+	$('#byTerm2').html(term2) ;
+	
+	var xmlInterpretations = $(response.children("Interpretations")) ;
+	var xmlInterpretation = $(xmlInterpretations.children()[0]) ;
 	
 	if (xmlInterpretation.attr('id1') != undefined && xmlInterpretation.attr('id2')) {
 	
@@ -167,6 +171,25 @@ function processRelatednessResponse(response) {
 		$('#senses').hide() ;
 		$('#noSenses').show() ;
 	}
+	
+	var candidates1 = Number(xmlInterpretations.attr("term1Candidates")) ;
+	var candidates2 = Number(xmlInterpretations.attr("term2Candidates")) ;
+	
+	if (candidates1 == 2)
+		$('#alternatives1').html("there is <a href='../search/?query=" + term1 + "'>1 other sense</a> for this term.") ;
+	else if (candidates1 > 2)
+		$('#alternatives1').html("there are <a href='../search/?query=" + term1 + "'>" + (candidates1-1) + " other senses</a> for this term") ;
+	else
+		$('#alternatives1').html("this is the only possible sense.") ;
+		
+	if (candidates2 == 2)
+		$('#alternatives2').html("there is <a href='../search/?query=" + term2 + "'>1 other sense</a> for this term.") ;
+	else if (candidates2 > 2)
+		$('#alternatives2').html("there are <a href='../search/?query=" + term2 + "'>" + (candidates2-1) + " other senses</a> for this term") ;
+	else
+		$('#alternatives2').html("this is the only possible sense.") ;
+		
+		
 	
 	var sortedConnections = $(response).find("Connection").get().sort(function(a,b) {
 		var valA = $(a).attr("title") ;
@@ -208,9 +231,6 @@ function processRelatednessResponse(response) {
 		$('#snippets').hide() ;
 		$('#noSnippets').show() ;
 	}
-	
-	
-	
 	
 	wm_addDefinitionTooltipsToAllLinks($('#snippets')) ;
 }
