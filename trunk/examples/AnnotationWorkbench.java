@@ -184,10 +184,10 @@ public class AnnotationWorkbench {
 				trainer.createArffFiles(datasetName) ;
 				break ;
 			case 3:
-				System.out.println("Disambiguation classifer config (or ENTER to use default):") ;
+				System.out.println("Disambiguation classifier config (or ENTER to use default):") ;
 				String configDisambig = input.readLine() ;
 				
-				System.out.println("Detection classifer config (or ENTER to use default):") ;
+				System.out.println("Detection classifier config (or ENTER to use default):") ;
 				String configDetect = input.readLine() ;
 				
 				trainer.createClassifiers(configDisambig, configDetect) ;
