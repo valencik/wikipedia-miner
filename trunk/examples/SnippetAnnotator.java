@@ -65,9 +65,7 @@ public class SnippetAnnotator {
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[0])) ;
 		conf.clearDatabasesToCache() ;
-		//conf.addDatabaseToCache(DatabaseType.label) ;
-		//conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences) ;
-
+		
 		Wikipedia wikipedia = new Wikipedia(conf, false) ;
 		
 		SnippetAnnotator annotator = new SnippetAnnotator(wikipedia) ;
