@@ -36,12 +36,16 @@ $(document).ready(function() {
 }) ;
 
 function requestServiceList() {
-	$.get("listServices", function(response){
-		processServiceListResponse($(response));
-	});
+	$.get(
+		"listServices", 
+		{responseFormat:'JSON'},
+		function(data){
+			processServiceListResponse(data);
+		}
+	);
 }
 
-function processServiceListResponse(response) {
+function processServiceListResponse(data) {
 	
 	var serviceList = $("#serviceList") ;
 	
@@ -51,25 +55,20 @@ function processServiceListResponse(response) {
 		serviceList.append("<li><a href='.'>introduction</a></li>") ;
 	}
 
-	$.each(response.find("ServiceGroup"), function() {
+	$.each(data.response.serviceGroups, function() {
+				
+		serviceList.append("<li class='header'><em>" + this.name + "</em> services</li>") ;
 		
-		var groupXml = $(this) ;
-		
-		serviceList.append("<li class='header'><em>" + groupXml.attr("name") + "</em> services</li>") ;
-		
-		$.each(groupXml.find("Service"), function() {
-			var serviceXml = $(this) ;
-		
-			//alert(service.attr("name")) ;
-			
-			if (serviceXml.attr("name") == currService) {
-				serviceList.append("<li><em>" + serviceXml.attr("name") + "</em></li>") ;
+		$.each(this.services, function(name, description) {
+				
+			if (name == currService) {
+				serviceList.append("<li><em>" + name + "</em></li>") ;
 			} else {
 					
-				var service = $("<li><a href='?" + serviceXml.attr("name") + "'>" + serviceXml.attr("name") + "</a></li>") ;
+				var service = $("<li><a href='?" + name + "'>" + name + "</a></li>") ;
 				service.qtip(
 				{
-				      content: serviceXml.find("Details").text(),
+				      content: description,
 					  style: { name: 'wmstyle' },
 					  position: {
 					  	corner: {
@@ -91,37 +90,63 @@ function processServiceListResponse(response) {
 }
 
 function requestServiceDetails(serviceName) {
-	$.get(serviceName+"?help", function(xml){
-		processServiceDetailsResponse($(xml).find("ServiceDescription"));
-	});
+	$.get(
+		serviceName, 
+		{
+			help:true,
+			responseFormat:'JSON'
+		},
+		function(data){
+			processServiceDetailsResponse(data);
+		}
+	);
 }
 
-function processServiceDetailsResponse(response) {
+function processServiceDetailsResponse(data) {
 	
-	$("#serviceDetails").append("<h2><em>" + response.attr("serviceName") + "</em> service</h2>") ;
+	var desc = data.response.serviceDescription ;
 	
-	$("#serviceDetails").append($(response).children("Details").text()) ;
+	$("#serviceDetails").append("<h2><em>" + desc.name + "</em> service</h2>") ;
+	
+	$("#serviceDetails").append(desc.details) ;
+	
+	if (desc.examples.length > 0) {
+		$("#serviceDetails").append("<h3>Examples</h3>") ;
+		
+		$.each(desc.examples , function() {
+			$("#serviceDetails").append(constructExampleBox(this,  desc.name));
+		}) ;
+	}
 	
 	$("#serviceDetails").append("<h3>Available parameters</h3>") ;
 	
-	if ($(response).find("Parameter[name!='help']").length == 0) {
-		$("#serviceDetails").append("<p class='explanatory'>There are no parameters to specify</p>") ;
-		return ;
-	}
+	//if ($(response).find("Parameter[name!='help']").length == 0) {
+	//	$("#serviceDetails").append("<p class='explanatory'>There are no parameters to specify</p>") ;
+	//	return ;
+	//}
 	
-	var paramGroups = $(response).find("ParameterGroup") ;
+	var paramGroups = desc.parameterGroups ;
 	
 	if (paramGroups.length > 0) {
 		
 		$("#serviceDetails").append("<p class='explanatory'>Only specify parameters from <em>one</em> of the following groups</p>") ;
 		
-		$.each($(response).find("ParameterGroup"), function(){
-			$("#serviceDetails").append(constructParamGroupBox($(this))) ;
+		$.each(paramGroups, function(){
+			$("#serviceDetails").append(constructParamGroupBox(this)) ;
 		}) ;
 	}
 	
-	var mandatoryGlobalParams = $(response).children("Parameter[optional|='false']") ;
+	var mandatoryGlobalParams = new Array() ;
+	var optionalGlobalParams = new Array() ;
 	
+	$.each(desc.globalParameters, function() {
+		if (this.optional == true)
+			optionalGlobalParams.push(this) ;
+		else
+			mandatoryGlobalParams.push(this) ;
+	}) ;
+	
+
 	if (mandatoryGlobalParams.length > 0) {
 		
 		if (mandatoryGlobalParams.length == 1)
@@ -130,16 +155,13 @@ function processServiceDetailsResponse(response) {
 			$("#serviceDetails").append("<p class='explanatory'>Specify <em>all</em> of the following</p>") ;
 		
 		$.each(mandatoryGlobalParams, function(){
-			var xmlParam = $(this) ;
-			var divParam = constructParamBox(xmlParam) ;
+			var divParam = constructParamBox(this) ;
 			$("#serviceDetails").append(divParam);
-			intializeParamBox(divParam, xmlParam) ;
+			intializeParamBox(divParam, this) ;
 		}) ;
 	}
 	
-	
-	var optionalGlobalParams = $(response).children("Parameter[optional|='true']") ;
-	var baseParams = $(response).children("BaseParameters").children("Parameter[name!='help']") ;
+	var baseParams = desc.baseParameters ;
 	
 	if (optionalGlobalParams.length + baseParams.length > 0) {
 		
@@ -149,32 +171,20 @@ function processServiceDetailsResponse(response) {
 			$("#serviceDetails").append("<p class='explanatory'>Optionally specify <em>any</em> of the following</p>") ;
 		
 		$.each(optionalGlobalParams, function(){
-			var xmlParam = $(this) ;
-			var divParam = constructParamBox(xmlParam) ;
+			var divParam = constructParamBox(this) ;
 			$("#serviceDetails").append(divParam);
-			intializeParamBox(divParam, xmlParam) ;
+			intializeParamBox(divParam, this) ;
 		}) ;
 		
 		$.each(baseParams, function(){
-			var xmlParam = $(this) ;
-			var divParam = constructParamBox(xmlParam) ;
+			var divParam = constructParamBox(this) ;
 			$("#serviceDetails").append(divParam);
-			intializeParamBox(divParam, xmlParam) ;
-		}) ;
-	}
-	
-	var examples = $(response).children("Examples").children("Example") ;
-	
-	if (examples.length > 0) {
-		$("#serviceDetails").append("<h3>Examples</h3>") ;
-		
-		$.each(examples , function() {
-			$("#serviceDetails").append(constructExampleBox($(this), response.attr("serviceName")));
+			intializeParamBox(divParam, this) ;
 		}) ;
 	}
 }
 
-function constructParamGroupBox(xmlParamGroup) {
+function constructParamGroupBox(data) {
 	var divParamGroup = $("<div class='paramGroup ui-widget-content ui-corner-all'></div>") ;
 	
 	var divParamGroupTitle = $("<div class='title'></div>") ;
@@ -197,12 +207,21 @@ function constructParamGroupBox(xmlParamGroup) {
 		$(this).parent().removeClass("ui-state-highlight") ;
 	}) ;
 	
-	divParamGroupTitle.append("<span>" + xmlParamGroup.children("Description").text() + "</span>");
+	divParamGroupTitle.append("<span>" + data.description + "</span>");
 	
 	var divParamGroupContent = $("<div class='content' style='display: none'></div>") ;
 	divParamGroup.append(divParamGroupContent) ;
 	
-	var mandatoryParams = xmlParamGroup.children("Parameter[optional|='false']") ;
+	
+	var mandatoryParams = new Array() ;
+	var optionalParams = new Array() ;
+	
+	$.each(data.parameters, function() {
+		if (this.optional == true)
+			optionalParams.push(this) ;
+		else
+			mandatoryParams.push(this) ;
+	}) ;
 	
 	if (mandatoryParams.length > 0) {
 		if (mandatoryParams.length == 1)
@@ -211,14 +230,11 @@ function constructParamGroupBox(xmlParamGroup) {
 			divParamGroupContent.append("<p class='explanatory'>Specify <em>all</em> of the following</p>");
 		
 		$.each(mandatoryParams, function(){
-			var xmlParam = $(this) ;
-			var divParam = constructParamBox(xmlParam) ;
+			var divParam = constructParamBox(this) ;
 			divParamGroupContent.append(divParam);
-			intializeParamBox(divParam, xmlParam) ;
+			intializeParamBox(divParam, this) ;
 		});
 	}
-	
-	var optionalParams = xmlParamGroup.children("Parameter[optional|='true']") ;
 	
 	if (optionalParams.length > 0) {
 		if (optionalParams.length == 1)
@@ -227,17 +243,16 @@ function constructParamGroupBox(xmlParamGroup) {
 			divParamGroupContent.append("<p class='explanatory'>Optionally specify <em>any</em> of the following</p>");
 		
 		$.each(optionalParams, function(){
-			var xmlParam = $(this) ;
-			var divParam = constructParamBox(xmlParam) ;
+			var divParam = constructParamBox(this) ;
 			divParamGroupContent.append(divParam);
-			intializeParamBox(divParam, xmlParam) ;
+			intializeParamBox(divParam, this) ;
 		});
 	}
 	
 	return divParamGroup ;
 }
 
-function constructParamBox(xmlParam) {
+function constructParamBox(data) {
 	
 	var divParam = $("<div class='param ui-widget-content ui-corner-all'></div>");
 	
@@ -264,30 +279,27 @@ function constructParamBox(xmlParam) {
 	}) ;
 	
 	
-	divParamTitle.append("<span>" + xmlParam.attr("name") + "</span>");
+	divParamTitle.append("<span>" + data.name + "</span>");
 	
 	var divParamContent = $("<div class='content'></div>") ;
 	divParam.append(divParamContent) ;
-	divParamContent.append("<p>" + xmlParam.children("Description").text() + "</p>") ;
+	divParamContent.append("<p>" + data.description + "</p>") ;
 	
 	var tblType = divParamContent.append("<table></table>") ;
 	
 	var tr = tblType.append("<tr></tr>") ;
 	tr.append("<td class='header'>type</td>") ;
 	
-	tr.append("<td><a class='datatype'>" + xmlParam.attr("dataType") + "</a></td>") ;
+	tr.append("<td><a class='datatype'>" + data.datatype + "</a></td>") ;
 	tr.find(".datatype").qtip(
 	   {
-	      content: datatypeDescriptions[xmlParam.attr("dataType")],
+	      content: datatypeDescriptions[data.datatype],
 		  style: {
               name: 'wmstyle' 
    		  }
 	   }) ;
 	
-	
-	var possibleValues = xmlParam.children("PossibleValue") ;
-	
-	if (possibleValues.length > 0) {
+	if (data.possibleValues != undefined) {
 		
 		tr = tblType.append("<tr/>") ;
 		
@@ -295,13 +307,12 @@ function constructParamBox(xmlParam) {
 		
 		var td = $("<td></td>") ;
 	
-		$.each(possibleValues, function() {
-			var xmlPossibleVal = $(this) ;
-			
-			var val = $("<span class='value'>" + xmlPossibleVal.attr("name") + "</a></span>") ;
+		$.each(data.possibleValues, function(name, desc) {
+
+			var val = $("<span class='value'>" + name + "</a></span>") ;
 			val.qtip(
 			   {
-			      content: xmlPossibleVal.attr("description"),
+			      content: desc,
 				  style: {
 	                  name: 'wmstyle' 
            		  }
@@ -313,11 +324,11 @@ function constructParamBox(xmlParam) {
 	}
 	
 	
-	if (typeof xmlParam.attr('default') != "undefined") {
+	if (typeof data.defaultValue != 'undefined') {
 		tr = tblType.append("<tr></tr>") ;
 		
 		tr.append("<td class='header'>default value</td>")
-		tr.append("<td>" + xmlParam.attr('default') + "</td>");	
+		tr.append("<td>" + data.defaultValue + "</td>");	
 		
 	}
 	return divParam ;
@@ -325,8 +336,8 @@ function constructParamBox(xmlParam) {
 
 //Decide wheither to initially expand or collapse param box initially
 //Mandatory params are expanded initially, optional ones are collapsed
-function intializeParamBox(divParam, xmlParam) {
-	if (typeof xmlParam.attr('default') != "undefined") {
+function intializeParamBox(divParam, data) {
+	if (typeof data.defaultValue != 'undefined') {
 		divParam.find(".content").hide() ;
 		divParam.find(".ui-icon-circle-triangle-s").show() ;
 		divParam.find(".ui-icon-circle-triangle-n").hide() ;	
@@ -339,7 +350,7 @@ function intializeParamBox(divParam, xmlParam) {
 
 
 
-function constructExampleBox(xmlExample, serviceName) {
+function constructExampleBox(data, serviceName) {
 	
 	var divExample = $("<div class='example ui-widget-content ui-corner-all'></div>");
 	
@@ -362,7 +373,7 @@ function constructExampleBox(xmlExample, serviceName) {
 		$(this).parent().removeClass("ui-state-highlight") ;
 	}) ;
 	
-	divExampleTitle.append("<span class='title'>" + xmlExample.text() + "</span>") ;
+	divExampleTitle.append("<span class='title'>" + data.description + "</span>") ;
 	
 	var divExampleContent = $("<div class='content'></div>") ;
 	divExample.append(divExampleContent) ;
@@ -373,7 +384,8 @@ function constructExampleBox(xmlExample, serviceName) {
 	
 	divExampleContent.append(parParams) ;
 	
-	$.each(xmlExample.find("Parameter"), function(index, value) {
+	var index = 0 ;
+	$.each(data.parameters, function(name, value) {
 		
 		var parParam = $("<p class='param'></p>") ;
 		parParams.append(parParam) ;
@@ -383,13 +395,15 @@ function constructExampleBox(xmlExample, serviceName) {
 		else
 			parParam.append("&") ;
 			
-		if ($(value).attr('value') == 'true')
-			parParam.append("<b>" + $(value).attr("name") + "</b>") ;
+		if (value == 'true')
+			parParam.append("<b>" + name + "</b>") ;
 		else
-			parParam.append("<b>" + $(value).attr("name") + "</b>=" + $(value).attr("value")) ;
+			parParam.append("<b>" + name + "</b>=" + value) ;
+			
+		index++ ;
 	});
 	
-	var cmdTry = $("<a class='try' target='_blank' href='" + xmlExample.attr("url") + "'>try it!</a>") ;
+	var cmdTry = $("<a class='try' target='_blank' href='" + data.url + "'>try it!</a>") ;
 	divExampleContent.append(cmdTry) ;
 	
 	return divExample ;

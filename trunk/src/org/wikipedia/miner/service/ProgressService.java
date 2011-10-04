@@ -4,8 +4,10 @@ import java.text.DecimalFormat;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.w3c.dom.Element;
+import org.simpleframework.xml.*;
 import org.wikipedia.miner.model.Wikipedia;
+
+import com.google.gson.annotations.Expose;
 
 public class ProgressService extends Service {
 
@@ -26,20 +28,34 @@ public class ProgressService extends Service {
 	}
 	
 	@Override
-	public Element buildWrappedResponse(HttpServletRequest request, Element xmlResponse) {
+	public Response buildWrappedResponse(HttpServletRequest request) {
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		double progress = wikipedia.getEnvironment().getProgress() ;
-	
-		xmlResponse.setAttribute("progress", df.format(progress)) ;
-
-		return xmlResponse ;
+		
+		return new Response(progress) ;
 	}
 	
 	@Override
 	public boolean requiresWikipedia() {
 		return false ;
+	}
+	
+	@Override
+	public int getUsageCost(HttpServletRequest request) {
+		return 0 ;
+	}
+	
+	public static class Response extends Service.Response {
+		
+		@Expose
+		@Attribute
+		double progress ;
+		
+		public Response(double progress) {
+			this.progress = progress ;
+		}
 	}
 
 }

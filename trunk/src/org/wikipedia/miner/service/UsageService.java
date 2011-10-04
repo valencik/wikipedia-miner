@@ -7,9 +7,11 @@ import java.util.TimeZone;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.w3c.dom.Element;
+import org.simpleframework.xml.Element;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.model.Wikipedia;
+
+import com.google.gson.annotations.Expose;
 
 public class UsageService extends Service{
 	
@@ -23,15 +25,24 @@ public class UsageService extends Service{
 	}
 
 	@Override
-	public Element buildWrappedResponse(HttpServletRequest request,
-			Element response) throws Exception {
+	public Response buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
-		response = buildUsageResponse(request, response) ;
-		return response;
+		return new Response(getHub().identifyClient(request)) ;
 	}
 
 	@Override 
 	public int getUsageCost(HttpServletRequest request) {
 		return 0 ;
+	}
+	
+	public static class Response extends Service.Response {
+		
+		@Expose
+		@Element
+		private Client client ;
+		
+		public Response(Client c) {
+			client = c ;
+		}
 	}
 }

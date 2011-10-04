@@ -1,18 +1,29 @@
 package org.wikipedia.miner.service;
 
+import java.util.ArrayList;
+
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
+import org.simpleframework.xml.Attribute;
+import org.simpleframework.xml.ElementList;
 import org.w3c.dom.Element;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Category;
 import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.model.Wikipedia;
+import org.wikipedia.miner.service.ExploreArticleService.ResponseImage;
+import org.wikipedia.miner.service.ExploreArticleService.ResponseLabel;
+import org.wikipedia.miner.service.ExploreArticleService.ResponsePage;
+import org.wikipedia.miner.service.ExploreArticleService.ResponseTranslation;
+import org.wikipedia.miner.service.Service.ParameterMissingResponse;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.IntParameter;
 import org.wikipedia.miner.service.param.ParameterGroup;
 import org.wikipedia.miner.service.param.StringParameter;
+
+import com.google.gson.annotations.Expose;
 
 public class ExploreCategoryService extends Service{
 
@@ -81,19 +92,15 @@ public class ExploreCategoryService extends Service{
 		
 	}
 	
-
-	@Override
-	public Element buildWrappedResponse(HttpServletRequest request,
-			Element xmlResponse) throws Exception {
+	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+		
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		ParameterGroup grp = getSpecifiedParameterGroup(request) ;
 		
-		if (grp == null) {
-			xmlResponse.setAttribute("unspecifiedParameters", "true") ;
-			return xmlResponse ;
-		}
+		if (grp == null) 
+			return new ParameterMissingResponse() ;
 		
 		Category cat = null ;
 		
@@ -104,14 +111,14 @@ public class ExploreCategoryService extends Service{
 			
 			Page page = wikipedia.getPageById(id) ;
 			if (page==null) 
-				return buildErrorResponse("'" + id + "' is an unknown id", xmlResponse) ;
+				return new InvalidIdResponse(id) ;
 			
 			switch(page.getType()) {
 				case category:
 					cat = (Category)page ;
 					break ;
 				default:
-					return buildErrorResponse("'" + id + "' is not a category id", xmlResponse) ;
+					return new InvalidIdResponse(id) ;
 			}
 			break ;
 		case title :
@@ -119,29 +126,20 @@ public class ExploreCategoryService extends Service{
 			cat = wikipedia.getCategoryByTitle(title) ;
 			
 			if (cat == null)
-				return buildErrorResponse("'" + title + "' is an unknown category title", xmlResponse) ;
+				return new InvalidTitleResponse(title) ;
 			break ;
 		}
 		
-		xmlResponse.setAttribute("id", String.valueOf(cat.getId()));
-		xmlResponse.setAttribute("title", String.valueOf(cat.getTitle()));
+		Response response = new Response(cat) ;
 		
 		if (prmParentCategories.getValue(request)) {
 			
 			Category[] parents = cat.getParentCategories() ;
 			
-			Element xmlParents = getHub().createElement("ParentCategories") ;
-			xmlParents.setAttribute("total", String.valueOf(parents.length)) ;
+			response.setTotalParentCategories(parents.length) ;
 
-			for (Category parent:parents) {
-
-				Element xmlParent = getHub().createElement("ParentCategory") ;
-				xmlParent.setAttribute("id", String.valueOf(parent.getId())) ;
-				xmlParent.setAttribute("title", parent.getTitle()) ;
-				
-				xmlParents.appendChild(xmlParent) ;
-			}
-			xmlResponse.appendChild(xmlParents) ;
+			for (Category parent:parents) 
+				response.addParentCategory(new ResponsePage(parent)) ;
 		}
 		
 		if (prmChildCategories.getValue(request)) {
@@ -155,18 +153,9 @@ public class ExploreCategoryService extends Service{
 		
 			Category[] children = cat.getChildCategories() ;
 			
-			Element xmlChildren = getHub().createElement("ChildCategories") ;
-			xmlChildren.setAttribute("total", String.valueOf(children.length)) ;
-
-			for (int i=start ; i < max && i < children.length ; i++) {
-
-				Element xmlChild = getHub().createElement("ChildCategory") ;
-				xmlChild.setAttribute("id", String.valueOf(children[i].getId())) ;
-				xmlChild.setAttribute("title", children[i].getTitle()) ;
-				
-				xmlChildren.appendChild(xmlChild) ;
-			}
-			xmlResponse.appendChild(xmlChildren) ;
+			response.setTotalChildCategories(children.length) ;
+			for (int i=start ; i < max && i < children.length ; i++) 
+				response.addChildCategory(new ResponsePage(children[i])) ;
 		}
 		
 		if (prmChildArticles.getValue(request)) {
@@ -180,21 +169,114 @@ public class ExploreCategoryService extends Service{
 			
 			Article[] children = cat.getChildArticles() ;
 			
-			Element xmlChildren = getHub().createElement("ChildArticles") ;
-			xmlChildren.setAttribute("total", String.valueOf(children.length)) ;
-
-			for (int i=start ; i < max && i < children.length ; i++) {
-
-				Element xmlChild = getHub().createElement("ChildArticle") ;
-				xmlChild.setAttribute("id", String.valueOf(children[i].getId())) ;
-				xmlChild.setAttribute("title", children[i].getTitle()) ;
-				
-				xmlChildren.appendChild(xmlChild) ;
-			}
-			xmlResponse.appendChild(xmlChildren) ;
+			response.setTotalChildArticles(children.length) ;
+			for (int i=start ; i < max && i < children.length ; i++) 
+				response.addChildArticle(new ResponsePage(children[i])) ;
 		}
 
-		return xmlResponse ;
+		return response ;
 	}
 
+	
+	public class InvalidIdResponse extends Service.ErrorResponse {
+
+		@Expose 
+		@Attribute
+		private Integer invalidId ;
+
+		public InvalidIdResponse(Integer id) {
+			super("'" + id + "' is not a valid article id") ;	
+			invalidId = id ;
+		}
+	}
+
+	public class InvalidTitleResponse extends Service.ErrorResponse {
+
+		@Expose 
+		@Attribute
+		private String invalidTitle ;
+
+		public InvalidTitleResponse(String title) {
+			super("'" + title + "' is not a valid article title") ;	
+			invalidTitle = title ;
+		}
+	}
+	
+	public static class Response extends Service.Response {
+
+		@Expose
+		@Attribute
+		int id ;
+
+		@Expose
+		@Attribute
+		String title ;
+
+		@Expose
+		@ElementList(required=false, entry="parentCategory") 
+		ArrayList<ResponsePage> parentCategories = null ;
+
+		@Expose
+		@Attribute(required=false)
+		private Integer totalParentCategories ;
+		
+		@Expose
+		@ElementList(required=false, entry="childCategory") 
+		ArrayList<ResponsePage> childCategories = null ;
+
+		@Expose
+		@Attribute(required=false)
+		private Integer totalChildCategories ;
+		
+		@Expose
+		@ElementList(required=false, entry="childArticle") 
+		ArrayList<ResponsePage> childArticles = null ;
+
+		@Expose
+		@Attribute(required=false)
+		private Integer totalChildArticles ;
+
+	
+
+		public Response(Category cat) {	
+			this.id = cat.getId();
+			this.title = cat.getTitle();
+		}
+
+		public void addParentCategory(ResponsePage p) {
+			if (parentCategories == null)
+				parentCategories = new ArrayList<ResponsePage>() ;
+
+			parentCategories.add(p) ;
+		}
+
+		public void setTotalParentCategories(int total) {
+			totalParentCategories = total ;
+		}
+
+		public void addChildCategory(ResponsePage p) {
+			if (childCategories == null)
+				childCategories = new ArrayList<ResponsePage>() ;
+
+			childCategories.add(p) ;
+		}
+
+		public void setTotalChildCategories(int total) {
+			totalChildCategories = total ;
+		}
+
+		public void addChildArticle(ResponsePage p) {
+			if (childArticles == null)
+				childArticles = new ArrayList<ResponsePage>() ;
+
+			childArticles.add(p) ;
+		}
+
+		public void setTotalChildArticles(int total) {
+			totalChildArticles = total ;
+		}
+
+
+	}
+	
 }

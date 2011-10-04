@@ -67,10 +67,10 @@ function checkProgress() {
 	
 	$.get(
 		"../../services/getProgress",
+		{responseFormat:'JSON'},
 		function(data) {
 			
-			var xmlResponse = $(data).find("Response") ;
-			var progress = Number(xmlResponse.attr("progress")) ;
+			var progress = data.response.progress ;
 
 			if (progress >= 1) {
 				ready() ;
@@ -114,10 +114,11 @@ function ready() {
 				interpretations: true,
 				connections: true,
 				maxConnectionsReturned: 50,
-				snippets: true
+				snippets: true,
+				responseFormat:'JSON'
 			},
 			function(data){
-				processRelatednessResponse($(data).find("Response")) ;
+				processRelatednessResponse(data) ;
 			}
 		);
 		
@@ -128,11 +129,12 @@ function ready() {
 }
 
 
-function processRelatednessResponse(response) {
+function processRelatednessResponse(data) {
 	
 	$('#loadingSpacer').hide() ;
 	
-	var unknownTerm = response.attr('unknownTerm') ;
+	
+	var unknownTerm = data.response.unknownTerm ;
 	
 	if (unknownTerm != undefined) {
 
@@ -149,7 +151,7 @@ function processRelatednessResponse(response) {
 	
 	
 	
-	$('#relationWeight').html(Math.round(response.attr("relatedness")*100) + "% related") ;
+	$('#relationWeight').html(Math.round(data.response.relatedness*100) + "% related") ;
 	
 	var term1 = urlParams["term1"] ;
 	var term2 = urlParams["term2"] ;
@@ -157,13 +159,12 @@ function processRelatednessResponse(response) {
 	$('#byTerm1').html(term1) ;
 	$('#byTerm2').html(term2) ;
 	
-	var xmlInterpretations = $(response.children("Interpretations")) ;
-	var xmlInterpretation = $(xmlInterpretations.children()[0]) ;
+	var interpretation = data.response.disambiguationDetails.interpretations[0] ;
 	
-	if (xmlInterpretation.attr('id1') != undefined && xmlInterpretation.attr('id2')) {
+	if (interpretation != undefined) {
 	
-		$('#sense1').html("<a pageId='" + xmlInterpretation.attr('id1') + "' href='../search/?artId=" + xmlInterpretation.attr('id1') + "'>" + xmlInterpretation.attr('title1') + "</a>") ;
-		$('#sense2').html("<a pageId='" + xmlInterpretation.attr('id2') + "' href='../search/?artId=" + xmlInterpretation.attr('id2') + "'>" + xmlInterpretation.attr('title2') + "</a>") ;
+		$('#sense1').html("<a pageId='" + interpretation.id1 + "' href='../search/?artId=" + interpretation.id1 + "'>" + interpretation.title1 + "</a>") ;
+		$('#sense2').html("<a pageId='" + interpretation.id2 + "' href='../search/?artId=" + interpretation.id2 + "'>" + interpretation.title2 + "</a>") ;
 	
 		wm_addDefinitionTooltipsToAllLinks($('#sense1')) ;
 		wm_addDefinitionTooltipsToAllLinks($('#sense2')) ;
@@ -172,8 +173,8 @@ function processRelatednessResponse(response) {
 		$('#noSenses').show() ;
 	}
 	
-	var candidates1 = Number(xmlInterpretations.attr("term1Candidates")) ;
-	var candidates2 = Number(xmlInterpretations.attr("term2Candidates")) ;
+	var candidates1 = Number(data.response.disambiguationDetails.term1Candidates) ;
+	var candidates2 = Number(data.response.disambiguationDetails.term2Candidates) ;
 	
 	if (candidates1 == 2)
 		$('#alternatives1').html("there is <a href='../search/?query=" + term1 + "'>1 other sense</a> for this term.") ;
@@ -191,19 +192,17 @@ function processRelatednessResponse(response) {
 		
 		
 	
-	var sortedConnections = $(response).find("Connection").get().sort(function(a,b) {
-		var valA = $(a).attr("title") ;
-		var valB = $(b).attr("title") ;
+	var sortedConnections = data.response.connections.sort(function(a,b) {
+		var valA = a.title ;
+		var valB = b.title ;
 		
 		return valA < valB ? -1 : valA == valB? 0 : 1 ;
 	}) ;
 	
 	if (sortedConnections.length > 0) {
-		$.each(sortedConnections, function() {
-			var xmlConnection = $(this) ;
-			
-			var connection = $("<a pageId='" + xmlConnection.attr('id') + "' href='../search/?artId=" + xmlConnection.attr('id') + "'>" + xmlConnection.attr('title') + "</a>") ;
-			var weight = (Number(xmlConnection.attr('relatedness1')) + Number(xmlConnection.attr('relatedness2'))) / 2 ;
+		$.each(sortedConnections, function() {		
+			var connection = $("<a pageId='" + this.id + "' href='../search/?artId=" + this.id + "'>" + this.title + "</a>") ;
+			var weight = (Number(this.relatedness1) + Number(this.relatedness2)) / 2 ;
 			connection.css('font-size', getFontSize(weight) + "px") ;
 			connection.css('color', getFontColor(weight)) ;
 			
@@ -218,13 +217,12 @@ function processRelatednessResponse(response) {
 		$('#noConnections').show() ;
 	}
 	
-	var snippets = response.find("Snippet") ;
+	var snippets = data.response.snippets ;
 	
 	if (snippets.length > 0) {
 		
-		$.each(response.find("Snippet"), function() {
-			var xmlSnippet = $(this) ;
-			var snippet = $("<ul class='snippet ui-corner-all'><p>" + xmlSnippet.text() + " </p> <p class='source'>from <a pageId='" + xmlSnippet.attr('sourceId') + "' href='../search/?artId=" + xmlSnippet.attr('sourceId') + "'>" + xmlSnippet.attr('sourceTitle') + "</a></ul>") ;
+		$.each(snippets, function() {
+			var snippet = $("<ul class='snippet ui-corner-all'><p>" + this.markup + " </p> <p class='source'>from <a pageId='" + this.sourceId + "' href='../search/?artId=" + this.sourceId + "'>" + this.sourceTitle + "</a></ul>") ;
 			$("#snippets").append(snippet) ;
 		}) ;
 	} else {

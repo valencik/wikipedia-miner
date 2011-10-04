@@ -13,7 +13,9 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.w3c.dom.Element;
+import org.simpleframework.xml.Attribute;
+import org.simpleframework.xml.Element;
+import org.simpleframework.xml.ElementList;
 import org.wikipedia.miner.annotation.Disambiguator;
 import org.wikipedia.miner.annotation.Topic;
 import org.wikipedia.miner.annotation.TopicDetector;
@@ -28,6 +30,8 @@ import org.wikipedia.miner.annotation.tagging.DocumentTagger.RepeatMode;
 import org.wikipedia.miner.annotation.weighting.LinkDetector;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.service.param.*;
+
+import com.google.gson.annotations.Expose;
 
 public class WikifyService extends Service {
 
@@ -129,16 +133,14 @@ public class WikifyService extends Service {
 		
 	}
 	
-
-	@Override
-	public Element buildWrappedResponse(HttpServletRequest request, Element xmlResponse) throws Exception {
+	
+	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		String source = prmSource.getValue(request) ;
-		if (source == null || source.trim().length() == 0){
-			return buildErrorResponse("You must specify a source document to wikify", xmlResponse) ;
-		}
+		if (source == null || source.trim().length() == 0)
+			return new ParameterMissingResponse() ;
 		
 		SourceMode sourceMode = prmSourceMode.getValue(request) ;
 		if (sourceMode == SourceMode.AUTO)
@@ -151,27 +153,17 @@ public class WikifyService extends Service {
 		for (Topic t:detectedTopics)
 			docScore = docScore + t.getRelatednessToOtherTopics() ;
 		
-		Element xmlWikifiedDoc = getHub().createCDATAElement("WikifiedDocument", wikifiedDoc) ;
-		xmlWikifiedDoc.setAttribute("sourceMode", sourceMode.toString()) ;
-		xmlWikifiedDoc.setAttribute("documentScore", getHub().format(docScore)) ;
-		xmlResponse.appendChild(xmlWikifiedDoc) ;
+		Response response = new Response(wikifiedDoc, sourceMode, docScore) ;
 		
-		Element xmlDetectedTopics = getHub().createElement("DetectedTopics") ;
 		float minProb = prmMinProb.getValue(request) ;
 		for (Topic dt:detectedTopics) {
 			
 			if (dt.getWeight() < minProb) break ;
-
-			Element detectedTopic = getHub().createElement("DetectedTopic") ;
-			detectedTopic.setAttribute("id", String.valueOf(dt.getId())) ;
-			detectedTopic.setAttribute("title", dt.getTitle()) ;
-			detectedTopic.setAttribute("weight", getHub().format(dt.getWeight())) ;
-
-			xmlDetectedTopics.appendChild(detectedTopic) ;
+			
+			response.addTopic(dt) ;
 		}
-		xmlResponse.appendChild(xmlDetectedTopics) ;
 		
-		return xmlResponse;
+		return response;
 	}
 	
 	public void buildUnwrappedResponse(HttpServletRequest request, HttpServletResponse response) throws Exception{
@@ -292,8 +284,11 @@ public class WikifyService extends Service {
 				if (style != null && style.trim().length() > 0) 
 					newHeaderStuff.append("<style type='text/css'> ." + linkClassName + "{" + style + ";}</style>\n") ;
 				
+				newHeaderStuff.append("<style type='text/css'> .qtip-content div, .qtip-content div p, .qtip-content div b {color:inherit;} </style>") ;
+				
 				
 				newHeaderStuff.append("<script type=\"text/javascript\" src=\"" + basePath + "/js/jquery-1.5.1.min.js\"></script>\n") ;
+				newHeaderStuff.append("<script type=\"text/javascript\" src=\"" + basePath + "/js/jquery.qtip-1.0.0-rc3.min.js\"></script>\n") ;
 				newHeaderStuff.append("<script type=\"text/javascript\" src=\"" + basePath + "/js/tooltips.js\"></script>\n") ;
 				newHeaderStuff.append("<script type=\"text/javascript\"> \n") ;
 				newHeaderStuff.append("  var wm_host=\"" + basePath + "\" ; \n") ;
@@ -427,6 +422,60 @@ public class WikifyService extends Service {
 			
 			tag.append("]]") ;
 			return tag.toString() ;
+		}
+	}
+	
+	private static class Response extends Service.Response {
+		
+		@Expose
+		@Element(data=true)	
+		private String wikifiedDocument ;
+
+		@Expose
+		@Attribute
+		private SourceMode sourceMode ;
+		
+		@Expose
+		@Attribute
+		private double documentScore ;
+		
+		@Expose
+		@ElementList(entry="detectedTopic")
+		private ArrayList<ResponseTopic> detectedTopics = new ArrayList<ResponseTopic>();
+		
+		public Response(String wikifiedDoc, SourceMode sourceMode, double documentScore) {
+			
+			this.wikifiedDocument = wikifiedDoc ;
+			this.sourceMode = sourceMode ;
+			this.documentScore = documentScore ;
+			
+			this.detectedTopics = new ArrayList<ResponseTopic>() ;
+		}
+		
+		public void addTopic(Topic t) {
+			this.detectedTopics.add(new ResponseTopic(t)) ;
+		}
+	}
+	
+	private static class ResponseTopic {
+		
+		@Expose
+		@Attribute
+		int id ;
+		
+		@Expose
+		@Attribute
+		String title ;
+		
+		@Expose
+		@Attribute
+		double weight ;
+		
+		public ResponseTopic(Topic t) {
+			
+			this.id = t.getId();
+			this.title = t.getTitle() ;
+			this.weight = t.getWeight();
 		}
 	}
 	

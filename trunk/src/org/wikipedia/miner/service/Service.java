@@ -1,7 +1,10 @@
 package org.wikipedia.miner.service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.text.DecimalFormat;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -14,42 +17,52 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.TransformerFactoryConfigurationError;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 
-import org.w3c.dom.Element;
+
+import org.simpleframework.xml.*;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.param.BooleanParameter;
-import org.wikipedia.miner.service.param.EnumParameter;
-import org.wikipedia.miner.service.param.IntListParameter;
-import org.wikipedia.miner.service.param.IntParameter;
-import org.wikipedia.miner.service.param.Parameter;
-import org.wikipedia.miner.service.param.ParameterGroup;
-import org.wikipedia.miner.service.param.StringArrayParameter;
-import org.wikipedia.miner.service.param.StringParameter;
+import org.wikipedia.miner.service.param.*;
+
+import com.google.gson.annotations.Expose;
+import com.google.gson.annotations.SerializedName;
 
 
 public abstract class Service extends HttpServlet {
 
-	public enum ResponseFormat {XML,DIRECT} ; 
+	public enum ResponseFormat {XML,JSON,DIRECT} ; 
 
 	private ServiceHub hub ;
 	
+	@Expose
+	@Attribute
 	private String groupName ;
+	
+	@Expose
+	@SerializedName(value="description")
+	@Attribute (name="description")
 	private String shortDescription ;
+	
+	@Expose
+	@SerializedName(value="details")
+	@Element(name="details", data=true)
 	private String detailsMarkup ;
 
+	@Expose
+	@ElementList
 	private Vector<ParameterGroup> parameterGroups ;
-	@SuppressWarnings("unchecked")
+	
+	@Expose
+	@ElementList
+	@SuppressWarnings("rawtypes")
 	private Vector<Parameter> globalParameters ;
-	@SuppressWarnings("unchecked")
+	
+	@Expose
+	@ElementList
+	@SuppressWarnings("rawtypes")
 	private Vector<Parameter> baseParameters ;
+	
+	@Expose
+	@ElementList
 	private Vector<Example> examples = new Vector<Example>() ;
 
 
@@ -60,12 +73,9 @@ public abstract class Service extends HttpServlet {
 	protected BooleanParameter prmHelp ;
 	protected StringArrayParameter prmWikipedia ;
 
-	private Transformer serializer ;
-
-
 	private DecimalFormat progressFormat = new DecimalFormat("#0%") ;
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings("rawtypes")
 	public Service(String groupName, String shortDescription, String detailsMarkup, boolean wikipediaSpecific, boolean supportsDirectResponse) {
 
 		//this.name = name ;
@@ -80,20 +90,7 @@ public abstract class Service extends HttpServlet {
 		this.supportsDirectResponse = supportsDirectResponse ;
 
 
-		try {
-			serializer = TransformerFactory.newInstance().newTransformer();
 
-			serializer.setOutputProperty(OutputKeys.INDENT, "yes");
-			serializer.setOutputProperty(OutputKeys.METHOD,"xml");
-			serializer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "3");
-
-		} catch (TransformerConfigurationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (TransformerFactoryConfigurationError e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 
 		
 	}
@@ -103,12 +100,9 @@ public abstract class Service extends HttpServlet {
 
 		hub = ServiceHub.getInstance(config.getServletContext()) ;
 
-		if (supportsDirectResponse) {
-			String[] descResponseFormat = {"in XML format", "directly, without any additional information such as request parameters. This format will not be valid for some services."} ;
-			prmResponseFormat = new EnumParameter<ResponseFormat>("responseFormat", "the format in which the response should be returned", ResponseFormat.XML, ResponseFormat.values(), descResponseFormat) ;
-			baseParameters.add(prmResponseFormat) ;
-		}
-
+		String[] descResponseFormat = {"in XML format", "in JSON format", "directly, without any additional information such as request parameters. This format will not be valid for some services."} ;
+		prmResponseFormat = new EnumParameter<ResponseFormat>("responseFormat", "the format in which the response should be returned", ResponseFormat.XML, ResponseFormat.values(), descResponseFormat) ;
+		baseParameters.add(prmResponseFormat) ;
 		
 		if (wikipediaSpecific) {
 			String[] valsWikipedia = getHub().getWikipediaNames() ;
@@ -159,79 +153,58 @@ public abstract class Service extends HttpServlet {
 
 	public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
 
+		
+		
 		try {
-
-			response.setHeader("Cache-Control", "no-cache"); 
-			response.setCharacterEncoding("UTF-8") ;
-
-			if (prmHelp.getValue(request)) {
-				response.setContentType("application/xml;charset=UTF-8");
-
-				serializer.transform(new DOMSource(getXmlDescription()), new StreamResult(response.getWriter()));
-				return ;
-			}
-
 			
+			ResponseFormat responseFormat = prmResponseFormat.getValue(request) ;
+			boolean requestingHelp = prmHelp.getValue(request) ;
 			
-			double loadProgress ;
-			
-			if (wikipediaSpecific) {
-				Wikipedia wikipedia = getWikipedia(request) ;
-				loadProgress= wikipedia.getEnvironment().getProgress() ;
-			} else {
-				loadProgress = 1 ;
-			}
-			
-			boolean usageExceeded = isUsageLimitExceeded(request) ;
-			
-			if (supportsDirectResponse) {
-				ResponseFormat responseFormat = prmResponseFormat.getValue(request) ;
-	
-				if (responseFormat == ResponseFormat.DIRECT) { 
-	
-					if (requiresWikipedia() && loadProgress < 1)
-						throw new ServletException("Wikipedia is not yet ready. Current progress is " + progressFormat.format(loadProgress)) ;
-	
-					if (usageExceeded)
-						throw new ServletException("You have exceeded your usage limits.") ;
+			if (!requestingHelp) {
+				
+				if (wikipediaSpecific) {
+					Wikipedia wikipedia = getWikipedia(request) ;
+					double loadProgress= wikipedia.getEnvironment().getProgress() ;
 					
-					try {
-						buildUnwrappedResponse(request, response) ;
-					} catch (Exception e) {
-						throw new ServletException(e) ;
-					}
-	
-					return ;
+					if (loadProgress < 1)
+						throw new ProgressException(loadProgress) ;
 				}
+				
+				if (isUsageLimitExceeded(request))
+					throw new UsageLimitException() ;
 			}
-
-			Element xmlRoot = getHub().createElement("WikipediaMiner") ;
-			xmlRoot.setAttribute("service", request.getServletPath()) ;
-			xmlRoot.appendChild(getXmlRequest(request)) ;
-
-			Element xmlResponse = getHub().createElement("Response") ;
-
-			if (requiresWikipedia() && loadProgress < 1) {
-				xmlResponse = buildErrorResponse("Wikipedia is not yet ready. Current progress is " + progressFormat.format(loadProgress), xmlResponse) ;
-			} else if (usageExceeded) {
-				xmlResponse = buildErrorResponse("Usage limits exceeded", xmlResponse) ;
-				xmlResponse = buildUsageResponse(request, xmlResponse) ;			
+			
+			if (responseFormat == ResponseFormat.DIRECT) {
+				buildUnwrappedResponse(request, response) ;
 			} else {
-				try {
-					xmlResponse = buildWrappedResponse(request, xmlResponse) ;
-				} catch (Exception e) {
-					throw new ServletException(e) ;
+				
+				Message msg = new Message(request) ;
+				
+				if (requestingHelp)
+					msg.response = new HelpResponse(this) ;
+				else 
+					msg.response = buildWrappedResponse(request) ;
+				
+				if (responseFormat == ResponseFormat.XML) {
+					response.setContentType("application/xml");
+					response.setHeader("Cache-Control", "no-cache"); 
+					response.setCharacterEncoding("UTF8") ;
+					
+					
+					getHub().getXmlSerializer().write(msg, System.out) ;
+					getHub().getXmlSerializer().write(msg, response.getWriter());
+				} else {
+					response.setContentType("application/json");
+					response.setHeader("Cache-Control", "no-cache"); 
+					response.setCharacterEncoding("UTF8") ;
+					
+					getHub().getJsonSerializer().toJson(msg, response.getWriter());
 				}
 			}
-
-			xmlRoot.appendChild(xmlResponse) ;
-
-			response.setContentType("application/xml");
-			response.setHeader("Cache-Control", "no-cache"); 
-			response.setCharacterEncoding("UTF8") ;
-
-			serializer.transform(new DOMSource(xmlRoot), new StreamResult(response.getWriter()));
-		} catch (TransformerException e) {
+			
+			response.getWriter().flush() ;
+			
+		} catch (Exception e) {
 			throw new ServletException(e) ;
 		}
 	}
@@ -242,7 +215,7 @@ public abstract class Service extends HttpServlet {
 	}
 
 
-	public abstract Element buildWrappedResponse(HttpServletRequest request, Element response) throws Exception;
+	public abstract Response buildWrappedResponse(HttpServletRequest request) throws Exception;
 
 	public void buildUnwrappedResponse(HttpServletRequest request, HttpServletResponse response) throws Exception{
 		throw new UnsupportedOperationException() ;
@@ -258,9 +231,13 @@ public abstract class Service extends HttpServlet {
 		if (client == null)
 			return false ;
 		
+		if (getUsageCost(request)==0)
+			return false ;
+		
 		return client.update(getUsageCost(request)) ; 
 	}
 	
+	/*
 	protected Element buildUsageResponse(HttpServletRequest request, Element xmlResponse) {
 		
 		Client client = getHub().identifyClient(request) ;
@@ -269,12 +246,13 @@ public abstract class Service extends HttpServlet {
 		xmlResponse.appendChild(client.getXML(hub)) ;
 		return xmlResponse ;
 		
-	}
+	}*/
 
 	public boolean requiresWikipedia() {
 		return wikipediaSpecific ;
 	}
 
+	/*
 	public Element buildErrorResponse(String message, Element response) {
 
 		response.setAttribute("error", message) ;
@@ -285,7 +263,7 @@ public abstract class Service extends HttpServlet {
 
 		response.setAttribute("warning", message) ;
 		return response ;
-	}
+	}*/
 	
 	
 
@@ -313,48 +291,12 @@ public abstract class Service extends HttpServlet {
 		return shortDescription ;
 	}
 
-	@SuppressWarnings("unchecked")
-	public Element getXmlDescription() {
-
-		Element xmlResponse = hub.createElement("Response") ;
-		
-		Element xmlDescription = hub.createElement("ServiceDescription") ;
-		xmlDescription.setAttribute("groupName", groupName) ;
-		xmlDescription.setAttribute("serviceName", getServletName()) ;
-		xmlDescription.setAttribute("description", shortDescription) ;
-		
-		
-		xmlDescription.appendChild(hub.createCDATAElement("Details", detailsMarkup)) ;
-		
-
-		for(ParameterGroup paramGroup:parameterGroups) 
-			xmlDescription.appendChild(paramGroup.getXmlDescription(hub)) ;
-
-		for (Parameter param:globalParameters) 
-			xmlDescription.appendChild(param.getXmlDescription(hub)) ;
-		
-		Element xmlBaseParams = hub.createElement("BaseParameters") ;
-		for (Parameter param:baseParameters)
-			xmlBaseParams.appendChild(param.getXmlDescription(hub)) ;
-		xmlDescription.appendChild(xmlBaseParams) ;
-
-		Element xmlExamples = hub.createElement("Examples") ;
-		for (Example example:examples) {
-			xmlExamples.appendChild(example.getXML()) ;
-		}
-		xmlDescription.appendChild(xmlExamples) ;
-		
-		
-		xmlResponse.appendChild(xmlDescription) ;
-		return xmlResponse ;
-	}
-
-
 	public void addParameterGroup(ParameterGroup paramGroup) {
 		parameterGroups.add(paramGroup) ;
 	}
 
-	@SuppressWarnings("unchecked")
+
+	@SuppressWarnings("rawtypes")
 	public void addGlobalParameter(Parameter param) {
 		globalParameters.add(param) ;
 	}
@@ -370,35 +312,30 @@ public abstract class Service extends HttpServlet {
 		return null ;
 	}
 
-	private Element getXmlRequest(HttpServletRequest request) {
 
-		Element xmlRequest = getHub().createElement("Request") ;
-
-		for (Enumeration<String> e = request.getParameterNames() ; e.hasMoreElements() ;) {
-			String paramName = e.nextElement() ;
-			xmlRequest.setAttribute(paramName, request.getParameter(paramName)) ;
-		}
-
-		return xmlRequest ;
-	}
-
-	private class Example {
+	private static class Example {
 		
+		@Expose
+		@Element(data=true)
 		private String description ;
-		private LinkedHashMap params ;
 		
-		public Example(String description, LinkedHashMap<String,String>params) {
+		@Expose
+		@ElementMap(attribute=true, entry="parameter", key="name")
+		private Map<String,String> parameters ;
+		
+		@Expose
+		@Attribute
+		private String url ;
+		
+		public Example(String description, LinkedHashMap<String,String>params, String servletName) {
 			this.description = description ;
-			this.params = params ;
-		}
-		
-		private String getUrl() {
+			this.parameters = params ;
+			
 			StringBuffer sb = new StringBuffer() ;
-			sb.append(getServletName()) ;
+			sb.append(servletName) ;
 			
 			int index = 0 ;
-			for (Object o:params.entrySet())  {
-				Map.Entry<String, String> e = (Map.Entry<String, String>)o ;
+			for (Map.Entry<String, String> e:parameters.entrySet())  {
 				
 				if (index == 0)
 					sb.append("?") ;
@@ -411,24 +348,8 @@ public abstract class Service extends HttpServlet {
 				
 				index++ ;
 			}
-			return sb.toString() ;
-		}
-		
-		private Element getXML() {
-			Element xml = getHub().createCDATAElement("Example", description) ;
-			xml.setAttribute("url", getUrl()) ;
 			
-			Element xmlParams = getHub().createElement("Parameters") ;
-			for (Object o:params.entrySet())  {
-				Map.Entry<String, String> e = (Map.Entry<String, String>)o ;
-				Element xmlParam = getHub().createElement("Parameter") ;
-				xmlParam.setAttribute("name", e.getKey()) ;
-				xmlParam.setAttribute("value", e.getValue()) ;
-				xmlParams.appendChild(xmlParam) ;
-			}
-			xml.appendChild(xmlParams) ;
-			
-			return xml ;
+			url = sb.toString() ;
 		}
 	}
 	
@@ -448,9 +369,99 @@ public abstract class Service extends HttpServlet {
 		}
 		
 		public Example build() {
-			return new Example(description, params) ;
+			return new Example(description, params, getServletName()) ;
 		}
 	
 	}
+	
+	private class ProgressException extends Exception {
+		private double _progress ;
+		
+		public ProgressException(double progress) {
+			super("Wikipedia is not yet ready. Current progress is " + progressFormat.format(progress)) ;
+			_progress = progress ;
+		}
+	}
+	
+	private class UsageLimitException extends Exception {
+		public UsageLimitException() {
+			super("You have exceeded your usage limits") ;
+		}
+	}
 
+	private static class Message {
+		
+		@Expose
+		@Attribute
+		private String service ;
+		
+		@Expose
+		@ElementMap(attribute=true, entry="param", key="name")
+		private HashMap<String, String> request = new HashMap<String,String>();
+		
+		@Expose
+		@Element
+		private Response response ;
+		
+		public Message(HttpServletRequest httpRequest) {
+			this.service = httpRequest.getServletPath() ;
+			
+			for (Enumeration<String> e = httpRequest.getParameterNames() ; e.hasMoreElements() ;) {
+				String paramName = e.nextElement() ;
+				request.put(paramName, httpRequest.getParameter(paramName)) ;
+			}
+		}
+	}
+	
+	protected static class Response {
+		
+	}
+	
+	private static class HelpResponse extends Response {
+		
+		@Expose
+		@SerializedName(value="serviceDescription")
+		@Element(name="serviceDescription")
+		private Service service ;
+		
+		public HelpResponse(Service service) {
+			this.service = service ;
+		}
+	}
+	
+	public static class ParameterMissingResponse extends Response {	
+		@Expose
+		@Attribute
+		private String error = "Parameters missing" ;
+	}
+	
+	public static class ErrorResponse extends Response {
+		
+		@Expose
+		@Attribute
+		private String error ;
+		
+		@Expose
+		@Element (required=false)
+		private String trace = null ;
+		
+		public ErrorResponse(String message) {
+			error = message ;
+		}
+		
+		public ErrorResponse(Exception e) {
+			error = e.getMessage() ;
+					
+			ByteArrayOutputStream writer1 = new ByteArrayOutputStream() ;
+			PrintWriter writer2 = new PrintWriter(writer1) ;
+			
+			e.printStackTrace(writer2) ;
+			
+			writer2.flush() ;
+			trace = writer1.toString() ;
+		}
+	}
+	
+	
+	
 }

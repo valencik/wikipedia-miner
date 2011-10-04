@@ -65,6 +65,8 @@ public class SnippetAnnotator {
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[0])) ;
 		conf.clearDatabasesToCache() ;
+		conf.setTopicDisambiguationModel(new File("temp/disambig.model")) ;
+		conf.setLinkDetectionModel(new File("temp/detect.model")) ;
 		
 		Wikipedia wikipedia = new Wikipedia(conf, false) ;
 		

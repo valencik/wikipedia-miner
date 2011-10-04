@@ -1,20 +1,28 @@
 package org.wikipedia.miner.service;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
 
 import org.apache.commons.lang.time.DateUtils;
-import org.w3c.dom.Element;
+import org.simpleframework.xml.*;
+
+import com.google.gson.annotations.Expose;
 
 public class Client {
+	
+	public enum Granularity {day,hour,minute} ;
 
-	
+	@Expose
+	@Attribute
 	private String _name ;
-	private String _password ;
 	
-	private HashMap<Integer, Usage> _usageByGranularity ;	
+	private String _password ;
+		
+	@Expose
+	@ElementList(inline=true)
+	private ArrayList<Usage> _usage ;
 	
 	private static SimpleDateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss") ;
 	
@@ -22,20 +30,20 @@ public class Client {
 		_name = name ;
 		_password = password ;
 		
-		_usageByGranularity = new HashMap<Integer, Usage>() ;
-		_usageByGranularity.put(Calendar.MINUTE, new Usage(Calendar.MINUTE, minLimit)) ;
-		_usageByGranularity.put(Calendar.HOUR, new Usage(Calendar.HOUR, hourLimit)) ;
-		_usageByGranularity.put(Calendar.DAY_OF_MONTH, new Usage(Calendar.DAY_OF_MONTH, dayLimit)) ;
+		_usage = new ArrayList<Usage>() ;
+		_usage.add(new Usage(Granularity.day, dayLimit)) ;
+		_usage.add(new Usage(Granularity.hour, hourLimit)) ;
+		_usage.add(new Usage(Granularity.minute, minLimit)) ;
 	}
 	
 	public Client(String name, String password, Client client) {
 		_name = name ;
 		_password = password ;
 		
-		_usageByGranularity = new HashMap<Integer, Usage>() ;
-		_usageByGranularity.put(Calendar.MINUTE, new Usage(Calendar.MINUTE, client.getMinuteUsage().getLimit())) ;
-		_usageByGranularity.put(Calendar.HOUR, new Usage(Calendar.HOUR, client.getHourUsage().getLimit())) ;
-		_usageByGranularity.put(Calendar.DAY_OF_MONTH, new Usage(Calendar.DAY_OF_MONTH, client.getDayUsage().getLimit())) ;
+		_usage = new ArrayList<Usage>() ;
+		_usage.add(new Usage(Granularity.day, client.getDayUsage().getLimit())) ;
+		_usage.add(new Usage(Granularity.hour, client.getHourUsage().getLimit())) ;
+		_usage.add(new Usage(Granularity.minute, client.getMinuteUsage().getLimit())) ;
 	}
 	
 	public String getName() {
@@ -54,7 +62,7 @@ public class Client {
 		
 		boolean limitExceeded = false ;
 		
-		for (Usage u:_usageByGranularity.values()) {
+		for (Usage u:_usage) {
 			
 			if (u.update(usageCost)) 
 				limitExceeded = true ;
@@ -64,68 +72,46 @@ public class Client {
 	}
 	
 	public Usage getMinuteUsage() {
-		return _usageByGranularity.get(Calendar.MINUTE) ;
+		return _usage.get(Granularity.minute.ordinal()) ;
 	}
 	
 	public Usage getHourUsage() {
-		return _usageByGranularity.get(Calendar.HOUR) ;
+		return _usage.get(Granularity.hour.ordinal()) ;
 	}
 	
 	public Usage getDayUsage() {
-		return _usageByGranularity.get(Calendar.DAY_OF_MONTH) ;
-	}
-	
-	public Element getXML(ServiceHub hub) {
-		
-		Element xml = hub.createElement("Client") ;
-		
-		xml.setAttribute("name", _name) ;
-		
-		for (Usage u:_usageByGranularity.values())
-			xml.appendChild(u.getXML(hub)) ;
-		
-		return xml ;
+		return _usage.get(Granularity.day.ordinal()) ;
 	}
 	
 	public class Usage {
 		
-		private int _granularity ;
+		@Expose
+		@Attribute(name="granularity") 
+		private Granularity _granularity ;
+		
+		@Expose
+		@Attribute(name="start") 
 		private Date _start ;
+		
+		@Expose
+		@Attribute(name="end")
 		private Date _end ;
+		
+		@Expose
+		@Attribute(name="unitCount") 
 		int _count ;
+		
+		@Expose
+		@Attribute(name="unitLimit")
 		int _limit ;
 		
-		public Usage(int granularity, int limit) {
+		public Usage(Granularity granularity, int limit) {
 			
 			_granularity = granularity ;
 			_count = 0 ;
 			setPeriod() ;
 			
 			_limit = limit ;
-		}
-		
-		public Element getXML(ServiceHub hub) {
-			
-			Element xml = hub.createElement("Usage") ;
-			
-			switch(_granularity) {
-			case Calendar.MINUTE :
-				xml.setAttribute("granularity", "minute") ;
-				break ;
-			case Calendar.HOUR :
-				xml.setAttribute("granularity", "hour") ;
-				break ;
-			case Calendar.DAY_OF_MONTH :
-				xml.setAttribute("granularity", "day") ;
-				break ;
-			}
-			
-			xml.setAttribute("unitLimit", String.valueOf(_limit)) ;
-			xml.setAttribute("unitsUsed", String.valueOf(_count)) ;
-			xml.setAttribute("start", df.format(_start)) ;
-			xml.setAttribute("end", df.format(_end)) ;
-			
-			return xml ;
 		}
 		
 		public Date getPeriodStart() {
@@ -148,22 +134,35 @@ public class Client {
 			return (_limit > 0 && _count > _limit) ;
 		}
 		
+		private int getGranularityInt() {
+			switch(_granularity) {
+			case day:
+				return Calendar.DAY_OF_MONTH ;
+			case hour:
+				return Calendar.HOUR ;
+			case minute:
+				return Calendar.MINUTE ;
+			}
+			
+			return -1 ;
+		}
+		
 		private void setPeriod() {
 			
 			_start = new Date() ;
 			_end = new Date() ;
 			
-			DateUtils.truncate(_start, _granularity) ;
-			DateUtils.truncate(_end, _granularity) ;
+			DateUtils.truncate(_start, getGranularityInt()) ;
+			DateUtils.truncate(_end, getGranularityInt()) ;
 			
 			switch(_granularity) {
-			case Calendar.MINUTE:
+			case minute:
 				_end = DateUtils.addMinutes(_end, 1) ;
 				break ;
-			case Calendar.HOUR:
+			case hour:
 				_end = DateUtils.addHours(_end, 1) ;
 				break ;
-			case Calendar.DAY_OF_MONTH:
+			case day:
 				_end = DateUtils.addDays(_end, 1) ;
 				break ;
 			}

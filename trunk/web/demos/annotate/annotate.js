@@ -87,10 +87,10 @@ function checkProgress() {
 	
 	$.get(
 		"../../services/getProgress",
+		{responseFormat:'JSON'},
 		function(data) {
 			
-			var xmlResponse = $(data).find("Response") ;
-			var progress = Number(xmlResponse.attr("progress")) ;
+			var progress = data.response.progress ;
 
 			if (progress >= 1) {
 				ready() ;
@@ -124,16 +124,17 @@ function ready() {
 		$("#results").show() ;
 		
 		
-		$.get(
+		$.post(
 			"../../services/wikify", 
 			{
 				source: source,
 				sourceMode: sourceMode,
 				repeatMode: repeatMode,
-				minProbability: minProbability
+				minProbability: minProbability,
+				responseFormat:'JSON'
 			},
 			function(data){
-				processAnnotationResponse($(data).find("Response")) ;
+				processAnnotationResponse(data) ;
 			}
 		);
 	} 
@@ -152,17 +153,17 @@ function hideOptions() {
 }
 
 
-function processAnnotationResponse(response) {
+function processAnnotationResponse(data) {
 	
-	var wikifiedDoc = response.find("WikifiedDocument") ;
+	var wikifiedDoc = data.response.wikifiedDocument ;
 	
-	var sourceMode = wikifiedDoc.attr('sourceMode') ;
+	var sourceMode = data.response.sourceMode ;
 	
 	var topicsByTitle = new Array() ;  
 	
-	var sortedTopics = $(response).find("DetectedTopic").get().sort(function(a,b) {
-		var valA = $(a).attr('title') ;
-		var valB = $(b).attr('title') ;
+	var sortedTopics = data.response.detectedTopics.sort(function(a,b) {
+		var valA = a.title ;
+		var valB = b.title ;
 		
 		return valA < valB ? -1 : valA == valB? 0 : 1 ;
 	}) ;
@@ -173,20 +174,19 @@ function processAnnotationResponse(response) {
 		var maxWeight = undefined ;
 		var minWeight = undefined ;
 		
-		for (var i=0 ; i<sortedTopics.length ; i++) {
-			var weight = Number($(sortedTopics[i]).attr('weight')) ;
+		$.each(sortedTopics, function() {
+			var weight = Number(this.weight) ;
 			
 			if (minWeight == undefined || weight < minWeight) minWeight = weight ;
 			if (maxWeight == undefined || weight > maxWeight) maxWeight = weight ;
 			
-			topicsByTitle[$(sortedTopics[i]).attr('title').toLowerCase()] = {id:$(sortedTopics[i]).attr("id"), weight:$(sortedTopics[i]).attr("weight")}  ;
-		}
+			topicsByTitle[this.title.toLowerCase()] = this  ;
+		}) ;
 		
 		$.each(sortedTopics, function() {
-			var xmlLink = $(this) ;
-			
-			var link = $("<a pageId='" + xmlLink.attr('id') + "' linkProb='" + xmlLink.attr('weight') + "' href='../search/?artId=" + xmlLink.attr('id') + "'>" + xmlLink.attr('title') + "</a>") ;
-			var weight = Number(xmlLink.attr('weight')) ;
+		
+			var link = $("<a pageId='" + this.id + "' linkProb='" + this.weight + "' href='../search/?artId=" + this.id + "'>" + this.title + "</a>") ;
+			var weight = Number(this.weight) ;
 			weight = normalize(weight, minWeight, maxWeight) ;
 			link.css('font-size', getFontSize(weight) + "px") ;
 			link.css('color', getFontColor(weight)) ;
@@ -205,7 +205,7 @@ function processAnnotationResponse(response) {
 		$('#tabs').tabs("remove", 1) ;
 		$('#tabs').tabs("remove", 1) ;
 
-		var origMarkup = wikifiedDoc.text() ;
+		var origMarkup = wikifiedDoc ;
 		var newMarkup = "" ;
 
 		var lastIndex = 0 ;
@@ -231,13 +231,13 @@ function processAnnotationResponse(response) {
 	} else {
 		$('#tabs').tabs("remove", 0) ;
 		
-		$('#renderedHtml').html(wikifiedDoc.text()) ;
+		$('#renderedHtml').html(wikifiedDoc) ;
 	
 		wm_addDefinitionTooltipsToAllLinks($('#renderedHtml')) ;
 		
 		//alert("blah!") ;
 		
-		var escapedHTML= wikifiedDoc.text() ;
+		var escapedHTML= wikifiedDoc ;
 	    escapedHTML = escapedHTML.replace(/</g, "&lt;");
 	    escapedHTML = escapedHTML.replace(/>/g, "&gt;");
 	    //remove additional attributes

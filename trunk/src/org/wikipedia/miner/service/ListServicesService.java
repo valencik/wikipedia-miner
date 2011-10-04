@@ -1,5 +1,6 @@
 package org.wikipedia.miner.service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -9,7 +10,13 @@ import java.util.Vector;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.simpleframework.xml.Attribute;
+import org.simpleframework.xml.ElementList;
+import org.simpleframework.xml.ElementMap;
 import org.w3c.dom.Element;
+
+import com.google.gson.annotations.Expose;
+import com.google.gson.annotations.SerializedName;
 
 public class ListServicesService extends Service{
 
@@ -44,10 +51,9 @@ public class ListServicesService extends Service{
 	}
 
 	@Override
-	public Element buildWrappedResponse(HttpServletRequest request,
-			Element response) throws Exception {
+	public Response buildWrappedResponse(HttpServletRequest request) throws Exception {
 
-		TreeMap<String, ServiceGroup> serviceGroups = new TreeMap<String, ServiceGroup>(groupNameComparator) ;
+		TreeMap<String, ServiceGroup> serviceGroupsByName = new TreeMap<String, ServiceGroup>(groupNameComparator) ;
 
 		for (String serviceName:getHub().getServiceNames()) {
 
@@ -55,46 +61,50 @@ public class ListServicesService extends Service{
 
 			String groupName = service.getGroupName() ;
 
-			ServiceGroup sg = serviceGroups.get(groupName) ;
+			ServiceGroup sg = serviceGroupsByName.get(groupName) ;
 
 			if (sg == null)
 				sg = new ServiceGroup(groupName) ;
 
-			sg.put(serviceName,service) ;
-			serviceGroups.put(groupName, sg) ;
+			sg.addService(serviceName, service) ;
+			serviceGroupsByName.put(groupName, sg) ;
 		}
-
-		for (ServiceGroup sg:serviceGroups.values()) 
-			response.appendChild(sg.getXml()) ;
-
-		return response ;
+		
+		ArrayList<ServiceGroup> serviceGroups = new ArrayList<ServiceGroup>() ;
+		serviceGroups.addAll(serviceGroupsByName.values()) ;
+		
+		return new Response(serviceGroups) ;
 	}
 
-
-
-	private class ServiceGroup extends TreeMap<String, Service>{
-
-		private static final long serialVersionUID = -2117255966208147633L;
+	private static class Response extends Service.Response {
 		
+		@Expose
+		@ElementList
+		ArrayList<ServiceGroup> serviceGroups ;
+		
+		public Response(ArrayList<ServiceGroup> serviceGroups) {
+			this.serviceGroups = serviceGroups ;
+		}
+	}
+
+	private static class ServiceGroup {
+
+		@Expose
+		@Attribute
 		private String name ;
+		
+		@Expose
+		@SerializedName(value="services") 
+		@ElementMap(inline=true, attribute=true, entry="service", key="name", data=true)
+		public TreeMap<String, String> serviceDescriptionsByName ;
 
 		public ServiceGroup(String name)  {
-			super() ;
 			this.name = name ;
+			this.serviceDescriptionsByName = new TreeMap<String,String>() ;
 		}
-
-		public Element getXml() {
-			Element xmlGroup = getHub().createElement("ServiceGroup") ;
-			xmlGroup.setAttribute("name", name) ;
-
-			for (Map.Entry<String,Service>e:entrySet()) {
-				Element xmlService = getHub().createElement("Service") ;
-				xmlService.setAttribute("name", e.getKey()) ;
-				xmlService.appendChild(getHub().createCDATAElement("Details", e.getValue().getShortDescription())) ;
-				xmlGroup.appendChild(xmlService) ;
-			}
-
-			return xmlGroup ;
+		
+		public void addService(String name, Service s) {
+			serviceDescriptionsByName.put(name, s.getShortDescription()) ;
 		}
 	}
 

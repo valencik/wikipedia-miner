@@ -12,7 +12,10 @@ import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
-import org.w3c.dom.Element;
+import org.simpleframework.xml.Attribute;
+import org.simpleframework.xml.Element;
+import org.simpleframework.xml.ElementList;
+import org.simpleframework.xml.Text;
 import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.comparison.ConnectionSnippet;
 import org.wikipedia.miner.comparison.ConnectionSnippetWeighter;
@@ -30,6 +33,8 @@ import org.wikipedia.miner.service.param.ParameterGroup;
 import org.wikipedia.miner.service.param.StringParameter;
 import org.wikipedia.miner.util.RelatednessCache;
 import org.wikipedia.miner.util.text.TextProcessor;
+
+import com.google.gson.annotations.Expose;
 
 
 /**
@@ -65,7 +70,7 @@ public class CompareService extends Service{
 	private IntListParameter prmIdList1 ;
 	private IntListParameter prmIdList2 ;
 	
-	private BooleanParameter prmInterpretations ;
+	private BooleanParameter prmDisambiguation ;
 	private BooleanParameter prmConnections ;
 	private BooleanParameter prmSnippets ;
 	private BooleanParameter prmTitles ;
@@ -103,8 +108,8 @@ public class CompareService extends Service{
 		grpTerms.addParameter(prmTerm1) ;
 		prmTerm2 = new StringParameter("term2", "The second of two terms (or phrases) to compare", null) ;
 		grpTerms.addParameter(prmTerm2) ;		
-		prmInterpretations = new BooleanParameter("interpretations", "if <b>true</b>, then the service will list different interpretations (combinations of senses for ambiguous terms) that were considered.", false) ;
-		grpTerms.addParameter(prmInterpretations) ;
+		prmDisambiguation = new BooleanParameter("disambiguationDetails", "if <b>true</b>, then the service will list different interpretations (combinations of senses for ambiguous terms) that were considered.", false) ;
+		grpTerms.addParameter(prmDisambiguation) ;
 		addParameterGroup(grpTerms) ;
 		
 		grpIds = new ParameterGroup(GroupName.idPair.name(), "To compare two (unambiguous) article ids") ;
@@ -158,7 +163,7 @@ public class CompareService extends Service{
 				new ExampleBuilder("To see full details of the same comparison").
 				addParam(prmTerm1, "kiwi").
 				addParam(prmTerm2, "takahe").
-				addParam(prmInterpretations, true).
+				addParam(prmDisambiguation, true).
 				addParam(prmConnections, true).
 				addParam(prmSnippets, true).
 				build()
@@ -180,30 +185,28 @@ public class CompareService extends Service{
 		//prmEscape = new BooleanParameter("escapeDefinition", "<true> if sentence snippets should be escaped, <em>false</em> if they are to be encoded directly", false) ;
 		//addGlobalParameter(prmEscape) ;
 	}
-
+	
+	
 	@Override
-	public Element buildWrappedResponse(HttpServletRequest request, Element xmlResponse) throws Exception {
+	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		TextProcessor tp = wikipedia.getEnvironment().getConfiguration().getDefaultTextProcessor() ;
 		
 		ParameterGroup grp = getSpecifiedParameterGroup(request) ;
 		
-		if (grp == null) {
-			xmlResponse.setAttribute("unspecifiedParameters", "true") ;
-			return xmlResponse ;
-		}
-			
+		if (grp == null) 
+			return new ParameterMissingResponse() ;
+		
+		Response response = null ;
+		
 		switch(GroupName.valueOf(grp.getName())) {
 		
 		case termPair :
 			
 			LabelComparer lblComparer = getHub().getLabelComparer(getWikipediaName(request)) ;
-			if (lblComparer == null) {
-				this.buildErrorResponse("term comparisons are not available with this wikipedia instance", xmlResponse) ;
-				return xmlResponse ;
-			}
-				
+			if (lblComparer == null) 
+				return new ErrorResponse("term comparisons are not available with this wikipedia instance") ;	
 			
 			String term1 = prmTerm1.getValue(request).trim() ;
 			String term2 = prmTerm2.getValue(request).trim() ;
@@ -211,71 +214,59 @@ public class CompareService extends Service{
 			Label label1 = new Label(wikipedia.getEnvironment(), term1, tp) ;
 			Label.Sense[] senses1 = label1.getSenses() ; 
 
-			if (senses1.length == 0) {
-				xmlResponse.setAttribute("unknownTerm", term1) ; 
-				return xmlResponse ;
-			}
+			if (senses1.length == 0) 
+				return new UnknownTermResponse(term1) ; 
 			
 			Label label2 = new Label(wikipedia.getEnvironment(), term2, tp) ;
 			Label.Sense[] senses2 = label2.getSenses() ; 
 
-			if (senses2.length == 0) {
-				xmlResponse.setAttribute("unknownTerm", term2) ; 
-				return xmlResponse ;
-			}
+			if (senses2.length == 0) 
+				return new UnknownTermResponse(term2) ; 
 			
 			LabelComparer.ComparisonDetails details = lblComparer.compare(label1, label2) ;
 			
-			xmlResponse.setAttribute("relatedness", getHub().format(details.getLabelRelatedness())) ;
-		
-			addInterpretations(xmlResponse, senses1, senses2, details, request) ;
+			response = new Response(details.getLabelRelatedness()) ;
+			
+			if (!prmDisambiguation.getValue(request)) 
+				response.addDisambiguationDetails(details) ;
 			
 			LabelComparer.SensePair bestInterpretation = details.getBestInterpretation() ;
 			if (bestInterpretation != null) 
-				addMutualLinksOrSnippets(xmlResponse, bestInterpretation.getSenseA(), bestInterpretation.getSenseB(), request, wikipedia) ;
-			else 
-				this.buildWarningResponse("Could not identify plausable senses for the given terms", xmlResponse) ;
+				response = addMutualLinksOrSnippets(response, bestInterpretation.getSenseA(), bestInterpretation.getSenseB(), request, wikipedia) ;
+			//else 
+			//	this.buildWarningResponse("Could not identify plausable senses for the given terms", xmlResponse) ;
 			
-			break ;
+			return response ;
 			
 		case idPair:
 			
 			ArticleComparer artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
-			if (artComparer == null) {
-				this.buildErrorResponse("article comparisons are not available with this wikipedia instance", xmlResponse) ;
-				return xmlResponse ;
-			}
+			if (artComparer == null) 
+				return new ErrorResponse("article comparisons are not available with this wikipedia instance") ;
 			
 			Article art1 = new Article(wikipedia.getEnvironment(), prmId1.getValue(request)) ;
-			if (!(art1.getType() == PageType.article || art1.getType() == PageType.disambiguation)) {
-				xmlResponse.setAttribute("unknownId", String.valueOf(prmId1.getValue(request))) ; 
-				return xmlResponse ;
-			}
+			if (!(art1.getType() == PageType.article || art1.getType() == PageType.disambiguation)) 
+				return new InvalidIdResponse(prmId1.getValue(request)) ; 
 
 			Article art2 = new Article(wikipedia.getEnvironment(), prmId2.getValue(request)) ;
-			if (!(art2.getType() == PageType.article || art2.getType() == PageType.disambiguation)) {
-				xmlResponse.setAttribute("unknownId", String.valueOf(prmId2.getValue(request))) ; 
-				return xmlResponse ;
-			}
+			if (!(art2.getType() == PageType.article || art2.getType() == PageType.disambiguation)) 
+				return new InvalidIdResponse(prmId2.getValue(request)) ; 
 			
-			xmlResponse.setAttribute("relatedness", getHub().format(artComparer.getRelatedness(art1, art2))) ;
 			
-			if (prmTitles.getValue(request)) {
-				xmlResponse.setAttribute("title1", art1.getTitle()) ;
-				xmlResponse.setAttribute("title2", art2.getTitle()) ;
-			}
+			response = new Response(artComparer.getRelatedness(art1, art2)) ;
 			
-			addMutualLinksOrSnippets(xmlResponse, art1, art2, request, wikipedia) ;
+			if (prmTitles.getValue(request)) 
+				response.setTitles(art1.getTitle(), art2.getTitle()) ;
+			
+			response = addMutualLinksOrSnippets(response, art1, art2, request, wikipedia) ;
 			break ;
 		case idLists :
 			
 			artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
-			if (artComparer == null) {
-				this.buildErrorResponse("article comparisons are not available with this wikipedia instance", xmlResponse) ;
-				return xmlResponse ;
-			}
+			if (artComparer == null) 
+				return new ErrorResponse("article comparisons are not available with this wikipedia instance") ;
 			
-			TreeSet<Integer> invalidIds = new TreeSet<Integer>() ;
+			response = new Response() ;
 			
 			//gather articles from ids1 ;
 			TreeSet<Article> articles1 = new TreeSet<Article>() ;
@@ -284,7 +275,7 @@ public class CompareService extends Service{
 					Article art = (Article)wikipedia.getPageById(id) ;
 					articles1.add(art) ;
 				} catch (Exception e) {
-					invalidIds.add(id) ;
+					response.addInvalidId(id) ;
 				}
 			}
 			
@@ -295,19 +286,8 @@ public class CompareService extends Service{
 					Article art = (Article)wikipedia.getPageById(id) ;
 					articles2.add(art) ;
 				} catch (Exception e) {
-					invalidIds.add(id) ;
+					response.addInvalidId(id) ;
 				}
-			}
-			
-			if (!invalidIds.isEmpty()) {
-				StringBuffer sb = new StringBuffer("Invalid ids: ") ;
-				
-				for (int id:invalidIds) {
-					sb.append(id) ;
-					sb.append(", ") ;
-				}
-				
-				xmlResponse = this.buildWarningResponse(sb.substring(0,sb.length()-2) + ".", xmlResponse) ;
 			}
 			
 			//if ids2 is not specified, then we want to compare each item in ids1 with every other one
@@ -315,8 +295,6 @@ public class CompareService extends Service{
 				articles2 = articles1 ;
 			
 			TLongHashSet doneKeys = new TLongHashSet() ;
-			
-			Element xmlMeasures = getHub().createElement("Measures") ;
 			
 			float minRelatedness = prmMinRelatedness.getValue(request) ;
 			boolean showTitles = prmTitles.getValue(request) ;
@@ -348,68 +326,22 @@ public class CompareService extends Service{
 					
 					double relatedness = artComparer.getRelatedness(a1, a2)  ;
 					
-					if (relatedness >= minRelatedness) {
-					
-						Element xmlMeasure = getHub().createElement("Measure") ;
-						xmlMeasure.setAttribute("lowId", String.valueOf(min.getId())) ;
-						xmlMeasure.setAttribute("highId", String.valueOf(max.getId())) ;
-						
-						if (showTitles) {
-							xmlMeasure.setAttribute("lowTitle", min.getTitle()) ;
-							xmlMeasure.setAttribute("highTitle", max.getTitle()) ;
-						}
-						
-						xmlMeasure.appendChild(getHub().createTextNode(getHub().format(relatedness))) ;
-						
-						xmlMeasures.appendChild(xmlMeasure) ;
-					}
+					if (relatedness >= minRelatedness) 
+						response.addComparison(new Comparison(min, max, relatedness, showTitles)) ;
 					
 					doneKeys.add(key) ;
 				}
 			}
-			
-			xmlResponse.appendChild(xmlMeasures) ;
-			
 			break ;
 		}
-
-		return xmlResponse ;
-	}
-	
-	
-	private Element addInterpretations(Element response, Label.Sense[] senses1, Label.Sense[] senses2, LabelComparer.ComparisonDetails details, HttpServletRequest request) {
 		
-		if (!prmInterpretations.getValue(request)) 
+		if (response == null) 
+			return new ErrorResponse("nothing to do") ;
+		else		
 			return response ;
-		
-		Element xmlInterpretations = getHub().createElement("Interpretations") ;
-		xmlInterpretations.setAttribute("term1Candidates", String.valueOf(senses1.length)) ;
-		xmlInterpretations.setAttribute("term2Candidates", String.valueOf(senses2.length)) ;
-		
-		
-		for (LabelComparer.SensePair interpretation:details.getCandidateInterpretations()) {
-			
-			Element xmlInterpretation = getHub().createElement("Interpretation") ;
-			
-			xmlInterpretation.setAttribute("id1", String.valueOf(interpretation.getSenseA().getId())) ;
-			xmlInterpretation.setAttribute("title1", interpretation.getSenseA().getTitle()) ;
-			
-			xmlInterpretation.setAttribute("id2", String.valueOf(interpretation.getSenseB().getId())) ;
-			xmlInterpretation.setAttribute("title2", interpretation.getSenseB().getTitle()) ;
-			
-			xmlInterpretation.setAttribute("relatedness", getHub().format(interpretation.getSenseRelatedness())) ;
-			xmlInterpretation.setAttribute("disambiguationConfidence", getHub().format(interpretation.getDisambiguationConfidence())) ;
-			
-			xmlInterpretations.appendChild(xmlInterpretation) ;
-		}
-		
-		response.appendChild(xmlInterpretations) ;
-		return response ;
 	}
 	
-	
-	
-	private Element addMutualLinksOrSnippets(Element response, Article art1, Article art2, HttpServletRequest request, Wikipedia wikipedia) throws Exception {
+	private Response addMutualLinksOrSnippets(Response response, Article art1, Article art2, HttpServletRequest request, Wikipedia wikipedia) throws Exception {
 
 		boolean getConnections = prmConnections.getValue(request) ;
 		boolean getSnippets = prmSnippets.getValue(request) ;
@@ -462,36 +394,20 @@ public class CompareService extends Service{
 		
 		if (getConnections) {
 
-			Element xmlConnections = getHub().createElement("Connections");
-			response.appendChild(xmlConnections) ;
-
 			int c = 0 ;
 
 			for (Article connection:connections) {
 				if (c++ >= maxConsReturned) break ;
-
-				Element xmlCon = getHub().createElement("Connection");
-				xmlCon.setAttribute("title", connection.getTitle()) ;
-				xmlCon.setAttribute("id", String.valueOf(connection.getId())) ;
-				xmlCon.setAttribute("relatedness1", getHub().format(rc.getRelatedness(connection, art1))) ;
-				xmlCon.setAttribute("relatedness2", getHub().format(rc.getRelatedness(connection, art2))) ;
-				xmlConnections.appendChild(xmlCon) ;
+				response.addConnection(new Connection(connection, rc.getRelatedness(connection, art1), rc.getRelatedness(connection, art2))) ;
 			}
-			
-			response.appendChild(xmlConnections) ;
 		}
 
 		if (getSnippets) {
 
-			Element xmlSnippets = getHub().createElement("Snippets");
-			response.appendChild(xmlSnippets) ;
-
 			int snippetsCollected=0 ;
 			int maxSnippetsConsidered = prmMaxSnippetsConsidered.getValue(request) ;
-			
-			
+						
 			//gather and weight snippets
-			
 			ConnectionSnippetWeighter snippetWeighter = getHub().getConnectionSnippetWeighter(getWikipediaName(request)) ;
 			
 			TreeSet<ConnectionSnippet> snippets = new TreeSet<ConnectionSnippet>() ;
@@ -539,21 +455,13 @@ public class CompareService extends Service{
 				if (snippetsReturned > maxSnippetsReturned)
 					break ;
 				
-				String sentence = snippet.getPlainText() ;
-				sentence = emphasizePatternMatches(sentence, labelPattern) ;
-				sentence = getHub().getFormatter().format(sentence, request, wikipedia) ;
-
-				Element xmlSnippet = getHub().createCDATAElement("Snippet", sentence);
-				xmlSnippet.setAttribute("sourceId", String.valueOf(snippet.getSource().getId())) ;
-				xmlSnippet.setAttribute("sourceTitle", snippet.getSource().getTitle()) ;
-				xmlSnippet.setAttribute("sentenceIndex", String.valueOf(snippet.getSentenceIndex())) ;
-				xmlSnippet.setAttribute("weight", getHub().format(snippet.getWeight())) ;
+				String formattedMarkup = snippet.getPlainText() ;
+				formattedMarkup = emphasizePatternMatches(formattedMarkup, labelPattern) ;
+				formattedMarkup = getHub().getFormatter().format(formattedMarkup, request, wikipedia) ;
 				
-				xmlSnippets.appendChild(xmlSnippet) ;
+				response.addSnippet(new Snippet(snippet, formattedMarkup)) ;
 				snippetsCollected ++ ;
 			}
-
-			response.appendChild(xmlSnippets) ;
 		}
 
 		return response ;
@@ -603,5 +511,267 @@ public class CompareService extends Service{
 		labelRegex.append(")(?=\\W)") ;
 		
 		return Pattern.compile(labelRegex.toString(), Pattern.CASE_INSENSITIVE) ;
+	}
+	
+	
+	protected static class UnknownTermResponse extends Service.Response {
+		
+		@Expose
+		@Attribute
+		String unknownTerm ;
+		
+		public UnknownTermResponse(String term) {
+			unknownTerm = term ;
+		}
+	}
+	
+	protected static class InvalidIdResponse extends Service.Response {
+		
+		@Expose
+		@Attribute
+		int invalidId ;
+		
+		public InvalidIdResponse(int id) {
+			invalidId = id ;
+		}
+	}
+
+	private static class Response extends Service.Response {
+		
+		@Expose
+		@Attribute(required=false)
+		private Double relatedness ;
+		
+		@Expose
+		@Attribute(required=false)
+		private String title1 ;
+		
+		@Expose
+		@Attribute(required=false)
+		private String title2 ;
+		
+		@Expose
+		@Element(required=false)
+		private DisambiguationDetails disambiguationDetails ;
+		
+		@Expose
+		@ElementList(required=false, entry="connection")
+		private ArrayList<Connection> connections ;
+		
+		@Expose
+		@ElementList(required=false, entry="snippet")
+		private ArrayList<Snippet> snippets ;
+		
+		@Expose
+		@ElementList(required=false, entry="comparison")
+		private ArrayList<Comparison> comparisons ;
+		
+		@Expose
+		@ElementList(required=false, entry="invalidId")
+		private TreeSet<Integer> invalidIds ;
+		
+		public Response() {
+			this.relatedness = null ;
+		}
+		
+		public Response(double relatedness) {
+			this.relatedness = relatedness ;
+		}
+		
+		public void setTitles(String title1, String title2) {
+			this.title1 = title1 ;
+			this.title2 = title2 ;
+		}
+		
+		public void addDisambiguationDetails(LabelComparer.ComparisonDetails details) {
+			disambiguationDetails = new DisambiguationDetails(details) ;			
+		}
+		
+		public void addConnection(Connection c) {
+			if (connections == null)
+				connections = new ArrayList<Connection>() ;
+			
+			connections.add(c) ;
+		}
+		
+		public void addSnippet(Snippet s) {
+			if (snippets == null)
+				snippets = new ArrayList<Snippet>() ;
+			
+			snippets.add(s) ;
+		}
+		
+		public void addComparison(Comparison c) {
+			if (comparisons == null)
+				comparisons = new ArrayList<Comparison>() ;
+			
+			comparisons.add(c) ;
+		}
+		
+		public void addInvalidId(Integer id) {
+			if (invalidIds == null)
+				invalidIds = new TreeSet<Integer>() ;
+			
+			invalidIds.add(id) ;
+		}
+	}
+	
+	private static class DisambiguationDetails  {
+		
+		@Expose
+		@Attribute
+		private int term1Candidates ;
+		
+		@Expose
+		@Attribute
+		private int term2Candidates ;
+		
+		@Expose
+		@ElementList(inline=true) 
+		ArrayList<Interpretation> interpretations ;
+		
+		public DisambiguationDetails(LabelComparer.ComparisonDetails details) {
+			
+			term1Candidates = details.getLabelA().getSenses().length ;
+			term2Candidates = details.getLabelB().getSenses().length ;
+			
+			interpretations = new ArrayList<Interpretation>() ;
+			for (LabelComparer.SensePair sp: details.getCandidateInterpretations()) {
+				interpretations.add(new Interpretation(sp)) ;
+			}
+		}
+		
+	}
+	
+	private static class Interpretation {
+		
+		@Expose
+		@Attribute
+		private int id1 ;
+		
+		@Expose
+		@Attribute
+		private int id2 ;
+		
+		@Expose
+		@Attribute
+		private String title1 ;
+		
+		@Expose
+		@Attribute
+		private String title2 ;
+		
+		@Expose
+		@Attribute
+		private double relatedness ;
+		
+		@Expose
+		@Attribute
+		private double disambiguationConfidence ;
+		
+		public Interpretation(LabelComparer.SensePair sensePair) {
+			id1 = sensePair.getSenseA().getId() ;
+			title1 = sensePair.getSenseA().getTitle() ;
+			
+			id2=sensePair.getSenseB().getId() ;
+			title2=sensePair.getSenseB().getTitle() ;
+			
+			relatedness=sensePair.getSenseRelatedness() ;
+			disambiguationConfidence=sensePair.getDisambiguationConfidence() ;
+		}
+	}
+	
+	private static class Comparison {
+		
+		@Expose
+		@Attribute
+		private int lowId ;
+		
+		@Expose
+		@Attribute(required=false)
+		private String lowTitle ;
+		
+		@Expose
+		@Attribute
+		private int highId ;
+		
+		@Expose
+		@Attribute(required=false)
+		private String highTitle ;
+		
+		@Expose
+		@Attribute
+		private double relatedness ;
+		
+		public Comparison(Article lowArt, Article highArt, double relatedness, boolean showTitles) {
+			this.lowId = lowArt.getId() ;
+			this.highId = highArt.getId() ;
+			
+			if (showTitles) {
+				lowTitle = lowArt.getTitle();
+				highTitle = highArt.getTitle();
+			}
+			
+			this.relatedness = relatedness ;
+		}
+	}
+	
+	private static class Snippet {
+		
+		@Expose
+		@Attribute
+		private int sourceId ;
+		
+		@Expose
+		@Attribute
+		private String sourceTitle ;
+		
+		@Expose
+		@Text(data=true)
+		private String markup ;
+		
+		@Expose
+		@Attribute
+		private double weight ;
+		
+		@Expose
+		@Attribute
+		private int sentenceIndex ;
+		
+		public Snippet(ConnectionSnippet cs, String markup) {
+			this.sourceId = cs.getSource().getId();
+			this.sourceTitle = cs.getSource().getTitle();
+			this.weight = cs.getWeight() ;
+			this.sentenceIndex = cs.getSentenceIndex() ;
+			
+			this.markup = markup ;
+		}
+	}
+	
+	private static class Connection {
+		
+		@Expose
+		@Attribute
+		private int id ;
+		
+		@Expose
+		@Attribute
+		private String title ;
+		
+		@Expose
+		@Attribute
+		private double relatedness1 ;
+		
+		@Expose
+		@Attribute
+		private double relatedness2 ;
+		
+		public Connection(Article art, double relatedness1, double relatedness2) {
+			this.id = art.getId() ;
+			this.title = art.getTitle() ;
+			
+			this.relatedness1 = relatedness1 ;
+			this.relatedness2 = relatedness2 ;
+		}
 	}
 }
