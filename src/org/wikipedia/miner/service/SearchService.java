@@ -3,22 +3,28 @@ package org.wikipedia.miner.service;
 import gnu.trove.TIntFloatHashMap;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
-import org.w3c.dom.Element;
+import org.simpleframework.xml.Attribute;
+import org.simpleframework.xml.ElementList;
 import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.Service.ExampleBuilder;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.StringParameter;
 import org.wikipedia.miner.util.Position;
 import org.wikipedia.miner.util.RelatednessCache;
+
+import com.google.gson.annotations.Expose;
 
 /**
  * 
@@ -31,18 +37,12 @@ public class SearchService extends Service {
 
 	private static final long serialVersionUID = 5011451347638265017L;
 
-
-
 	//Pattern topicPattern = Pattern.compile("\\[\\[(\\d+)\\|(.*?)\\]\\]") ;
 	Pattern quotePattern = Pattern.compile("\".*?\"");
-
-
 
 	private StringParameter prmQuery ;
 	private BooleanParameter prmComplex ;
 	private FloatParameter prmMinPriorProb ;
-	
-
 
 	public SearchService() {
 		super("core","Lists the senses (wikipedia articles) of terms and phrases",
@@ -54,9 +54,12 @@ public class SearchService extends Service {
 				"<p>For queries that contain multiple terms, the senses of each term will be compared against each other to disambiguate them. This " +
 				"provides the weight attribute, which is larger for senses that are likely to be the correct interpretation of the query.</p>",
 				true, false);
+	}
+	
+	@Override
+	public void init(ServletConfig config) throws ServletException {
+		super.init(config);
 		
-		// TODO Auto-generated constructor stub
-
 		prmQuery = new StringParameter("query", "Your query", null) ;
 		addGlobalParameter(prmQuery) ;
 
@@ -80,29 +83,20 @@ public class SearchService extends Service {
 		) ;
 	}
 
-
-
-	@Override
-	public Element buildWrappedResponse(HttpServletRequest request,
-			Element xmlResponse) throws Exception {
+	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
 
 		String query = prmQuery.getValue(request) ;
-		if (query == null) {
-			xmlResponse.setAttribute("unspecifiedParameters", "true") ;
-			return xmlResponse ;
-		}
+		if (query == null) 
+			return new ParameterMissingResponse() ;
 
 		if (prmComplex.getValue(request))
-			return resolveComplexQuery(query, request, xmlResponse) ;
+			return resolveComplexQuery(query, request) ;
 		else
-			return resolveSimpleQuery(query, request, xmlResponse) ;
+			return resolveSimpleQuery(query, request) ;
 
 	}
 
-
-
-
-	public Element resolveSimpleQuery(String query, HttpServletRequest request, Element xmlResponse) {
+	public Service.Response resolveSimpleQuery(String query, HttpServletRequest request) {
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
@@ -110,7 +104,7 @@ public class SearchService extends Service {
 		query = query.replaceAll("[\\W]*$", "") ;
 
 		Label label = new Label(wikipedia.getEnvironment(), query, wikipedia.getConfig().getDefaultTextProcessor()) ;
-		Element xmlLabel = createXML(label) ;
+		ResponseLabel rLabel = new ResponseLabel(label) ;
 
 		float minPriorProb = prmMinPriorProb.getValue(request) ;
 		for (Label.Sense sense:label.getSenses()) {
@@ -118,30 +112,28 @@ public class SearchService extends Service {
 			if (sense.getPriorProbability() < minPriorProb) 
 				break ;
 
-			Element xmlSense = createXML(sense) ;
-			xmlLabel.appendChild(xmlSense) ;
-
+			rLabel.addSense(new ResponseSense(sense)) ;
 		}
 
-		xmlResponse.appendChild(xmlLabel) ;
-
-		return xmlResponse ;
+		Response response = new Response() ;
+		response.addLabel(rLabel) ;
+		
+		return response ;
 	}
 
-
-	public Element resolveComplexQuery(String query, HttpServletRequest request, Element xmlResponse) throws Exception {
+	public Service.Response resolveComplexQuery(String query, HttpServletRequest request) throws Exception {
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		ArticleComparer artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
-		if (artComparer == null) {
-			this.buildErrorResponse("article comparisons are not available with this wikipedia instance", xmlResponse) ;
-			return xmlResponse ;
-		}
-		
+		if (artComparer == null)
+			return new ErrorResponse("article comparisons are not available with this wikipedia instance") ;
+
 		ExhaustiveDisambiguator disambiguator = new ExhaustiveDisambiguator(artComparer) ;
 
 		float minPriorProb = prmMinPriorProb.getValue(request) ;
+		
+		Response response = new Response() ;
 		
 		//resolve query
 		ArrayList<QueryLabel> queryLabels = getReferences(query, wikipedia) ;	
@@ -150,25 +142,24 @@ public class SearchService extends Service {
 
 		for (QueryLabel queryLabel:queryLabels) {
 
-			Element xmlLabel = createXML(queryLabel);
-			xmlLabel.setAttribute("isStopword", String.valueOf(queryLabel.isStopword)) ;
-			xmlLabel.setAttribute("start", String.valueOf(queryLabel.getPosition().getStart())) ;
-			xmlLabel.setAttribute("end", String.valueOf(queryLabel.getPosition().getEnd())) ;
-
+			ResponseLabel rLabel = new ResponseLabel(queryLabel);
+		
 			for (Label.Sense sense:queryLabel.getSenses()) {
 
 				if (sense.getPriorProbability() < minPriorProb) 
 					break ;
 				
-				Element xmlSense = createXML(sense);
-				xmlSense.setAttribute("weight", getHub().format(disambiguator.getSenseWeight(sense.getId()))) ;
-				xmlLabel.appendChild(xmlSense) ;
+				ResponseSense rSense = new ResponseSense(sense);
+				rSense.setWeight(disambiguator.getSenseWeight(sense.getId())) ;
+				rLabel.addSense(rSense) ;
 			}
 			
-			xmlResponse.appendChild(xmlLabel) ;
+			rLabel.sortSensesByWeight() ;
+			
+			response.addLabel(rLabel) ;
 		}
 
-		return xmlResponse;
+		return response;
 	}
 
 
@@ -178,39 +169,6 @@ public class SearchService extends Service {
 
 
 
-
-
-
-
-
-
-	private Element createXML(Label label) {
-
-		Element xmlLabel = getHub().createElement("Label") ;
-		xmlLabel.setAttribute("text", label.getText()) ;
-
-		xmlLabel.setAttribute("linkDocCount", String.valueOf(label.getLinkDocCount())) ;
-		xmlLabel.setAttribute("linkOccCount", String.valueOf(label.getLinkOccCount())) ;
-		xmlLabel.setAttribute("docCount", String.valueOf(label.getDocCount())) ;
-		xmlLabel.setAttribute("occCount", String.valueOf(label.getOccCount())) ;
-		xmlLabel.setAttribute("linkProbability", String.valueOf(label.getLinkProbability())) ;
-
-		return xmlLabel ;
-	}
-
-	private Element createXML(Label.Sense sense) {
-
-		Element xmlSense = getHub().createElement("Sense") ;
-		xmlSense.setAttribute("id", String.valueOf(sense.getId())) ;
-		xmlSense.setAttribute("title", sense.getTitle()) ;
-		xmlSense.setAttribute("linkDocCount", String.valueOf(sense.getLinkDocCount())) ;
-		xmlSense.setAttribute("linkOccCount", String.valueOf(sense.getLinkOccCount())) ;
-		xmlSense.setAttribute("priorProbability", getHub().format(sense.getPriorProbability())) ;
-		xmlSense.setAttribute("fromTitle", String.valueOf(sense.isFromTitle())) ;
-		xmlSense.setAttribute("fromRedirect", String.valueOf(sense.isFromTitle())) ;
-
-		return xmlSense ;
-	}
 
 
 
@@ -489,21 +447,167 @@ public class SearchService extends Service {
 		}
 	}
 
+	private static class Response extends Service.Response {
+		
+		@Expose
+		@ElementList(entry="label", inline=true)
+		private ArrayList<ResponseLabel> labels = new ArrayList<ResponseLabel>() ;
+		
+		public void addLabel(ResponseLabel lbl) {
+			labels.add(lbl) ;
+		}
+		
+	}
+
+	private static class ResponseLabel {
+		
+		@Expose
+		@Attribute
+		private String text ;
+		
+		@Expose
+		@Attribute
+		private long linkDocCount ;
+		
+		@Expose
+		@Attribute
+		private long linkOccCount ;
+		
+		@Expose
+		@Attribute
+		private long docCount ;
+		
+		@Expose
+		@Attribute
+		private long occCount ;
+		
+		@Expose
+		@Attribute
+		private double linkProbability ;
+		
+		@Expose
+		@Attribute(required = false)
+		private Boolean isStopword ;
+		
+		@Expose
+		@Attribute(required = false)
+		private Integer start ;
+		
+		@Expose
+		@Attribute(required = false)
+		private Integer end ;	
+		
+		@Expose
+		@ElementList(entry="sense")
+		private ArrayList<ResponseSense> senses ;
+		
+		public ResponseLabel(Label lbl) {
+			
+			text = lbl.getText() ;
+			linkDocCount = lbl.getLinkDocCount() ;
+			linkOccCount = lbl.getLinkOccCount() ;
+			docCount = lbl.getDocCount() ;
+			occCount = lbl.getOccCount() ;
+			linkProbability = lbl.getLinkProbability() ;
+			
+			senses = new ArrayList<ResponseSense>() ;
+		}
+		
+		public ResponseLabel(QueryLabel lbl) {
+			
+			text = lbl.getText() ;
+			linkDocCount = lbl.getLinkDocCount() ;
+			linkOccCount = lbl.getLinkOccCount() ;
+			docCount = lbl.getDocCount() ;
+			occCount = lbl.getOccCount() ;
+			linkProbability = lbl.getLinkProbability() ;
+			
+			this.isStopword = lbl.isStopword ;
+			this.start = lbl.position.getStart() ;
+			this.end = lbl.position.getEnd() ;
+			
+			senses = new ArrayList<ResponseSense>() ;
+		}
+		
+		public void addSense(ResponseSense s) {
+			senses.add(s) ;
+		}
+		
+		public void sortSensesByWeight() {
+			
+			Collections.sort(senses, new Comparator<ResponseSense>() {
+
+				@Override
+				public int compare(ResponseSense s1, ResponseSense s2) {
+					
+					int cmp = 0 ;
+					
+					if (s1.weight != null && s2.weight != null)
+						cmp = s2.weight.compareTo(s1.weight) ;
+					
+					if (cmp!=0)	return cmp ;
+					
+					cmp = s2.priorProbability.compareTo(s1.priorProbability) ;
+					
+					if (cmp!=0) return cmp ;
+					
+					return s1.id.compareTo(s2.id);
+				}
+				
+			}) ;
+			
+		}
+	}
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	private static class ResponseSense {
+		
+		@Expose
+		@Attribute
+		private Integer id ;
+		
+		@Expose
+		@Attribute
+		private String title ;
+		
+		@Expose
+		@Attribute
+		private long linkDocCount ;
+		
+		@Expose
+		@Attribute
+		private long linkOccCount ;
+		
+		@Expose
+		@Attribute
+		private Double priorProbability ;
+		
+		@Expose
+		@Attribute
+		boolean fromTitle ;
+		
+		@Expose
+		@Attribute
+		boolean fromRedirect ;
+		
+		@Expose
+		@Attribute
+		Double weight ;
+		
+		public ResponseSense(Label.Sense sense) {
+		
+			id = sense.getId() ;
+			title = sense.getTitle() ;
+			linkDocCount = sense.getLinkDocCount() ;
+			linkOccCount = sense.getLinkOccCount() ;
+			priorProbability = sense.getPriorProbability() ;
+			fromTitle = sense.isFromTitle() ;
+			fromRedirect = sense.isFromTitle() ;
+		}
+		
+		public void setWeight(double weight) {
+			this.weight = weight ;
+		}
+		
+	}
 }

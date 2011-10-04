@@ -2,43 +2,34 @@ package org.wikipedia.miner.service.param;
 
 import java.util.HashMap;
 import javax.servlet.http.HttpServletRequest;
+
+import org.simpleframework.xml.ElementMap;
 import org.w3c.dom.Element;
 import org.wikipedia.miner.service.ServiceHub;
+
+import com.google.gson.annotations.Expose;
+import com.google.gson.annotations.SerializedName;
 
 public class StringArrayParameter extends Parameter<String> {
 
 	
 	private String[] values ;
-	private String[] valueDescriptions ;
 	private HashMap<String, String> valuesByNormalizedValue ;
 	
 	public StringArrayParameter(String name, String description, String defaultValue, String[] allValues, String[] valueDescriptions) {
 		super(name, description, defaultValue, "enum");
 		
 		valuesByNormalizedValue = new HashMap<String, String>() ;
-		for (String val:allValues) {
-			valuesByNormalizedValue.put(normalizeValue(val), val) ;
+		valueDescriptionsByName = new HashMap<String,String>() ;
+		for (int i=0 ; i<allValues.length ; i++) {
+			String normVal = normalizeValue(allValues[i]) ;
+			valuesByNormalizedValue.put(normVal, allValues[i]) ;
+			valueDescriptionsByName.put(normVal, valueDescriptions[i]) ;
 		}
 		
 		this.values = allValues ;
-		this.valueDescriptions = valueDescriptions ;
 	}
 	
-	@Override
-	public Element getXmlDescription(ServiceHub hub) {
-		Element xml = super.getXmlDescription(hub) ;
-		
-		for (int i=0 ; i<values.length ; i++) {
-			Element xmlVal = hub.createElement("PossibleValue") ;
-			xmlVal.setAttribute("name", values[i]) ;
-			xmlVal.setAttribute("description", valueDescriptions[i]) ;
-			
-			xml.appendChild(xmlVal) ;
-		}
-		
-		return xml ;
-	}
-
 	@Override
 	public String getValue(HttpServletRequest request) throws IllegalArgumentException {
 		

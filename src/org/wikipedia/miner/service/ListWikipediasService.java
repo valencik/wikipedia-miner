@@ -1,8 +1,12 @@
 package org.wikipedia.miner.service;
 
+import java.util.ArrayList;
+
 import javax.servlet.http.HttpServletRequest;
 
-import org.w3c.dom.Element;
+import org.simpleframework.xml.*;
+
+import com.google.gson.annotations.Expose;
 
 public class ListWikipediasService extends Service{
 
@@ -14,21 +18,48 @@ public class ListWikipediasService extends Service{
 	}
 
 	@Override
-	public Element buildWrappedResponse(HttpServletRequest request,
-			Element response) throws Exception {
+	public Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+		
+		Response response = new Response() ;
 		
 		for (String wikiName: getHub().getWikipediaNames()) {
-			
-			Element xmlWikipedia = getHub().createElement("Wikipedia") ;
-			xmlWikipedia.setAttribute("name", wikiName) ;
-			xmlWikipedia.setAttribute("description", getHub().getWikipediaDescription(wikiName)) ;
-			xmlWikipedia.setAttribute("isDefault", String.valueOf(wikiName.equals(getHub().getDefaultWikipediaName()))) ;
-			response.appendChild(xmlWikipedia) ;
+			String desc = getHub().getWikipediaDescription(wikiName) ;
+			boolean isDefault = wikiName.equals(getHub().getDefaultWikipediaName()) ;
+			response.addWikipedia(new Wikipedia(wikiName, desc, isDefault)) ;
 		}
 		
 		return response ;
 	}
 
+	public static class Response extends Service.Response {
+		
+		@Expose
+		@ElementList(inline=true)
+		private ArrayList<Wikipedia> wikipedias = new ArrayList<Wikipedia>() ;
+		
+		public void addWikipedia(Wikipedia w) {
+			wikipedias.add(w) ;
+		}
+	}
 	
-	
+	public static class Wikipedia {
+		
+		@Expose
+		@Attribute
+		private String name ;
+		
+		@Expose
+		@Attribute
+		private String description ;
+		
+		@Expose
+		@Attribute
+		private boolean isDefault ;
+		
+		public Wikipedia(String name, String description, boolean isDefault) {
+			this.name = name ;
+			this.description = description ;
+			this.isDefault = isDefault ;
+		}
+	}
 }

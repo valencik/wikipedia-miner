@@ -63,12 +63,11 @@ $(document).ready(function() {
 
 function checkProgress() {
 	
-	$.get(
+	$.getJSON(
 		"../../services/getProgress",
+		{responseFormat:'json'},
 		function(data) {
-			
-			var xmlResponse = $(data).find("Response") ;
-			var progress = Number(xmlResponse.attr("progress")) ;
+			var progress = data.response.progress ;
 
 			if (progress >= 1) {
 				ready() ;
@@ -126,10 +125,11 @@ function ready() {
 				inLinkMax: 100,
 				outLinks:true,
 				outLinkMax: 100,
-				linkRelatedness:true 
+				linkRelatedness:true,
+				responseFormat:'json'
 			},
 			function(data){
-				processArticleResponse($(data).find("Response")) ;
+				processArticleResponse(data.response) ;
 			}
 		);
 		
@@ -147,10 +147,11 @@ function ready() {
 		$.get(
 			"../../services/search", 
 			{
-				query: query, 
+				query: query,
+				responseFormat:'json'
 			},
 			function(data){
-				processSearchResponse($(data).find("Response")) ;
+				processSearchResponse(data.response) ;
 			}
 		);
 		
@@ -165,17 +166,18 @@ function processSearchResponse(response) {
 	$('#loading').hide() ;
 	
 	
-	var senses = response.find("Sense") ;
+	var label = response.labels[0] ;
+	var senses = label.senses ;	
 	
 	if (senses.length > 1) {
 		$('#senseDetails').show() ;
 		
 		$.each(senses, function() {
-			var xmlSense = $(this) ;
+			var sense = this ;
 			
-			var pp = Number(xmlSense.attr("priorProbability")) ;
+			var pp = Number(sense.priorProbability) ;
 			
-			var senseBox = $("<div class='senseBox' id='senseBox_" + xmlSense.attr('id') + "'></div>") ;
+			var senseBox = $("<div class='senseBox' id='senseBox_" + sense.id + "'></div>") ;
 			
 			var bar = $("<div class='bar'></div>") ;
 			bar.append("<div style='width:" + Math.floor(pp*50) + "px'></div>") ;
@@ -187,7 +189,7 @@ function processSearchResponse(response) {
 			
 			senseBox.append(bar) ;
 			
-			senseBox.append("<a class='title' href='?artId=" + xmlSense.attr('id') + "'>" + xmlSense.attr('title') + "</a>") ;
+			senseBox.append("<a class='title' href='?artId=" + sense.id + "'>" + sense.title + "</a>") ;
 			
 			
 			senseBox.append("<p class='definition'><img src='../images/loading.gif'></img></p>") ;
@@ -195,25 +197,22 @@ function processSearchResponse(response) {
 			$.get(
 				"../../services/exploreArticle", 
 				{
-					id: xmlSense.attr('id'), 
+					id: sense.id, 
 					definition:true,
-					linkFormat:'PLAIN'
+					linkFormat:'PLAIN',
+					responseFormat:'JSON'
 				},
 				function(data){
 					
-					var id = Number($(data).find("Request").attr("id")) ;
-					var definition = $(data).find("Definition") ;
+					var id = data.request.id ;
+					var definition = data.response.definition ;
 					
 					var senseBox = $('#senseBox_' + id)
 					
-					var definitionText = definition.text() ;
-					
-					if (definitionText == undefined || definitionText == "")
+					if (definition == undefined || definition == "")
 						senseBox.find('.definition').html("No definition could be found") ;
 					else
-						senseBox.find('.definition').html(definition.text()) ;
-					
-					
+						senseBox.find('.definition').html(definition) ;
 				}
 			);
 			
@@ -227,7 +226,7 @@ function processSearchResponse(response) {
 		$.get(
 			"../../services/exploreArticle", 
 			{
-				id: $(senses[0]).attr('id'),
+				id: senses[0].id,
 				definition: true,
 				definitionLength:'LONG',
 				linkFormat: 'WIKI_ID',
@@ -241,10 +240,11 @@ function processSearchResponse(response) {
 				inLinkMax: 100,
 				outLinks:true,
 				outLinkMax: 100,
-				linkRelatedness:true 
+				linkRelatedness:true,
+				responseFormat:'JSON'
 			},
 			function(data){
-				processArticleResponse($(data).find("Response")) ;
+				processArticleResponse(data.response) ;
 			}
 		);
 		
@@ -267,9 +267,9 @@ function processArticleResponse(response) {
 	
 
 	
-	$('#artTitle').html(response.attr("title")) ;
+	$('#artTitle').html(response.title) ;
 	
-	var origDefinition = response.find("Definition").text() ;
+	var origDefinition = response.definition ;
 	
 	if (origDefinition == undefined || origDefinition.length == 0)
 		origDefinition = "No definition avaialble" ;
@@ -297,9 +297,9 @@ function processArticleResponse(response) {
 	wm_addDefinitionTooltipsToAllLinks($('#artDefinition')) ;
 	
 	
-	var sortedLabels = $(response).find("Label").get().sort(function(a,b) {
-		var valA = $(a).text() ;
-		var valB = $(b).text() ;
+	var sortedLabels = response.labels.sort(function(a,b) {
+		var valA = a.text ;
+		var valB = b.text ;
 		
 		return valA < valB ? -1 : valA == valB? 0 : 1 ;
 	}) ;
@@ -308,17 +308,18 @@ function processArticleResponse(response) {
 		
 		var maxWeight, minWeight ;
 		$.each(sortedLabels, function() {
-			var weight = Number($(this).attr('proportion')) ;
+			var weight = this.proportion ;
 			
 			if (minWeight == undefined || weight < minWeight) minWeight = weight ;
 			if (maxWeight == undefined || weight > maxWeight) maxWeight = weight ;
 		}) ;
 		
 		$.each(sortedLabels, function() {
-			var xmlLabel = $(this) ;
+			//var xmlLabel = $(this) ;
+			var sortedLabel = this ;
 			
-			var label = $("<li>" + xmlLabel.text() + "</li>") ;
-			var weight = Number(xmlLabel.attr('proportion')) ;
+			var label = $("<li>" + sortedLabel.text + "</li>") ;
+			var weight = Number(sortedLabel.proportion) ;
 			weight = normalize(weight, minWeight, maxWeight) ;
 						
 			if (weight > 0.01) {
@@ -326,7 +327,7 @@ function processArticleResponse(response) {
 				label.css('color', getFontColor(weight)) ;
 				
 				label.qtip({
-					content: "used <em>" +xmlLabel.attr('occurances') + "</em> times",
+					content: "used <em>" + sortedLabel.occurrances + "</em> times",
 					style: { name: 'wmstyle' }
 				}) ;
 				
@@ -338,36 +339,32 @@ function processArticleResponse(response) {
 		$('#noLabels').show() ;
 	}
 	
-	var sortedTranslations = $(response).find("Translation").get().sort(function(a,b) {
-		var valA = $(a).attr('lang') ;
-		var valB = $(b).attr('lang') ;
+	var sortedTranslations = response.translations.sort(function(a,b) {
+		var valA = a.lang ;
+		var valB = b.lang ;
 		
 		return valA < valB ? -1 : valA == valB? 0 : 1 ;
 	}) ;
 	
 	if (sortedTranslations.length > 0) {
-		$.each(sortedTranslations, function() {
-			var xmlTranslation = $(this) ;
-			
-			var translation = $("<li><em>" + xmlTranslation.attr('lang') + "</em>: " + xmlTranslation.text() + "</li>") ;
+		$.each(sortedTranslations, function() {			
+			var translation = $("<li><em>" + this.lang + "</em>: " + this.text + "</li>") ;
 			$('#translations').append(translation) ;
 		}) ;
 	} else {
 		$('#noTranslations').show() ;
 	}
 	
-	var sortedCategories = $(response).find("ParentCategory").get().sort(function(a,b) {
-		var valA = $(a).attr('title') ;
-		var valB = $(b).attr('title') ;
+	var sortedCategories = response.parentCategories.sort(function(a,b) {
+		var valA = a.title ;
+		var valB = b.title ;
 		
 		return valA < valB ? -1 : valA == valB? 0 : 1 ;
 	}) ;
 	
 	if (sortedCategories.length > 0) {
 		$.each(sortedCategories, function() {
-			var xmlCategory = $(this) ;
-			
-			var category = $("<a href='?catId=" + xmlCategory.attr('id') + "'>" + xmlCategory.attr('title') + "</a>") ;
+			var category = $("<a href='?catId=" + this.id + "'>" + this.title + "</a>") ;
 			
 			var li = $("<li></li>") ;
 			li.append(category) ;
@@ -380,9 +377,9 @@ function processArticleResponse(response) {
 		$('#noCategories').show() ;
 	}
 	
-	var sortedOutLinks = $(response).find("OutLink").get().sort(function(a,b) {
-		var valA = $(a).attr('title') ;
-		var valB = $(b).attr('title') ;
+	var sortedOutLinks = response.outLinks.sort(function(a,b) {
+		var valA = a.title ;
+		var valB = b.title ;
 		
 		return valA < valB ? -1 : valA == valB? 0 : 1 ;
 	}) ;
@@ -393,19 +390,18 @@ function processArticleResponse(response) {
 		var maxWeight = undefined ;
 		var minWeight = undefined ;
 		
-		for (var i=0 ; i<sortedOutLinks.length ; i++) {
-			var weight = Number($(sortedOutLinks[i]).attr('relatedness')) ;
+		$.each(sortedOutLinks, function() {
+			var weight = Number(this.relatedness) ;
 			
 			if (minWeight == undefined || weight < minWeight) minWeight = weight ;
 			if (maxWeight == undefined || weight > maxWeight) maxWeight = weight ;
 			
-		}
+		}) ;
 		
 		$.each(sortedOutLinks, function() {
-			var xmlLink = $(this) ;
-			
-			var link = $("<a pageId='" + xmlLink.attr('id') + "' href='./?artId=" + xmlLink.attr('id') + "' relatedness='" + xmlLink.attr('relatedness') + "'>" + xmlLink.attr('title') + "</a>") ;
-			var weight = Number(xmlLink.attr('relatedness')) ;
+		
+			var link = $("<a pageId='" + this.id + "' href='./?artId=" + this.id + "' relatedness='" + this.relatedness + "'>" + this.title + "</a>") ;
+			var weight = Number(this.relatedness) ;
 			weight = normalize(weight, minWeight, maxWeight) ;
 			link.css('font-size', getFontSize(weight) + "px") ;
 			link.css('color', getFontColor(weight)) ;
@@ -422,9 +418,9 @@ function processArticleResponse(response) {
 	}
 	
 	
-	var sortedInLinks = $(response).find("InLink").get().sort(function(a,b) {
-		var valA = $(a).attr('title') ;
-		var valB = $(b).attr('title') ;
+	var sortedInLinks = response.inLinks.sort(function(a,b) {
+		var valA = a.title ;
+		var valB = b.title ;
 		
 		return valA < valB ? -1 : valA == valB? 0 : 1 ;
 	}) ;
@@ -433,17 +429,16 @@ function processArticleResponse(response) {
 		
 		var maxWeight, minWeight ;
 		$.each(sortedInLinks, function() {
-			var weight = Number($(this).attr('relatedness')) ;
+			var weight = Number(this.relatedness) ;
 			
 			if (minWeight == undefined || weight < minWeight) minWeight = weight ;
 			if (maxWeight == undefined || weight > maxWeight) maxWeight = weight ;
 		}) ;
 		
 		$.each(sortedInLinks, function() {
-			var xmlLink = $(this) ;
-			
-			var link = $("<a pageId='" + xmlLink.attr('id') + "' href='./?artId=" + xmlLink.attr('id') + "' relatedness='" + xmlLink.attr('relatedness') + "'>" + xmlLink.attr('title') + "</a>") ;
-			var weight = Number(xmlLink.attr('relatedness')) ;
+		
+			var link = $("<a pageId='" + this.id + "' href='./?artId=" + this.id + "' relatedness='" + this.relatedness + "'>" + this.title + "</a>") ;
+			var weight = Number(this.relatedness) ;
 			weight = normalize(weight, minWeight, maxWeight) ;
 			link.css('font-size', getFontSize(weight) + "px") ;
 			link.css('color', getFontColor(weight)) ;

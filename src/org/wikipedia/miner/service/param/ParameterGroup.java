@@ -4,8 +4,11 @@ import java.util.Vector;
 
 import javax.servlet.http.HttpServletRequest;
 
-import org.w3c.dom.Element;
+import org.simpleframework.xml.*;
 import org.wikipedia.miner.service.ServiceHub;
+
+import com.google.gson.annotations.Expose;
+import com.google.gson.annotations.SerializedName;
 
 /**
  * A group of parameters that are somehow related to each other
@@ -13,9 +16,17 @@ import org.wikipedia.miner.service.ServiceHub;
 @SuppressWarnings("unchecked")
 public class ParameterGroup {
 	
+	@Expose
+	@Attribute
 	String name ;
+	
+	@Expose
+	@SerializedName(value="description")
+	@Element(name="description", data=true)
 	String descriptionMarkup ;
 	
+	@Expose
+	@ElementList
 	Vector<Parameter> parameters ;
 	
 	/**
@@ -56,26 +67,6 @@ public class ParameterGroup {
 	 */
 	public Vector<Parameter> getParameters() {
 		return parameters;
-	}
-
-	/**
-	 * Returns an XML description of this parameter group
-	 * 
-	 * @param hub a hub with utility functions for creating XML elements
-	 * @return an XML description of this parameter group
-	 */
-	public Element getXmlDescription(ServiceHub hub) {
-		
-		Element xml = hub.createElement("ParameterGroup") ;
-		xml.setAttribute("name", name) ;
-		
-		Element xmlDescription = hub.createCDATAElement("Description", descriptionMarkup) ;
-		xml.appendChild(xmlDescription) ;
-			
-		for (Parameter param:parameters) 
-			xml.appendChild(param.getXmlDescription(hub)) ;
-			
-		return xml ;
 	}
 	
 	/**

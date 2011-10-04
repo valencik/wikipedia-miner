@@ -15,20 +15,23 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.TransformerFactoryConfigurationError;
+import javax.xml.transform.stream.StreamSource;
 
-import org.apache.xerces.parsers.DOMParser;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Text;
+import org.simpleframework.xml.core.Persister;
 import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.comparison.ConnectionSnippetWeighter;
 import org.wikipedia.miner.comparison.LabelComparer;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.WikipediaConfiguration;
-import org.xml.sax.InputSource;
 
-import com.sun.org.apache.xerces.internal.dom.DocumentImpl;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 public class ServiceHub {
 	
@@ -48,10 +51,16 @@ public class ServiceHub {
 	
 	private MarkupFormatter formatter = new MarkupFormatter() ;
 	private WebContentRetriever retriever ;
-	private Document doc = new DocumentImpl();
-	private DOMParser parser = new DOMParser() ;
+	//private Document doc = new DocumentImpl();
+	//private DOMParser parser = new DOMParser() ;
 	
 	private DecimalFormat decimalFormat = (DecimalFormat) NumberFormat.getInstance(Locale.US);
+	
+	private Gson jsonSerializer ;
+	private Persister xmlSerializer ;
+	
+	//private Transformer xmlSerializer ;
+	//private Transformer jsonSerializer ;
 	
 	// Protect the constructor, so no other class can call it
 	private ServiceHub(ServletContext context) throws ServletException {
@@ -91,6 +100,27 @@ public class ServiceHub {
 			clientsByName = config.getClientsByName() ;
 		
 			retriever = new WebContentRetriever(config) ;
+			
+			jsonSerializer = new GsonBuilder()
+			.excludeFieldsWithoutExposeAnnotation()
+			.setPrettyPrinting()
+			.create();
+			
+			xmlSerializer = new Persister() ;
+			/*
+			TransformerFactory xsltFactory = TransformerFactory.newInstance() ;
+			
+			xmlSerializer = xsltFactory.newTransformer();
+			xmlSerializer.setOutputProperty(OutputKeys.INDENT, "yes");
+			xmlSerializer.setOutputProperty(OutputKeys.METHOD,"xml");
+			xmlSerializer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "3");
+
+			StreamSource xml2json = new StreamSource(new File("/Users/dmilne/Research/workspaces/eclipse/Junk/xml-to-jsonml.xsl")) ;
+			jsonSerializer = xsltFactory.newTransformer(xml2json); 
+			jsonSerializer.setOutputProperty(OutputKeys.INDENT, "yes");
+			jsonSerializer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "3");
+			*/
+			
 		} catch (Exception e) {
 			throw new ServletException(e) ;
 		}
@@ -167,11 +197,21 @@ public class ServiceHub {
 		return retriever ;
 	}
 	
+	/*
 	public DOMParser getParser() {
 		return parser ;
 	}
+	*/
 	
+	public Persister getXmlSerializer() {
+		return xmlSerializer ;
+	}
 	
+	public Gson getJsonSerializer() {
+		return jsonSerializer ;
+	}
+	
+	/*
 	public Element createElement(String tagName) {
 		
 		return doc.createElement(tagName) ;
@@ -186,6 +226,7 @@ public class ServiceHub {
 		e.appendChild(doc.createCDATASection(data)) ;
 		return e ;			
 	}
+	*/
 	
 	public String format(double number) {
 		return decimalFormat.format(number) ;

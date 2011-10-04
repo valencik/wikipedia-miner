@@ -54,6 +54,9 @@ public class AnnotationWorkbench {
 		
 		_arffDisambig = new File(_dataDir.getPath() + "/disambig.arff") ;
 		_arffDetect = new File(_dataDir.getPath() + "/detect.arff") ;
+		
+		_modelDisambig = new File(_dataDir.getPath() + "/disambig.model") ;
+		_modelDetect = new File(_dataDir.getPath() + "/detect.model") ;
 	}
 	
 	
@@ -61,11 +64,11 @@ public class AnnotationWorkbench {
 		int[] sizes = {200,100,100} ;
 
 		ArticleSet[] articleSets = new ArticleSetBuilder()
-		.setMinOutLinks(25)
+		.setMinOutLinks(15)
 		.setMinInLinks(50)
 		.setMaxListProportion(0.1)
-		.setMinWordCount(1000)
-		.setMaxWordCount(2000)
+		.setMinWordCount(2000)
+		.setMaxWordCount(4000)
 		.buildExclusiveSets(sizes, _wikipedia) ;
 		
 		articleSets[0].save(_artsTrain) ;
@@ -89,7 +92,7 @@ public class AnnotationWorkbench {
 	
 	private void createClassifiers(String configDisambig, String configDetect) throws Exception {
 		
-		if (_arffDisambig.canRead() || !_arffDetect.canRead())
+		if (!_arffDisambig.canRead() || !_arffDetect.canRead())
 			throw new Exception("Arff files have not yet been created") ;
 		
 		_disambiguator.loadTrainingData(_arffDisambig) ;
@@ -139,11 +142,12 @@ public class AnnotationWorkbench {
 		System.out.println("Detect results: " + detectResults) ;
 	}
 	
-	public static void main(String args[]) throws Exception {
+	public static void main(String[] args) throws Exception {
 		
 		File dataDir = new File(args[0]) ;
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[1])) ;
+		conf.setMinLinkProbability(0.001F) ;
 		conf.addDatabaseToCache(DatabaseType.label) ;
 		conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences) ;
 		

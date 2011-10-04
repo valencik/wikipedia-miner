@@ -1,9 +1,14 @@
 package org.wikipedia.miner.service.param;
 
+import java.util.HashMap;
+
 import javax.servlet.http.HttpServletRequest;
 
-import org.w3c.dom.Element;
+import org.simpleframework.xml.*;
 import org.wikipedia.miner.service.ServiceHub;
+
+import com.google.gson.annotations.Expose;
+import com.google.gson.annotations.SerializedName;
 
 
 
@@ -16,11 +21,39 @@ import org.wikipedia.miner.service.ServiceHub;
  */
 public abstract class Parameter<T> {
 
+	@Expose
+	@Attribute
 	private String name ;
-	private String description ;
-	private T defaultValue ;
 	
+	@Expose
+	@Element(data=true) 
+	private String description ;
+
+	private T defaultValue ;
+
+	@Expose
+	@SerializedName(value="datatype")
+	@Attribute(name="datatype")
 	private String dataTypeName ;
+	
+	
+	//these are only needed for serialization
+	@Expose
+	@Attribute
+	private boolean optional ;
+	
+	@Expose
+	@SerializedName(value="defaultValue")
+	@Attribute(name="defaultValue", required=false)
+	private String defaultValueForSerialization ;
+	
+
+
+	@Expose
+	@SerializedName(value="possibleValues")
+	@ElementMap(name="possibleValues", entry="possibleValue", key="name", value="description", required=false)
+	protected HashMap<String,String> valueDescriptionsByName = null ;
+	
 	
 	/**
 	 * Returns the name of the parameter
@@ -50,28 +83,6 @@ public abstract class Parameter<T> {
 	public T getDefaultValue() {
 		return defaultValue;
 	}
-
-	/**
-	 * Returns an XML description of this parameter
-	 * 
-	 * @param hub a hub with utility functions for creating XML elements
-	 * @return an XML description of this parameter
-	 */
-	public Element getXmlDescription(ServiceHub hub) {
-		Element xmlParam = hub.createElement("Parameter") ;
-		xmlParam.setAttribute("name", name) ;
-		xmlParam.setAttribute("dataType", dataTypeName) ;
-		xmlParam.appendChild(hub.createCDATAElement("Description", description)) ;
-		
-		if (defaultValue != null) {
-			xmlParam.setAttribute("optional", "true") ;
-			xmlParam.setAttribute("default", getValueForDescription(defaultValue)) ; 
-		} else {
-			xmlParam.setAttribute("optional", "false") ;
-		}
-		
-		return xmlParam ;
-	}
 	
 	public String getValueForDescription(T val) {
 		return val.toString() ;
@@ -89,6 +100,14 @@ public abstract class Parameter<T> {
 		this.description = description ;
 		this.defaultValue = defaultValue ;
 		this.dataTypeName = dataTypeName ;
+		
+		
+		if (defaultValue != null) {
+			optional = true ;
+			defaultValueForSerialization = getValueForDescription(defaultValue) ; 
+		} else {
+			optional = false ;
+		}
 	}
 	
 	/**

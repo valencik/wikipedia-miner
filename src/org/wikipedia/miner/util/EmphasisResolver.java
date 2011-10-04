@@ -109,8 +109,12 @@ public class EmphasisResolver {
 			int firstSpace = -1 ;
 
 			for (String r:arr) {
-				if ((i%2==1) && i>=2 && r.length()==3) {
-
+				if ((i%2==1) && r.length()==3) {
+					
+					//added these checks to avoid string out of bounds exceptions
+					if (i==0) continue ;
+					if (arr[i-1].length() < 2) continue ;
+					
 					char x1 = arr[i-1].charAt(arr[i-1].length()-1) ;
 					char x2 = arr[i-1].charAt(arr[i-1].length()-2) ;
 
