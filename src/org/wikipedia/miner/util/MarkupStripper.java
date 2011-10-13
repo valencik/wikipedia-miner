@@ -32,6 +32,9 @@ public class MarkupStripper {
 
 	private Pattern linkPattern = Pattern.compile("\\[\\[(.*?:)?(.*?)(\\|.*?)?\\]\\]") ;
 	
+	private Pattern isolatedBefore = Pattern.compile("(\\s*|.*\\n(\\s*))", Pattern.DOTALL) ;
+	private Pattern isolatedAfter = Pattern.compile("(\\s*|(\\s*)\\n.*)", Pattern.DOTALL) ;
+	
 	private EmphasisResolver emphasisResolver = new EmphasisResolver() ;
 
 	/**
@@ -406,6 +409,46 @@ public class MarkupStripper {
 	public Vector<int[]> gatherTemplates(String markup) {
 		//currItem = "templates" ;
 		return gatherComplexRegions(markup, "\\{\\{", "\\}\\}") ;
+	}
+	
+	public Vector<int[]> getIsolatedRegions(Vector<int[]> regions, String markup) {
+		
+		Vector<int[]> isolatedRegions = new Vector<int[]>() ;
+		
+		for (int[] region:regions) {
+			if (isIsolated(region, markup))
+				isolatedRegions.add(region) ;
+		} ;
+		
+		return isolatedRegions ;
+	}
+	
+	public Vector<int[]> excludeIsolatedRegions(Vector<int[]> regions, String markup) {
+		
+		Vector<int[]> unisolatedRegions = new Vector<int[]>() ;
+		
+		for (int[] region:regions) {
+			if (!isIsolated(region, markup))
+				unisolatedRegions.add(region) ;
+		} ;
+		
+		return unisolatedRegions ;
+	}
+	
+	private boolean isIsolated(int[] region, String markup) {
+		
+		String before = markup.substring(0, region[0]) ;
+		String after = markup.substring(region[1]) ;
+		
+		Matcher m = isolatedBefore.matcher(before) ;
+		if (!m.matches())
+			return false ;
+		
+		m = isolatedAfter.matcher(after) ;
+		if(!m.matches())
+			return false ;
+		
+		return true ;
 	}
 
 	/**
