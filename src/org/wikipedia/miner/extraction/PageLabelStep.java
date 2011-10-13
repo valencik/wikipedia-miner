@@ -94,7 +94,7 @@ public class PageLabelStep extends Configured implements Tool {
 				
 				for (DbSenseForLabel sense:dbLabel.getSenses()) {
 					
-					DbLabelForPage pageLabel = new DbLabelForPage(text, sense.getLinkOccCount(), sense.getLinkDocCount(), sense.getFromRedirect(), sense.getFromTitle(), isPrimary) ;
+					DbLabelForPage pageLabel = new DbLabelForPage(text, sense.getLinkOccCount(), sense.getLinkDocCount(), sense.getFromTitle(), sense.getFromRedirect(), isPrimary) ;
 					
 					ArrayList<DbLabelForPage> labels = new ArrayList<DbLabelForPage>() ;
 					labels.add(pageLabel) ;
