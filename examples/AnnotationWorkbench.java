@@ -66,9 +66,9 @@ public class AnnotationWorkbench {
 		ArticleSet[] articleSets = new ArticleSetBuilder()
 		.setMinOutLinks(15)
 		.setMinInLinks(50)
-		.setMaxListProportion(0.1)
+		.setMaxListProportion(0.05)
 		.setMinWordCount(2000)
-		.setMaxWordCount(4000)
+		.setMaxWordCount(5000)
 		.buildExclusiveSets(sizes, _wikipedia) ;
 		
 		articleSets[0].save(_artsTrain) ;
@@ -147,7 +147,6 @@ public class AnnotationWorkbench {
 		File dataDir = new File(args[0]) ;
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[1])) ;
-		conf.setMinLinkProbability(0.001F) ;
 		conf.addDatabaseToCache(DatabaseType.label) ;
 		conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences) ;
 		

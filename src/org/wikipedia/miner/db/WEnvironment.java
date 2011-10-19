@@ -589,8 +589,6 @@ public class WEnvironment  {
 			
 			boolean mustGatherIds = (conf.getMinLinksIn() > 0 && !conf.getDatabasesToCache().isEmpty()) && conf.getArticlesOfInterest() == null ;
 			
-			System.out.println("Must gather ids: " + mustGatherIds) ;
-			
 			int taskCount = conf.getDatabasesToCache().size() + 1;
 			if (mustGatherIds)
 				taskCount++ ;

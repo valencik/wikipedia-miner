@@ -65,13 +65,19 @@ public class SnippetAnnotator {
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[0])) ;
 		conf.clearDatabasesToCache() ;
-		conf.setTopicDisambiguationModel(new File("temp/disambig.model")) ;
-		conf.setLinkDetectionModel(new File("temp/detect.model")) ;
+		//conf.setTopicDisambiguationModel(new File("temp/disambig.model")) ;
+		//conf.setLinkDetectionModel(new File("temp/detect.model")) ;
 		
 		Wikipedia wikipedia = new Wikipedia(conf, false) ;
 		
+		
+		String testText = "Martial artists competing in Pride parade around the ring during the tournament's opening ceremony" ;		
+		
 		SnippetAnnotator annotator = new SnippetAnnotator(wikipedia) ;
 		
+		annotator.annotate(testText) ;
+		
+		/*
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in)) ;
 		
 		while (true) {
@@ -82,6 +88,6 @@ public class SnippetAnnotator {
 				break ;
 			
 			annotator.annotate(line) ;
-		}
+		} */
 	}
 }

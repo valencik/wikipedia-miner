@@ -177,6 +177,8 @@ public class LabelOccurrencesStep extends Configured implements Tool {
 
 					String s = "$ " + markup + " $" ;
 					//pd.update() ;
+					
+					//TODO: make this use an ngrammer
 
 					Pattern p = Pattern.compile("[\\s\\{\\}\\(\\)\"\'\\.\\,\\;\\:\\-\\_]") ;  //would just match all non-word chars, but we don't want to match utf chars
 					Matcher m = p.matcher(s) ;

@@ -32,6 +32,7 @@ import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.util.*;
+import org.wikipedia.miner.util.NGrammer.NGramSpan;
 import org.wikipedia.miner.util.text.*;
 import org.wikipedia.miner.model.Label.Sense;
 
@@ -56,6 +57,7 @@ public class Disambiguator {
 	private ArticleCleaner cleaner ;
 	private TextProcessor tp ;
 	private ArticleComparer comparer ;
+	private NGrammer nGrammer ;
 
 	private double minSenseProbability ; 
 	private int maxLabelLength = 20 ;
@@ -141,6 +143,9 @@ public class Disambiguator {
 		this.comparer = comparer ;
 		this.cleaner = new ArticleCleaner() ;
 		this.tp = textProcessor ;
+		
+		this.nGrammer = new NGrammer(wikipedia.getConfig().getSentenceDetector(), wikipedia.getConfig().getTokenizer()) ;
+		this.nGrammer.setMaxN(maxLabelLength) ;
 
 		this.minSenseProbability = minSenseProbability ;
 		this.minLinkProbability = minLinkProbability ;
@@ -523,39 +528,28 @@ public class Disambiguator {
 	}
 
 	private Context getContext(Article article, SnippetLength snippetLength, RelatednessCache rc) throws Exception{
-
+		
 		Vector<Label> unambigLabels = new Vector<Label>() ;
-
+		
 		String content = cleaner.getMarkupLinksOnly(article, snippetLength) ;
-		String s = "$ " + content + " $" ;
+		for (NGramSpan span:nGrammer.ngramPosDetect(content)) {
+			
+			Label label = wikipedia.getLabel(span, content) ;
+			
+			System.out.println("potential context: " + label.getText()) ;
+			
+			if (!label.exists())
+				continue ;
+			
+			if (label.getLinkProbability() < minLinkProbability)
+				continue ;
+			
+			if (label.getLinkDocCount() < wikipedia.getConfig().getMinLinksIn())
+				continue ;
 
-		Pattern p = Pattern.compile("[\\s\\{\\}\\(\\)\"\'\\.\\,\\;\\:\\-\\_]") ;  //would just match all non-word chars, but we dont want to match utf chars
-		Matcher m = p.matcher(s) ;
-
-		Vector<Integer> matchIndexes = new Vector<Integer>() ;
-
-		while (m.find()) 
-			matchIndexes.add(m.start()) ;
-
-		for (int i=0 ; i<matchIndexes.size() ; i++) {
-
-			int startIndex = matchIndexes.elementAt(i) + 1 ;
-
-			for (int j=Math.min(i + maxLabelLength, matchIndexes.size()-1) ; j > i ; j--) {
-				int currIndex = matchIndexes.elementAt(j) ;	
-				String ngram = s.substring(startIndex, currIndex) ;
-
-				if (! (ngram.length()==1 && s.substring(startIndex-1, startIndex).equals("'"))&& !ngram.trim().equals("")) {
-					Label label = new Label(wikipedia.getEnvironment(), ngram, tp) ;
-
-					if (label.getLinkProbability() > minLinkProbability) {
-						
-						Label.Sense[] senses = label.getSenses() ;
-					
-						if (senses.length == 1 || senses[0].getPriorProbability() >= (1-minSenseProbability)) 
-							unambigLabels.add(label) ;
-					}
-				}	
+			Label.Sense[] senses = label.getSenses() ;
+			if (senses.length == 1 || senses[0].getPriorProbability() >= (1-minSenseProbability)) {
+				unambigLabels.add(label) ;
 			}
 		}
 
@@ -613,55 +607,4 @@ public class Disambiguator {
 	public int getSensesConsidered() {
 		return sensesConsidered ;
 	}
-
-	/**
-	 * A demo of how to train and test the disambiguator. 
-	 * 
-	 * @param args	an array of 2 or 4 String arguments; the connection string of the Wikipedia 
-	 * database server, the name of the Wikipedia database and (optionally, if anonymous access
-	 * is not allowed) a username and password for the database.
-	 * 
-	 * @throws Exception
-	 *//*
-	public static void main(String[] args) throws Exception{
-
-		//set up an instance of wikipedia
-		//Wikipedia wikipedia = Wikipedia.getInstanceFromArguments(args) ;
-		Wikipedia wikipedia = new Wikipedia("localhost", "inexwiki_2008", "dnk2", null) ;
-		
-		//use a text processor, so that terms and items in wikipedia will both be case-folded before being compared.
-		TextProcessor tp = null ; //new CaseFolder() ;
-
-		//cache tables that will be used extensively
-		File dataDirectory = new File("/research/wikipediaminer/data/inex/2008") ;
-		ProgressTracker pn = new ProgressTracker(3) ;
-		
-		//TIntHashSet ids = wikipedia.getEnvironment().getValidPageIds(dataDirectory, 2, pn) ;
-		TIntHashSet ids = null ;
-		wikipedia.getEnvironment().cachePages(dataDirectory, ids, pn) ;
-		wikipedia.getEnvironment().cacheLabels(dataDirectory, tp, ids, 0, pn) ;
-		wikipedia.getEnvironment().cacheInLinks(dataDirectory, ids, pn) ;
-		
-		//gather article sets for training and testing		
-		ArticleSet trainSet = new ArticleSet(new File("/Desktop/data/articleSets/trainingIds.csv")) ;
-		ArticleSet testSet = new ArticleSet(new File("data/articleSets/testIds_disambig.csv")) ;
-
-		//use relatedness cache, so we won't repeat these calculations unnecessarily
-		RelatednessCache rc = new RelatednessCache() ;
-		
-		//train disambiguator
-		Disambiguator disambiguator = new Disambiguator(wikipedia, tp, 0.01, 0.01, 25) ;
-		disambiguator.train(trainSet, ArticleCleaner.ALL, "disambig_trainingIds", rc) ;
-		
-		//build disambiguation classifier
-		Classifier classifier = new Bagging() ;
-		classifier.setOptions(Utils.splitOptions("-P 10 -S 1 -I 10 -W weka.classifiers.trees.J48 -- -U -M 2")) ;
-		disambiguator.buildClassifier(classifier) ;
-		disambiguator.saveClassifier(new File("data/models/disambig.model")) ;
-		
-		//test
-		Result<Integer> r = disambiguator.test(testSet, null, ArticleCleaner.ALL, rc) ;
-		System.out.println(r) ; 
-	}*/
-
 }

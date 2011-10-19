@@ -20,7 +20,6 @@
 	-->
 	<defaultTextProcessor></defaultTextProcessor>
 
-
 	<!--
 		The minimum number of links a page or label must receive before it will be cached to memory.
 		This can be used to exclude obscure or unpopular pages and labels.
@@ -98,5 +97,14 @@
 	<!-- A file containing a Weka classifier for performing automatic link detection -->
 	<linkDetectionModel>
 	</linkDetectionModel>
+	
+	
+	<!-- A file containing an Open NLP model for tokenization. If not provided, then a simple rule-based tokenizer will be used -->
+	<tokenModel>
+	</tokenModel>
+	
+	<!-- A file containing an Open NLP model for sentence splitting. If not provided, then sentence splitting will not be performed during annotation, etc. -->
+	<sentenceModel>
+	</sentenceModel>
 
 </wikipediaConfiguration>

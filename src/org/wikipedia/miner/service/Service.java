@@ -162,7 +162,7 @@ public abstract class Service extends HttpServlet {
 			
 			if (!requestingHelp) {
 				
-				if (wikipediaSpecific) {
+				if (wikipediaSpecific && requiresWikipedia()) {
 					Wikipedia wikipedia = getWikipedia(request) ;
 					double loadProgress= wikipedia.getEnvironment().getProgress() ;
 					
@@ -389,19 +389,19 @@ public abstract class Service extends HttpServlet {
 		}
 	}
 
-	private static class Message {
+	public static class Message {
 		
 		@Expose
 		@Attribute
-		private String service ;
+		public String service ;
 		
 		@Expose
 		@ElementMap(attribute=true, entry="param", key="name")
-		private HashMap<String, String> request = new HashMap<String,String>();
+		public HashMap<String, String> request = new HashMap<String,String>();
 		
 		@Expose
 		@Element
-		private Response response ;
+		public Response response ;
 		
 		public Message(HttpServletRequest httpRequest) {
 			this.service = httpRequest.getServletPath() ;

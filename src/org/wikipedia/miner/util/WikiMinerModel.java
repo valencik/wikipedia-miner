@@ -42,7 +42,8 @@ public class WikiMinerModel extends WikiModel {
 			try {
 
 				Template template = wikipedia.getTemplateByTitle(articleName) ;
-
+				
+				System.out.println("looking for template: " + articleName + ", " + template) ;
 				if (template == null)
 					return null ;
 				else 
