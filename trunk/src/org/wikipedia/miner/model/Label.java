@@ -16,7 +16,6 @@ import org.wikipedia.miner.util.text.TextProcessor;
  */
 public class Label {
 	
-	
 	//properties =============================================================
 
 

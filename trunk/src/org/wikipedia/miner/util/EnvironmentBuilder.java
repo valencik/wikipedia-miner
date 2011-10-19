@@ -32,7 +32,7 @@ public class EnvironmentBuilder {
 			System.exit(1) ;
 		}
 	
-		WEnvironment.buildEnvironment(conf, conf.getDataDirectory(), true) ;
+		WEnvironment.buildEnvironment(conf, conf.getDataDirectory(), false) ;
 	}
 	
 }

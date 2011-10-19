@@ -4,8 +4,10 @@ import gnu.trove.TIntHashSet;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -15,6 +17,14 @@ import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+
+import opennlp.tools.sentdetect.SentenceDetector;
+import opennlp.tools.sentdetect.SentenceDetectorME;
+import opennlp.tools.sentdetect.SentenceModel;
+import opennlp.tools.tokenize.SimpleTokenizer;
+import opennlp.tools.tokenize.Tokenizer;
+import opennlp.tools.tokenize.TokenizerME;
+import opennlp.tools.tokenize.TokenizerModel;
 
 import org.apache.log4j.Logger;
 import org.w3c.dom.Document;
@@ -31,7 +41,7 @@ import org.xml.sax.SAXException;
 
 public class WikipediaConfiguration {
 	
-	private enum ParamName{langCode,databaseDirectory,dataDirectory, defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability, articlesOfInterest, databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, comparisonSnippetModel, topicDisambiguationModel, linkDetectionModel,unknown} ;
+	private enum ParamName{langCode,databaseDirectory,dataDirectory,defaultTextProcessor,minLinksIn,minSenseProbability,minLinkProbability, articlesOfInterest, databaseToCache,stopwordFile,articleComparisonDependency,articleComparisonModel, labelDisambiguationModel, labelComparisonModel, comparisonSnippetModel, topicDisambiguationModel, linkDetectionModel, tokenModel, sentenceModel, unknown} ;
 	
 	private String langCode ;
 
@@ -52,6 +62,9 @@ public class WikipediaConfiguration {
 	
 	private File topicDisambiguationModel ;
 	private File linkDetectionModel ;
+	
+	private Tokenizer tokenizer ;
+	private SentenceDetector sentenceDetector ;
 	
 	private int minLinksIn = 0;
 	private float minLinkProbability = 0 ;
@@ -234,6 +247,46 @@ public class WikipediaConfiguration {
 		topicDisambiguationModel = model;
 	}
 	
+	public Tokenizer getTokenizer() {
+		
+		if (tokenizer == null)
+			tokenizer = SimpleTokenizer.INSTANCE ;
+		
+		return tokenizer ;
+	}
+	
+	public void setTokenizer(Tokenizer t) {
+		tokenizer = t ;
+	}
+	
+	public void setTokenizer(File modelFile) throws IOException{
+			
+		InputStream modelStream = new FileInputStream(modelFile);
+		TokenizerModel model = null ;
+		
+		model = new TokenizerModel(modelStream);
+		
+		tokenizer = new TokenizerME(model) ;
+	}
+	
+	public SentenceDetector getSentenceDetector() {		
+		return sentenceDetector ;
+	}
+	
+	public void setSentenceDetector(SentenceDetector sd) {
+		sentenceDetector = sd ;
+	}
+	
+	public void setSentenceDetector(File modelFile) throws IOException{
+			
+		InputStream modelStream = new FileInputStream(modelFile);
+		SentenceModel model = null ;
+		
+		model = new SentenceModel(modelStream);
+		
+		sentenceDetector = new SentenceDetectorME(model) ;
+	}
+	
 	public EnumSet<DataDependency> getReccommendedRelatednessDependancies() {
 		
 		ArrayList<DataDependency> dependancies = new ArrayList<DataDependency>() ;
@@ -337,6 +390,12 @@ public class WikipediaConfiguration {
 					break ;
 				case linkDetectionModel:
 					this.linkDetectionModel = new File(paramValue) ;
+					break ;
+				case tokenModel:
+					this.setTokenizer(new File(paramValue)) ;
+					break ;
+				case sentenceModel:
+					this.setSentenceDetector(new File(paramValue)) ;
 					break ;
 				default:
 					Logger.getLogger(WikipediaConfiguration.class).warn("Ignoring unknown parameter: '" + paramName + "'") ;

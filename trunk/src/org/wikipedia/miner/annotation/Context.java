@@ -43,8 +43,8 @@ public class Context {
 	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated.
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
 	 * @throws Exception 
-	 */
-	public Context(Collection<Label> unambigLabels, RelatednessCache relatednessCache, double maxSize) throws Exception {
+	 */ 
+	public Context(Collection<Label> unambigLabels, RelatednessCache relatednessCache, int maxSize) throws Exception {
 		
 		this.relatednessCache = relatednessCache ;
 		
@@ -83,7 +83,7 @@ public class Context {
 			if (c++ > maxSize)
 				break ;
 			
-			//System.out.println(" - cntxt art:" + art + ", w: " + art.getWeight()) ;
+			System.out.println(" - cntxt art:" + art + ", w: " + art.getWeight()) ;
 			
 			totalWeight += art.getWeight() ;
 			contextArticles.add(art) ;			

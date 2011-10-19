@@ -24,9 +24,13 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
+import opennlp.tools.sentdetect.SentenceDetector;
+import opennlp.tools.util.Span;
+
 import org.wikipedia.miner.model.*;
 import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.util.*;
+import org.wikipedia.miner.util.NGrammer.NGramSpan;
 import org.wikipedia.miner.annotation.preprocessing.*;
 
 /**
@@ -42,9 +46,7 @@ import org.wikipedia.miner.annotation.preprocessing.*;
 public class TopicDetector {
 	
 	private Wikipedia wikipedia ;
-	//private SentenceSplitter ss; 
 	private Disambiguator disambiguator ;
-	//private HashSet<String> stopwords ;
 	
 	
 	private boolean strictDisambiguation ;
@@ -52,7 +54,7 @@ public class TopicDetector {
 	
 	private int maxTopicsForRelatedness = 25 ;
 	
-	
+	private NGrammer nGrammer ;
 	
 	
 	/**
@@ -68,6 +70,9 @@ public class TopicDetector {
 	public TopicDetector(Wikipedia wikipedia, Disambiguator disambiguator, boolean strictDisambiguation, boolean allowDisambiguations) throws IOException {
 		this.wikipedia = wikipedia ;
 		this.disambiguator = disambiguator ;
+		
+		this.nGrammer = new NGrammer(wikipedia.getConfig().getSentenceDetector(), wikipedia.getConfig().getTokenizer()) ;
+		this.nGrammer.setMaxN(disambiguator.getMaxLabelLength()) ;
 		
 		this.strictDisambiguation = strictDisambiguation ;
 		this.allowDisambiguations = allowDisambiguations ;
@@ -183,52 +188,28 @@ public class TopicDetector {
 	
 	
 	private Vector<TopicReference> getReferences(String text) {
-
+		
 		Vector<TopicReference> references = new Vector<TopicReference>() ;
-		//int sentenceStart = 0 ;
-
-		//ProgressDisplayer pd = new ProgressDisplayer(" - gathering candidate links", sentences.length, 0.1) ;
-
-		//for (String sentence:sentences) {
-			String s = "$ " + text + " $" ;
-			//pd.update() ;
-
-			Pattern p = Pattern.compile("[\\s\\{\\}\\(\\)\"\'\\.\\,\\;\\:\\-\\_]") ;  //would just match all non-word chars, but we don't want to match utf chars
-			Matcher m = p.matcher(s) ;
-
-			Vector<Integer> matchIndexes = new Vector<Integer>() ;
-
-			while (m.find()) 
-				matchIndexes.add(m.start()) ;
-
-			for (int i=0 ; i<matchIndexes.size() ; i++) {
-
-				int startIndex = matchIndexes.elementAt(i) + 1 ;
-				
-				if (Character.isWhitespace(s.charAt(startIndex))) 
-					continue ;
-
-				for (int j=Math.min(i + disambiguator.getMaxLabelLength(), matchIndexes.size()-1) ; j > i ; j--) {
-					int currIndex = matchIndexes.elementAt(j) ;	
-					String ngram = s.substring(startIndex, currIndex) ;
-
-					if (! (ngram.length()==1 && s.substring(startIndex-1, startIndex).equals("'"))&& !ngram.trim().equals("") && !wikipedia.getConfig().isStopword(ngram)) {
+		for (NGramSpan span:nGrammer.ngramPosDetect(text)) {
 						
-						//TODO: test if we need escapes here
-						Label label = new Label(wikipedia.getEnvironment(), ngram, disambiguator.getTextProcessor()) ;
-
-						if (label.exists() && label.getLinkProbability() >= disambiguator.getMinLinkProbability()) {
-							Position pos = new Position(startIndex-2, currIndex-2) ;
-							TopicReference ref = new TopicReference(label, pos) ;
-							references.add(ref) ;
-							
-							//System.out.println(" - ref: " + ngram + label.getLinkProbability()) ;
-						}
-					}
-				}
-			}
-			//sentenceStart = sentenceStart + sentence.length() ;
-		//}
+			Label label = wikipedia.getLabel(span, text) ;
+			
+			//System.out.println(" - " + label.getText() + ", " + label.exists() + ", " + label.getLinkProbability() + "," + label.getLinkDocCount()) ;
+			
+			if (!label.exists())
+				continue ;
+			
+			if (label.getLinkProbability() < disambiguator.getMinLinkProbability())
+				continue ;
+			
+			//if (label.getLinkDocCount() < wikipedia.getConfig().getMinLinksIn())
+			//	continue ;
+			
+			
+			System.out.println("adding ref: " + label.getText()) ;
+			TopicReference ref = new TopicReference(label, new Position(span.getStart(), span.getEnd())) ;
+			references.add(ref) ;
+		}
 		return references ;
 	}
 	
@@ -262,9 +243,9 @@ public class TopicDetector {
 		Context context ;
 		if (cache == null)
 			context = new Context(unambigLabels, new RelatednessCache(disambiguator.getArticleComparer()), disambiguator.getMaxContextSize()) ;
-		
 		else 
 			context = new Context(unambigLabels, cache, disambiguator.getMaxContextSize()) ;	
+		
 		unambigLabels = null ;
 
 		//now disambiguate all references
@@ -274,7 +255,7 @@ public class TopicDetector {
 		HashMap<String, ArrayList<CachedSense>> disambigCache = new HashMap<String, ArrayList<CachedSense>>() ;
 
 		for (TopicReference ref:references) {
-			//System.out.println("disambiguating ref: " + ref.getLabel().getText()) ;
+			System.out.println("disambiguating ref: " + ref.getLabel().getText()) ;
 
 			ArrayList<CachedSense> validSenses = disambigCache.get(ref.getLabel().getText()) ;
 
@@ -294,7 +275,7 @@ public class TopicDetector {
 
 					double disambigProb = disambiguator.getProbabilityOfSense(commonness, relatedness, context) ;
 
-					//System.out.println(" - sense " + sense + ", " + disambigProb) ;
+					System.out.println(" - sense " + sense + ", " + disambigProb) ;
 					
 					if (disambigProb > 0.1) {
 						// there is at least a chance that this is a valid sense for the link (there may be more than one)

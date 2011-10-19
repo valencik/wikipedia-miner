@@ -23,6 +23,7 @@ package org.wikipedia.miner.annotation.tagging;
 import gnu.trove.TIntDoubleHashMap;
 
 import java.util.*;
+
 import org.wikipedia.miner.annotation.* ;
 import org.wikipedia.miner.annotation.preprocessing.* ;
 import org.wikipedia.miner.util.*;
@@ -84,7 +85,7 @@ public abstract class DocumentTagger {
 		for (Topic topic: topics) 
 			topicsById.put(topic.getId(), topic) ;
 
-		Vector<TopicReference> references = resolveCollisions(topics) ;
+		ArrayList<TopicReference> references = resolveCollisions(topics) ;
 
 		String originalText = doc.getOriginalText() ;
 		StringBuffer wikifiedText = new StringBuffer() ;
@@ -119,7 +120,66 @@ public abstract class DocumentTagger {
 		wikifiedText.append(originalText.substring(lastIndex)) ;
 		return wikifiedText.toString() ;
 	}
+	
+	private ArrayList<TopicReference> resolveCollisions(Collection<Topic> topics) {
+		
 
+		//build up a list of topic references and hashmap of topic weights
+		ArrayList<TopicReference> references = new ArrayList<TopicReference>() ;
+		TIntDoubleHashMap topicWeights = new TIntDoubleHashMap() ;
+		
+		for(Topic topic: topics) {	
+			for (Position pos: topic.getPositions()) {
+				topicWeights.put(topic.getId(), topic.getWeight()) ;
+
+				TopicReference tr = new TopicReference(null, topic.getId(), pos) ;
+				references.add(tr) ;
+			}
+		}
+		//sort references
+		Collections.sort(references) ;
+		
+		
+		for (int i=0 ; i<references.size(); i++) {
+			TopicReference outerRef = references.get(i) ;
+
+			
+			//identify weight of this reference
+			double outerWeight = topicWeights.get(outerRef.getTopicId());
+
+			//identify references overlapped by this one, and their total weight
+			Vector<TopicReference> innerReferences = new Vector<TopicReference>() ;
+			double maxInnerWeight = 0 ;
+			for (int j=i+1 ; j<references.size(); j++){
+				TopicReference innerRef = references.get(j) ;
+
+				if (outerRef.overlaps(innerRef)) {
+					innerReferences.add(innerRef) ;	
+					
+					double innerWeight = topicWeights.get(innerRef.getTopicId());
+					if (innerWeight > maxInnerWeight)
+						maxInnerWeight = innerWeight ;
+				} else {
+					break ;
+				}
+			}
+
+			if (maxInnerWeight > outerWeight) {
+				// want to keep the inner references
+				references.remove(i) ;
+				i = i-1 ;				
+			} else {
+				//want to keep the outer reference
+				for (int j=0 ; j<innerReferences.size() ; j++) {
+					references.remove(i+1) ;
+				}
+			}
+		}
+		
+		return references ;
+	}
+
+	/*
 	private Vector<TopicReference> resolveCollisions(Collection<Topic> topics) {
 
 		TIntDoubleHashMap topicWeights = new TIntDoubleHashMap() ;
@@ -155,14 +215,16 @@ public abstract class DocumentTagger {
 				references.removeElementAt(i+1) ;
 			}
 			
+			/*
+			
 			//TODO: why is all of this blanked out??
 
-			//double refWeight = 0 ;
-			//Integer refId = reference.getTopicId() ;
+			double refWeight = 0 ;
+			Integer refId = reference.getTopicId() ;
 
-			//if (topicWeights.containsKey(refId))
-			//	refWeight = topicWeights.get(refId) ;
-			/*
+			if (topicWeights.containsKey(refId))
+				refWeight = topicWeights.get(refId) ;
+			
 			double overlapWeight = 0 ;
 
 			for (int j=i+1 ; j<references.size(); j++){
@@ -170,7 +232,7 @@ public abstract class DocumentTagger {
 
 				if (reference.overlaps(reference2)) {
 					//System.out.println("--" + getNGram(words, c.getStartIndex(), c.getEndIndex()) + " overlaps " + getNGram(words, c1.getStartIndex(), c1.getEndIndex()));
-					overlappingTopics.add(reference2) ;
+					overlappedTopics.add(reference2) ;
 
 					double ref2Weight = 0 ;
 					Integer ref2Id = reference2.getTopicId() ;
@@ -183,22 +245,22 @@ public abstract class DocumentTagger {
 				}
 			}
 
-			if (overlappingTopics.size() > 0)
-				overlapWeight = overlapWeight / overlappingTopics.size() ;
+			if (overlappedTopics.size() > 0)
+				overlapWeight = overlapWeight / overlappedTopics.size() ;
 
-			//if (overlapWeight > refWeight) {
+			if (overlapWeight > refWeight) {
 				// want to keep the overlapped items
-			//	references.removeElementAt(i) ;
-			//	i = i-1 ;				
-			//} else {
+				references.removeElementAt(i) ;
+				i = i-1 ;				
+			} else {
 				//want to keep the overlapping item
-				for (int j=0 ; j<overlappingTopics.size() ; j++) {
+				for (int j=0 ; j<overlappedTopics.size() ; j++) {
 					references.removeElementAt(i+1) ;
 				}
-			//}
-			 * 
-			 */
+			}
+			
 		}
+		
 		return references ;
-	}
+	}*/
 }

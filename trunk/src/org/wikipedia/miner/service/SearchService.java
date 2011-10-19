@@ -21,8 +21,10 @@ import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.StringParameter;
+import org.wikipedia.miner.util.NGrammer;
 import org.wikipedia.miner.util.Position;
 import org.wikipedia.miner.util.RelatednessCache;
+import org.wikipedia.miner.util.NGrammer.NGramSpan;
 
 import com.google.gson.annotations.Expose;
 
@@ -100,10 +102,16 @@ public class SearchService extends Service {
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
-		query = query.replaceAll("^[\\W]*", "") ;
-		query = query.replaceAll("[\\W]*$", "") ;
+		NGrammer nGrammer = new NGrammer(wikipedia.getConfig().getSentenceDetector(), wikipedia.getConfig().getTokenizer()) ;
+		
+		NGramSpan span = nGrammer.ngramPosDetect(query)[0] ;
+		
+		
+		
+		//query = query.replaceAll("^[\\W]*", "") ;
+		//query = query.replaceAll("[\\W]*$", "") ;
 
-		Label label = new Label(wikipedia.getEnvironment(), query, wikipedia.getConfig().getDefaultTextProcessor()) ;
+		Label label = wikipedia.getLabel(span, query) ; //new Label(wikipedia.getEnvironment(), query, wikipedia.getConfig().getDefaultTextProcessor()) ;
 		ResponseLabel rLabel = new ResponseLabel(label) ;
 
 		float minPriorProb = prmMinPriorProb.getValue(request) ;
@@ -196,46 +204,25 @@ public class SearchService extends Service {
 	private ArrayList<QueryLabel> getReferences(String query, Wikipedia wikipedia) {
 
 		ArrayList<QueryLabel> queryLabels = new ArrayList<QueryLabel>() ;
+		
+		NGrammer nGrammer = new NGrammer(wikipedia.getConfig().getSentenceDetector(), wikipedia.getConfig().getTokenizer()) ;
 
-		String text = "$ " + getMaskedQuery(query) + " $" ;
-
-		Pattern p = Pattern.compile("[\\s\\{\\}\\(\\)\'\\.\\,\\;\\:\\-\\_]") ;  //would just match all non-word chars, but we don't want to match utf chars
-		Matcher m = p.matcher(text) ;
-
-		Vector<Integer> matchPositions = new Vector<Integer>() ;
-
-		while (m.find()) 
-			matchPositions.add(m.start()) ;
-
-		for (int i=0 ; i<matchPositions.size() ; i++) {
-
-			int startPos = matchPositions.elementAt(i) + 1 ;
-
-			if (Character.isWhitespace(text.charAt(startPos))) 
+		for (NGramSpan span:nGrammer.ngramPosDetect(query)) {
+		
+			String origNgram = span.getNgram(query) ;
+			
+			String trimmedNgram = origNgram.replaceAll("^[\\W]*", "") ;
+			trimmedNgram = trimmedNgram.replaceAll("[\\W]*$", "") ;
+			
+			if (trimmedNgram.indexOf('\"') > 0)
 				continue ;
+			
+			Position pos = new Position(span.getStart(), span.getEnd()) ;
+			QueryLabel ql = new QueryLabel(trimmedNgram, origNgram, pos, wikipedia) ;
 
-			for (int j=Math.min(i + 15, matchPositions.size()-1) ; j > i ; j--) {
-				int currPos = matchPositions.elementAt(j) ;	
-				
-				String origNgram = query.substring(startPos-2, currPos-2) ;
-				
-				String trimmedNgram = origNgram.replaceAll("^[\\W]*", "") ;
-				trimmedNgram = trimmedNgram.replaceAll("[\\W]*$", "") ;
-				
-				if (trimmedNgram.indexOf('\"') > 0)
-					continue ;
-
-				if (! (trimmedNgram.length()==1 && trimmedNgram.substring(startPos-1, startPos).equals("'"))&& !trimmedNgram.trim().equals("")) {
-
-					Position pos = new Position(startPos-2, currPos-2) ;
-					QueryLabel ql = new QueryLabel(trimmedNgram, origNgram, pos, wikipedia) ;
-
-					queryLabels.add(ql) ;
-
-					//System.out.println(qt.getAnchor().getText() + "," + qt.getAnchor().getLinkProbability()) ;
-				}
-			}
+			queryLabels.add(ql) ;
 		}
+		
 		return queryLabels ;		
 	}
 
@@ -591,7 +578,7 @@ public class SearchService extends Service {
 		boolean fromRedirect ;
 		
 		@Expose
-		@Attribute
+		@Attribute(required=false) 
 		Double weight ;
 		
 		public ResponseSense(Label.Sense sense) {

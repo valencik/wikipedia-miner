@@ -425,23 +425,23 @@ public class WikifyService extends Service {
 		}
 	}
 	
-	private static class Response extends Service.Response {
+	public static class Response extends Service.Response {
 		
 		@Expose
 		@Element(data=true)	
-		private String wikifiedDocument ;
+		public String wikifiedDocument ;
 
 		@Expose
 		@Attribute
-		private SourceMode sourceMode ;
+		public SourceMode sourceMode ;
 		
 		@Expose
 		@Attribute
-		private double documentScore ;
+		public double documentScore ;
 		
 		@Expose
 		@ElementList(entry="detectedTopic")
-		private ArrayList<ResponseTopic> detectedTopics = new ArrayList<ResponseTopic>();
+		public ArrayList<ResponseTopic> detectedTopics = new ArrayList<ResponseTopic>();
 		
 		public Response(String wikifiedDoc, SourceMode sourceMode, double documentScore) {
 			
@@ -455,21 +455,22 @@ public class WikifyService extends Service {
 		public void addTopic(Topic t) {
 			this.detectedTopics.add(new ResponseTopic(t)) ;
 		}
+
 	}
 	
-	private static class ResponseTopic {
+	public static class ResponseTopic {
 		
 		@Expose
 		@Attribute
-		int id ;
+		public int id ;
 		
 		@Expose
 		@Attribute
-		String title ;
+		public String title ;
 		
 		@Expose
 		@Attribute
-		double weight ;
+		public double weight ;
 		
 		public ResponseTopic(Topic t) {
 			

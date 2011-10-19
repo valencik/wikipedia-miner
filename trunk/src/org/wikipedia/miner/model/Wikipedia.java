@@ -24,6 +24,8 @@ import java.io.IOException;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import jsc.ci.ConfidenceBand;
+
 import org.apache.log4j.Logger;
 import org.wikipedia.miner.db.WEnvironment;
 import org.wikipedia.miner.db.WIterator;
@@ -31,6 +33,8 @@ import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.db.struct.DbLabel;
 import org.wikipedia.miner.model.Page.PageType;
 import org.wikipedia.miner.util.LabelIterator;
+import org.wikipedia.miner.util.NGrammer.CaseContext;
+import org.wikipedia.miner.util.NGrammer.NGramSpan;
 import org.wikipedia.miner.util.PageIterator;
 import org.wikipedia.miner.util.ProgressTracker;
 import org.wikipedia.miner.util.WikipediaConfiguration;
@@ -269,9 +273,75 @@ public class Wikipedia {
 
 		return lbl != null ;
 	}
+	
+	public Label getLabel(NGramSpan span, String sourceText) {
+		
+		//System.out.println("context: " + span.getCaseContext()) ;
+		
+		String ngram = span.getNgram(sourceText) ;
+		
+		Label bestLabel = getLabel(ngram) ;
+		
+		//don't bother trying out different casing variations if we are using casefolder as text processor
+		//TextProcessor tp = getConfig().getDefaultTextProcessor() ;
+		//if (tp != null && (tp.class. == TextProcessor.class)
+		///	return bestLabel ;
+		
+		//if this starts with capital letter and is at start of sentence, try lower-casing that first letter.
+		if (span.getCaseContext() == CaseContext.mixed && span.isSentenceStart() && Character.isUpperCase(ngram.charAt(0))) {
+			//System.out.println("trying lower first letter first token") ;
+			char tmpNgram[] = ngram.toCharArray() ;
+			tmpNgram[0] = Character.toLowerCase(tmpNgram[0]) ;
+			
+			Label label = getLabel(new String(tmpNgram)) ;
+			
+			System.out.println(label.getText()) ;
+			
+			if (label.exists() && (!bestLabel.exists() || label.getLinkOccCount() > bestLabel.getLinkOccCount())) {
+				bestLabel = label ;
+				//System.out.println("using lower first letter first token") ;
+			}
+		}
+			
+		
+		
+		//if surrounding text is all lower case or ALL UPPER CASE, try with First Letter Of Each Token Uppercased.
+		if (span.getCaseContext() == CaseContext.lower || span.getCaseContext() == CaseContext.upper) {
+			//System.out.println("trying upper first letter all tokens") ;
+			Label label = getLabel(span.getNgramUpperFirst(sourceText)) ;
+			
+			if (label.exists() && (!bestLabel.exists() || label.getLinkOccCount() > bestLabel.getLinkOccCount())) {
+				bestLabel = label ;
+				//System.out.println("using upper first letter all tokens") ;
+			}
+		}
+		
+		//if surrounding text is ALL UPPER CASE or Has First Letter Of Each Token Uppercased, try with all lower case 
+		if (span.getCaseContext() == CaseContext.upperFirst || span.getCaseContext() == CaseContext.upper) {
+			//System.out.println("trying lower") ;
+			Label label = getLabel(ngram.toLowerCase()) ;
+			
+			if (label.exists() && (!bestLabel.exists() || label.getLinkOccCount() > bestLabel.getLinkOccCount())) {
+				bestLabel = label ;
+				//System.out.println("using lower") ;
+			}
+		}
+		
+		//if surrounding text is all lower case, try with ALL UPPER CASE
+		if (span.getCaseContext() == CaseContext.lower) {
+			//System.out.println("trying upper") ;
+			Label label = getLabel(ngram.toUpperCase()) ;
+			
+			if (label.exists() && (!bestLabel.exists() || label.getLinkOccCount() > bestLabel.getLinkOccCount())) {
+				//System.out.println("using upper") ;
+				bestLabel = label ;
+			}
+		}
+		
+		return bestLabel ;
+	}
 
 	public Label getLabel(String text)  {
-
 		return new Label(env, text) ;
 	}
 
