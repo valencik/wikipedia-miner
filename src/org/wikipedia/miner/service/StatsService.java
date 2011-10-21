@@ -2,8 +2,10 @@ package org.wikipedia.miner.service;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.TimeZone;
 
 import javax.servlet.http.HttpServletRequest;
@@ -32,9 +34,9 @@ public class StatsService extends Service{
 	}
 
 	@Override
-	public Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
-		Response response = new Response(getWikipediaName(request)) ;
+		Message msg = new Message(request, getWikipediaName(request)) ;
 		
 		Wikipedia w = getWikipedia(request) ;
 		
@@ -45,18 +47,18 @@ public class StatsService extends Service{
 			
 			case lastEdit: 
 				String date = df.format(new Date(stat)) ;
-				response.addStat(statName, date) ;
+				msg.addStat(statName, date) ;
 				break ;
 			default: 
-				response.addStat(statName, String.valueOf(stat)) ;
+				msg.addStat(statName, String.valueOf(stat)) ;
 				break ;
 			}
 		}
 		
-		return response;
+		return msg;
 	}
 	
-	public static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@SerializedName(value="for")
 		@Attribute(name="for")
@@ -66,13 +68,24 @@ public class StatsService extends Service{
 		@ElementMap(inline=true,attribute=true,entry="statistic",key="name")
 		private HashMap<StatisticName,String> statistics = new HashMap<StatisticName,String>() ;
 		
-		public Response(String wikiName) {
+		private Message(HttpServletRequest request, String wikiName) {
+			super(request) ;
 			this.wikiName = wikiName ;
 		}
 		
-		public void addStat(StatisticName name, String value) {
+		private void addStat(StatisticName name, String value) {
 			statistics.put(name, value) ;
 		}
+
+		public String getWikiName() {
+			return wikiName;
+		}
+
+		public Map<StatisticName, String> getStatistics() {
+			return Collections.unmodifiableMap(statistics);
+		}
+		
+		
 	}
 
 }

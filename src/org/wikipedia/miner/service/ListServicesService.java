@@ -1,9 +1,12 @@
 package org.wikipedia.miner.service;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Vector;
@@ -51,7 +54,7 @@ public class ListServicesService extends Service{
 	}
 
 	@Override
-	public Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 
 		TreeMap<String, ServiceGroup> serviceGroupsByName = new TreeMap<String, ServiceGroup>(groupNameComparator) ;
 
@@ -73,21 +76,26 @@ public class ListServicesService extends Service{
 		ArrayList<ServiceGroup> serviceGroups = new ArrayList<ServiceGroup>() ;
 		serviceGroups.addAll(serviceGroupsByName.values()) ;
 		
-		return new Response(serviceGroups) ;
+		return new Message(request, serviceGroups) ;
 	}
 
-	private static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@ElementList
-		ArrayList<ServiceGroup> serviceGroups ;
+		private ArrayList<ServiceGroup> serviceGroups ;
 		
-		public Response(ArrayList<ServiceGroup> serviceGroups) {
+		private Message(HttpServletRequest request, ArrayList<ServiceGroup> serviceGroups) {
+			super(request) ;
 			this.serviceGroups = serviceGroups ;
+		}
+
+		public List<ServiceGroup> getServiceGroups() {
+			return Collections.unmodifiableList(serviceGroups);
 		}
 	}
 
-	private static class ServiceGroup {
+	public static class ServiceGroup {
 
 		@Expose
 		@Attribute
@@ -96,15 +104,23 @@ public class ListServicesService extends Service{
 		@Expose
 		@SerializedName(value="services") 
 		@ElementMap(inline=true, attribute=true, entry="service", key="name", data=true)
-		public TreeMap<String, String> serviceDescriptionsByName ;
+		private TreeMap<String, String> serviceDescriptionsByName ;
 
-		public ServiceGroup(String name)  {
+		private ServiceGroup(String name)  {
 			this.name = name ;
 			this.serviceDescriptionsByName = new TreeMap<String,String>() ;
 		}
 		
-		public void addService(String name, Service s) {
+		private void addService(String name, Service s) {
 			serviceDescriptionsByName.put(name, s.getShortDescription()) ;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public SortedMap<String, String> getServiceDescriptionsByName() {
+			return Collections.unmodifiableSortedMap(serviceDescriptionsByName);
 		}
 	}
 

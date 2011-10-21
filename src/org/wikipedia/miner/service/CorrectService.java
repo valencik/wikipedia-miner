@@ -1,6 +1,8 @@
 package org.wikipedia.miner.service;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 import javax.servlet.http.HttpServletRequest;
@@ -12,6 +14,7 @@ import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.service.param.IntParameter;
 import org.wikipedia.miner.service.param.StringParameter;
+import org.wikipedia.miner.service.UtilityMessages.*;
 import org.wikipedia.miner.util.text.TextProcessor;
 
 import com.google.gson.annotations.Expose;
@@ -39,17 +42,17 @@ public class CorrectService extends Service {
 		addGlobalParameter(prmMax) ;
 	}
 
-	public Service.Response buildWrappedResponse(HttpServletRequest request) {
+	public Service.Message buildWrappedResponse(HttpServletRequest request) {
 		
 		String term = prmTerm.getValue(request) ;
 		
 		if (term == null) 
-			return new ParameterMissingResponse() ;
+			return new ParameterMissingMessage(request) ;
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		TextProcessor tp = wikipedia.getEnvironment().getConfiguration().getDefaultTextProcessor() ;
 		
-		Response response = new Response() ;
+		Message msg = new Message(request) ;
 		
 		int max = prmMax.getValue(request) ;
 		
@@ -57,10 +60,10 @@ public class CorrectService extends Service {
 		for (Suggestion s:getSuggestions(term, wikipedia, tp)) {
 			if (count++ > max) break ;
 			
-			response.addSuggestion(s) ;
+			msg.addSuggestion(s) ;
 		}
 		
-		return response;
+		return msg;
 	}
 	
 	
@@ -101,14 +104,22 @@ public class CorrectService extends Service {
 
 	}
 	
-	public static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@ElementList(inline=true, entry="suggestion")
 		private TreeSet<Suggestion> suggestions = new TreeSet<Suggestion>() ;
 		
-		public void addSuggestion(Suggestion s) {
+		private Message(HttpServletRequest request) {
+			super(request) ;
+		}
+		
+		private void addSuggestion(Suggestion s) {
 			suggestions.add(s) ;
+		}
+		
+		public SortedSet<Suggestion> getSuggestions() {
+			return Collections.unmodifiableSortedSet(suggestions) ;
 		}
 	}
 	
@@ -126,7 +137,7 @@ public class CorrectService extends Service {
 		@Attribute
 		private Long occCount ;
 		
-		public Suggestion(String text, int editDistance, long occCount) {
+		private Suggestion(String text, int editDistance, long occCount) {
 			this.text = text ;
 			this.editDistance = editDistance ;
 			this.occCount = occCount ;
@@ -144,6 +155,18 @@ public class CorrectService extends Service {
 				return c ;
 			
 			return text.compareTo(s.text) ;
+		}
+
+		public String getText() {
+			return text;
+		}
+
+		public Integer getEditDistance() {
+			return editDistance;
+		}
+
+		public Long getOccCount() {
+			return occCount;
 		}
 	}
 

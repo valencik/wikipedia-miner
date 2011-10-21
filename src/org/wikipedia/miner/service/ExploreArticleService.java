@@ -2,6 +2,8 @@ package org.wikipedia.miner.service;
 
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
@@ -25,6 +27,7 @@ import org.wikipedia.miner.service.param.EnumParameter;
 import org.wikipedia.miner.service.param.IntParameter;
 import org.wikipedia.miner.service.param.ParameterGroup;
 import org.wikipedia.miner.service.param.StringParameter;
+import org.wikipedia.miner.service.UtilityMessages.*;
 
 import com.google.gson.annotations.Expose;
 
@@ -145,7 +148,7 @@ public class ExploreArticleService extends Service{
 
 	}
 
-	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Service.Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 
@@ -153,13 +156,13 @@ public class ExploreArticleService extends Service{
 		if (prmLinkRelatedness.getValue(request)) {
 			artComparer = getHub().getArticleComparer(this.getWikipediaName(request)) ;
 			if (artComparer == null) 
-				return new ErrorResponse("Relatedness measures are unavailable for this instance of wikipedia") ;
+				return new ErrorMessage(request, "Relatedness measures are unavailable for this instance of wikipedia") ;
 		}
 
 		ParameterGroup grp = getSpecifiedParameterGroup(request) ;
 
 		if (grp == null) 
-			return new ParameterMissingResponse() ;
+			return new ParameterMissingMessage(request) ;
 
 		Article art = null ;
 
@@ -168,9 +171,9 @@ public class ExploreArticleService extends Service{
 		case id :
 			Integer id = prmId.getValue(request) ;
 
-			Page page = wikipedia.getPageById(id) ;
+			org.wikipedia.miner.model.Page page = wikipedia.getPageById(id) ;
 			if (page==null) 
-				return new InvalidIdResponse(id) ;
+				return new InvalidIdMessage(request, id) ;
 
 			switch(page.getType()) {
 			case disambiguation:
@@ -178,7 +181,7 @@ public class ExploreArticleService extends Service{
 				art = (Article)page ;
 				break ;
 			default:
-				return new InvalidIdResponse(id) ;
+				return new InvalidIdMessage(request, id) ;
 			}
 			break ;
 		case title :
@@ -186,12 +189,12 @@ public class ExploreArticleService extends Service{
 			art = wikipedia.getArticleByTitle(title) ;
 
 			if (art == null)
-				return new InvalidTitleResponse(title) ;
+				return new InvalidTitleMessage(request, title) ;
 			break ;
 		}
 
-		Response response = new Response(art) ;
-
+		Message msg = new Message(request, art) ;
+		
 		if (prmDefinition.getValue(request)) {
 			String definition = null ;
 
@@ -200,7 +203,7 @@ public class ExploreArticleService extends Service{
 			else
 				definition = art.getFirstParagraphMarkup() ; 
 
-			response.setDefinition(getHub().getFormatter().format(definition, request, wikipedia)) ;
+			msg.setDefinition(getHub().getFormatter().format(definition, request, wikipedia)) ;
 		}
 
 		if (prmLabels.getValue(request)) {
@@ -215,7 +218,7 @@ public class ExploreArticleService extends Service{
 				long occ = lbl.getLinkOccCount() ;
 
 				if (occ > 0) 
-					response.addLabel(new ResponseLabel(lbl, total)) ;
+					msg.addLabel(new Label(lbl, total)) ;
 
 			}
 		}
@@ -223,7 +226,7 @@ public class ExploreArticleService extends Service{
 		if (prmTranslations.getValue(request)) {
 			TreeMap<String,String> translations = art.getTranslations() ;
 			for (Map.Entry<String,String> entry:translations.entrySet()) 
-				response.addTranslation(new ResponseTranslation(entry.getKey(), entry.getValue())) ;	
+				msg.addTranslation(new Translation(entry.getKey(), entry.getValue())) ;	
 		}
 
 
@@ -240,7 +243,7 @@ public class ExploreArticleService extends Service{
 					Matcher n = fb_idPattern.matcher(m.group(1)) ;
 					while (n.find()) {
 						String url = "http://www.freebase.com/api/trans/image_thumb" + n.group(1).replace("\\/", "/") + "?maxwidth=" + prmImageWidth.getValue(request) + "&maxheight=" + prmImageHeight.getValue(request) ;
-						response.addImage(new ResponseImage(url)) ;
+						msg.addImage(new Image(url)) ;
 					}
 				}
 		}
@@ -248,9 +251,9 @@ public class ExploreArticleService extends Service{
 		if (prmParentCategories.getValue(request)) {
 			Category[] parents = art.getParentCategories() ;
 
-			response.setTotalParentCategories(parents.length) ;
+			msg.setTotalParentCategories(parents.length) ;
 			for (Category parent:parents) 
-				response.addParentCategory(new ResponsePage(parent)) ;		
+				msg.addParentCategory(new Page(parent)) ;		
 		}
 
 		if (prmOutLinks.getValue(request)) {
@@ -264,13 +267,13 @@ public class ExploreArticleService extends Service{
 
 			Article[] linksOut = art.getLinksOut() ;
 
-			response.setTotalOutLinks(linksOut.length) ;
+			msg.setTotalOutLinks(linksOut.length) ;
 			for (int i=start ; i < max && i < linksOut.length ; i++) {
-				ResponsePage rp = new ResponsePage(linksOut[i]) ;
+				Page p = new Page(linksOut[i]) ;
 				if (artComparer != null)
-					rp.setRelatedness(artComparer.getRelatedness(art, linksOut[i])) ;
+					p.setRelatedness(artComparer.getRelatedness(art, linksOut[i])) ;
 
-				response.addOutLink(rp) ;
+				msg.addOutLink(p) ;
 			}
 		}
 
@@ -285,72 +288,48 @@ public class ExploreArticleService extends Service{
 
 			Article[] linksIn = art.getLinksIn() ;
 
-			response.setTotalInLinks(linksIn.length) ;
+			msg.setTotalInLinks(linksIn.length) ;
 			for (int i=start ; i < max && i < linksIn.length ; i++) {
-				ResponsePage rp = new ResponsePage(linksIn[i]) ;
+				Page p = new Page(linksIn[i]) ;
 				if (artComparer != null)
-					rp.setRelatedness(artComparer.getRelatedness(art, linksIn[i])) ;
+					p.setRelatedness(artComparer.getRelatedness(art, linksIn[i])) ;
 
-				response.addInLink(rp) ;
+				msg.addInLink(p) ;
 			}
 		}
 		
-		return response ;
+		return msg ;
 	}
 
-	public class InvalidIdResponse extends Service.ErrorResponse {
-
-		@Expose 
-		@Attribute
-		private Integer invalidId ;
-
-		public InvalidIdResponse(Integer id) {
-			super("'" + id + "' is not a valid article id") ;	
-			invalidId = id ;
-		}
-	}
-
-	public class InvalidTitleResponse extends Service.ErrorResponse {
-
-		@Expose 
-		@Attribute
-		private String invalidTitle ;
-
-		public InvalidTitleResponse(String title) {
-			super("'" + title + "' is not a valid article title") ;	
-			invalidTitle = title ;
-		}
-	}
-
-	public static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 
 		@Expose
 		@Attribute
-		int id ;
+		private int id ;
 
 		@Expose
 		@Attribute
-		String title ;
+		private String title ;
 
 		@Expose
 		@Element(required=false, data=true)
-		String definition ;
+		private String definition ;
 
 		@Expose
 		@ElementList(required=false, entry="image") 
-		ArrayList<ResponseImage> images = null ;
+		private ArrayList<Image> images = null ;
 		
 		@Expose
 		@ElementList(required=false, entry="label") 
-		ArrayList<ResponseLabel> labels = null ;
+		private ArrayList<Label> labels = null ;
 
 		@Expose
 		@ElementList(required=false, entry="tranlation") 
-		ArrayList<ResponseTranslation> translations = null ;
+		private ArrayList<Translation> translations = null ;
 
 		@Expose
 		@ElementList(required=false, entry="parentCategory") 
-		ArrayList<ResponsePage> parentCategories = null ;
+		private ArrayList<Page> parentCategories = null ;
 
 		@Expose
 		@Attribute(required=false)
@@ -358,7 +337,7 @@ public class ExploreArticleService extends Service{
 
 		@Expose
 		@ElementList(required=false, entry="inLink") 
-		ArrayList<ResponsePage> inLinks = null ;
+		private ArrayList<Page> inLinks = null ;
 
 		@Expose
 		@Attribute(required=false)
@@ -366,114 +345,165 @@ public class ExploreArticleService extends Service{
 
 		@Expose
 		@ElementList(required=false, entry="outLink") 
-		ArrayList<ResponsePage> outLinks = null ;
+		private ArrayList<Page> outLinks = null ;
 
 		@Expose
 		@Attribute(required=false)
 		private Integer totalOutLinks ;
 
-		public Response(Article art) {	
+		private Message(HttpServletRequest request, Article art) {	
+			super(request) ;
 			this.id = art.getId();
 			this.title = art.getTitle();
 		}
 
-		public void setDefinition(String markup) {
+		private void setDefinition(String markup) {
 			this.definition = markup ;
 		}
 		
-		public void addImage(ResponseImage image) {
+		private void addImage(Image image) {
 			if (images == null)
-				images = new ArrayList<ResponseImage>() ;
+				images = new ArrayList<Image>() ;
 			
 			images.add(image) ;
 		}
 
-		public void addLabel(ResponseLabel label) {
+		private void addLabel(Label label) {
 			if (labels == null)
-				labels = new ArrayList<ResponseLabel>() ;
+				labels = new ArrayList<Label>() ;
 
 			labels.add(label) ;
 		}
 
-		public void addTranslation(ResponseTranslation t) {
+		private void addTranslation(Translation t) {
 			if (translations == null)
-				translations = new ArrayList<ResponseTranslation>() ;
+				translations = new ArrayList<Translation>() ;
 
 			translations.add(t) ;
 		}
 
-		public void addParentCategory(ResponsePage p) {
+		private void addParentCategory(Page p) {
 			if (parentCategories == null)
-				parentCategories = new ArrayList<ResponsePage>() ;
+				parentCategories = new ArrayList<Page>() ;
 
 			parentCategories.add(p) ;
 		}
 
-		public void setTotalParentCategories(int total) {
+		private void setTotalParentCategories(int total) {
 			totalParentCategories = total ;
 		}
 
-		public void addInLink(ResponsePage p) {
+		private void addInLink(Page p) {
 			if (inLinks == null)
-				inLinks = new ArrayList<ResponsePage>() ;
+				inLinks = new ArrayList<Page>() ;
 
 			inLinks.add(p) ;
 		}
 
-		public void setTotalInLinks(int total) {
+		private void setTotalInLinks(int total) {
 			totalInLinks = total ;
 		}
 
-		public void addOutLink(ResponsePage p) {
+		private void addOutLink(Page p) {
 			if (outLinks == null)
-				outLinks = new ArrayList<ResponsePage>() ;
+				outLinks = new ArrayList<Page>() ;
 
 			outLinks.add(p) ;
 		}
 
-		public void setTotalOutLinks(int total) {
+		private void setTotalOutLinks(int total) {
 			totalOutLinks = total ;
 		}
 
+		public int getId() {
+			return id;
+		}
 
-	}
+		public String getTitle() {
+			return title;
+		}
 
-	public static class ResponseImage {
-		@Expose
-		@Attribute
-		String url ;
-		
-		public ResponseImage(String url) {
-			this.url = url ;
+		public String getDefinition() {
+			return definition;
+		}
+
+		public List<Image> getImages() {
+			return Collections.unmodifiableList(images);
+		}
+
+		public List<Label> getLabels() {
+			return Collections.unmodifiableList(labels);
+		}
+
+		public List<Translation> getTranslations() {
+			return Collections.unmodifiableList(translations);
+		}
+
+		public List<Page> getParentCategories() {
+			return Collections.unmodifiableList(parentCategories);
+		}
+
+		public Integer getTotalParentCategories() {
+			return totalParentCategories;
+		}
+
+		public List<Page> getInLinks() {
+			return Collections.unmodifiableList(inLinks);
+		}
+
+		public Integer getTotalInLinks() {
+			return totalInLinks;
+		}
+
+		public List<Page> getOutLinks() {
+			return Collections.unmodifiableList(outLinks);
+		}
+
+		public Integer getTotalOutLinks() {
+			return totalOutLinks;
 		}
 	}
 
-	public static class ResponseLabel {
+	public static class Image {
 		@Expose
 		@Attribute
-		String text ;
+		private String url ;
+		
+		private Image(String url) {
+			this.url = url ;
+		}
+		
+		public String getUrl() {
+			return url ;
+		}
+	}
+
+	public static class Label {
+		@Expose
+		@Attribute
+		private String text ;
 
 		@Expose
 		@Attribute
-		long occurrances ;
+		private long occurrances ;
 
 		@Expose
 		@Attribute
-		double proportion ;
+		private double proportion ;
 
 		@Expose
 		@Attribute
-		boolean isPrimary ;
+		private boolean isPrimary ;
 
 		@Expose
 		@Attribute
-		boolean fromRedirect ;
+		private boolean fromRedirect ;
 
 		@Expose
 		@Attribute
-		boolean fromTitle ;
+		private boolean fromTitle ;
 
-		public ResponseLabel(Article.Label lbl, long totalOccurrances) {
+		private Label(Article.Label lbl, long totalOccurrances) {
 
 			text = lbl.getText() ;
 			occurrances = lbl.getLinkOccCount() ;
@@ -482,25 +512,57 @@ public class ExploreArticleService extends Service{
 			fromRedirect = lbl.isFromRedirect() ;
 			fromTitle = lbl.isFromTitle() ;
 		}
-	}
 
-	public static class ResponseTranslation {
+		public String getText() {
+			return text;
+		}
 
-		@Expose
-		@Attribute
-		String lang ;
+		public long getOccurrances() {
+			return occurrances;
+		}
 
-		@Expose
-		@Text(data=true)
-		String text ;
+		public double getProportion() {
+			return proportion;
+		}
 
-		public ResponseTranslation(String lang, String text) {
-			this.lang = lang ;
-			this.text = text ;
+		public boolean isPrimary() {
+			return isPrimary;
+		}
+
+		public boolean isFromRedirect() {
+			return fromRedirect;
+		}
+
+		public boolean isFromTitle() {
+			return fromTitle;
 		}
 	}
 
-	public static class ResponsePage {
+	public static class Translation {
+
+		@Expose
+		@Attribute
+		private String lang ;
+
+		@Expose
+		@Text(data=true)
+		private String text ;
+
+		private Translation(String lang, String text) {
+			this.lang = lang ;
+			this.text = text ;
+		}
+
+		public String getLang() {
+			return lang;
+		}
+
+		public String getText() {
+			return text;
+		}
+	}
+
+	protected static class Page {
 
 		@Expose
 		@Attribute
@@ -514,15 +576,26 @@ public class ExploreArticleService extends Service{
 		@Attribute(required=false)
 		private Double relatedness ;
 
-		public ResponsePage(Page p) {
+		protected Page(org.wikipedia.miner.model.Page p) {
 			this.id = p.getId() ;
 			this.title = p.getTitle() ;
 		}
 
-		public void setRelatedness(double relatedness) {
+		protected void setRelatedness(double relatedness) {
 			this.relatedness = relatedness ;
 		}
 
+		public int getId() {
+			return id;
+		}
+
+		public String getTitle() {
+			return title;
+		}
+
+		public Double getRelatedness() {
+			return relatedness;
+		}
 	}
 
 }

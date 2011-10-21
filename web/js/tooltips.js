@@ -98,11 +98,11 @@ function wm_handleTooltipResponse(tooltip, data, details) {
 	
 	var newContent = $("<div/>") ;
 	
-	var images = data.response.images ;
+	var images = data.images ;
 	if (images != undefined)
 		newContent.append("<img src='" + images[0].url + "' style='float:right;border:1px solid black;margin-left:20px;'></img>") ;
 	
-	var definition = data.response.definition ;
+	var definition = data.definition ;
 	
 	if (definition != undefined)
 		newContent.append(definition) ;

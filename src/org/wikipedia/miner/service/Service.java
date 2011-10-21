@@ -22,6 +22,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.simpleframework.xml.*;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.service.param.*;
+import org.wikipedia.miner.service.UtilityMessages.*;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
@@ -178,12 +179,12 @@ public abstract class Service extends HttpServlet {
 				buildUnwrappedResponse(request, response) ;
 			} else {
 				
-				Message msg = new Message(request) ;
+				Message msg  ;
 				
 				if (requestingHelp)
-					msg.response = new HelpResponse(this) ;
+					msg = new HelpMessage(request, this) ;
 				else 
-					msg.response = buildWrappedResponse(request) ;
+					msg = buildWrappedResponse(request) ;
 				
 				if (responseFormat == ResponseFormat.XML) {
 					response.setContentType("application/xml");
@@ -215,7 +216,7 @@ public abstract class Service extends HttpServlet {
 	}
 
 
-	public abstract Response buildWrappedResponse(HttpServletRequest request) throws Exception;
+	public abstract Message buildWrappedResponse(HttpServletRequest request) throws Exception;
 
 	public void buildUnwrappedResponse(HttpServletRequest request, HttpServletResponse response) throws Exception{
 		throw new UnsupportedOperationException() ;
@@ -399,10 +400,6 @@ public abstract class Service extends HttpServlet {
 		@ElementMap(attribute=true, entry="param", key="name")
 		public HashMap<String, String> request = new HashMap<String,String>();
 		
-		@Expose
-		@Element
-		public Response response ;
-		
 		public Message(HttpServletRequest httpRequest) {
 			this.service = httpRequest.getServletPath() ;
 			
@@ -413,54 +410,6 @@ public abstract class Service extends HttpServlet {
 		}
 	}
 	
-	protected static class Response {
-		
-	}
-	
-	private static class HelpResponse extends Response {
-		
-		@Expose
-		@SerializedName(value="serviceDescription")
-		@Element(name="serviceDescription")
-		private Service service ;
-		
-		public HelpResponse(Service service) {
-			this.service = service ;
-		}
-	}
-	
-	public static class ParameterMissingResponse extends Response {	
-		@Expose
-		@Attribute
-		private String error = "Parameters missing" ;
-	}
-	
-	public static class ErrorResponse extends Response {
-		
-		@Expose
-		@Attribute
-		private String error ;
-		
-		@Expose
-		@Element (required=false)
-		private String trace = null ;
-		
-		public ErrorResponse(String message) {
-			error = message ;
-		}
-		
-		public ErrorResponse(Exception e) {
-			error = e.getMessage() ;
-					
-			ByteArrayOutputStream writer1 = new ByteArrayOutputStream() ;
-			PrintWriter writer2 = new PrintWriter(writer1) ;
-			
-			e.printStackTrace(writer2) ;
-			
-			writer2.flush() ;
-			trace = writer1.toString() ;
-		}
-	}
 	
 	
 	

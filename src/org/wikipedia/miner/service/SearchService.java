@@ -5,6 +5,7 @@ import gnu.trove.TIntFloatHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,16 +14,17 @@ import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 
+import opennlp.tools.util.Span;
+
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.ElementList;
 import org.wikipedia.miner.comparison.ArticleComparer;
-import org.wikipedia.miner.model.Label;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.StringParameter;
+import org.wikipedia.miner.service.UtilityMessages.*;
 import org.wikipedia.miner.util.NGrammer;
-import org.wikipedia.miner.util.Position;
 import org.wikipedia.miner.util.RelatednessCache;
 import org.wikipedia.miner.util.NGrammer.NGramSpan;
 
@@ -39,7 +41,7 @@ public class SearchService extends Service {
 
 	private static final long serialVersionUID = 5011451347638265017L;
 
-	//Pattern topicPattern = Pattern.compile("\\[\\[(\\d+)\\|(.*?)\\]\\]") ;
+	Pattern topicPattern = Pattern.compile("\\[\\[(\\d+)\\|(.*?)\\]\\]") ;
 	Pattern quotePattern = Pattern.compile("\".*?\"");
 
 	private StringParameter prmQuery ;
@@ -85,11 +87,11 @@ public class SearchService extends Service {
 		) ;
 	}
 
-	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Service.Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 
 		String query = prmQuery.getValue(request) ;
 		if (query == null) 
-			return new ParameterMissingResponse() ;
+			return new ParameterMissingMessage(request) ;
 
 		if (prmComplex.getValue(request))
 			return resolveComplexQuery(query, request) ;
@@ -98,50 +100,45 @@ public class SearchService extends Service {
 
 	}
 
-	public Service.Response resolveSimpleQuery(String query, HttpServletRequest request) {
+	public Service.Message resolveSimpleQuery(String query, HttpServletRequest request) {
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		NGrammer nGrammer = new NGrammer(wikipedia.getConfig().getSentenceDetector(), wikipedia.getConfig().getTokenizer()) ;
 		
 		NGramSpan span = nGrammer.ngramPosDetect(query)[0] ;
-		
-		
-		
-		//query = query.replaceAll("^[\\W]*", "") ;
-		//query = query.replaceAll("[\\W]*$", "") ;
 
-		Label label = wikipedia.getLabel(span, query) ; //new Label(wikipedia.getEnvironment(), query, wikipedia.getConfig().getDefaultTextProcessor()) ;
-		ResponseLabel rLabel = new ResponseLabel(label) ;
+		org.wikipedia.miner.model.Label label = wikipedia.getLabel(span, query) ; 
+		Label rLabel = new Label(label) ;
 
 		float minPriorProb = prmMinPriorProb.getValue(request) ;
-		for (Label.Sense sense:label.getSenses()) {
+		for (org.wikipedia.miner.model.Label.Sense sense:label.getSenses()) {
 			
 			if (sense.getPriorProbability() < minPriorProb) 
 				break ;
 
-			rLabel.addSense(new ResponseSense(sense)) ;
+			rLabel.addSense(new Sense(sense)) ;
 		}
 
-		Response response = new Response() ;
-		response.addLabel(rLabel) ;
+		Message msg = new Message(request) ;
+		msg.addLabel(rLabel) ;
 		
-		return response ;
+		return msg ;
 	}
 
-	public Service.Response resolveComplexQuery(String query, HttpServletRequest request) throws Exception {
+	public Service.Message resolveComplexQuery(String query, HttpServletRequest request) throws Exception {
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		ArticleComparer artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
 		if (artComparer == null)
-			return new ErrorResponse("article comparisons are not available with this wikipedia instance") ;
+			return new ErrorMessage(request, "article comparisons are not available with this wikipedia instance") ;
 
 		ExhaustiveDisambiguator disambiguator = new ExhaustiveDisambiguator(artComparer) ;
 
 		float minPriorProb = prmMinPriorProb.getValue(request) ;
 		
-		Response response = new Response() ;
+		Message msg = new Message(request) ;
 		
 		//resolve query
 		ArrayList<QueryLabel> queryLabels = getReferences(query, wikipedia) ;	
@@ -150,24 +147,24 @@ public class SearchService extends Service {
 
 		for (QueryLabel queryLabel:queryLabels) {
 
-			ResponseLabel rLabel = new ResponseLabel(queryLabel);
+			Label rLabel = new Label(queryLabel);
 		
-			for (Label.Sense sense:queryLabel.getSenses()) {
+			for (org.wikipedia.miner.model.Label.Sense sense:queryLabel.getLabel().getSenses()) {
 
 				if (sense.getPriorProbability() < minPriorProb) 
 					break ;
 				
-				ResponseSense rSense = new ResponseSense(sense);
+				Sense rSense = new Sense(sense);
 				rSense.setWeight(disambiguator.getSenseWeight(sense.getId())) ;
 				rLabel.addSense(rSense) ;
 			}
 			
 			rLabel.sortSensesByWeight() ;
 			
-			response.addLabel(rLabel) ;
+			msg.addLabel(rLabel) ;
 		}
 
-		return response;
+		return msg ;
 	}
 
 
@@ -175,30 +172,6 @@ public class SearchService extends Service {
 
 
 
-
-
-
-
-
-	private String getMaskedQuery(String query) {
-
-		//mask out topics that have been detected already
-		StringBuffer sb = new StringBuffer() ;
-		int lastIndex = 0 ;
-
-		Matcher m = quotePattern.matcher(query) ;
-		while (m.find()) {
-			sb.append(query.substring(lastIndex, m.start())) ;
-
-			for (int i=0 ; i<m.group().length() ;i++)
-				sb.append("A") ;
-
-			lastIndex = m.end() ;
-		}
-		sb.append(query.substring(lastIndex)) ;
-		return sb.toString() ;
-
-	}
 
 
 	private ArrayList<QueryLabel> getReferences(String query, Wikipedia wikipedia) {
@@ -207,25 +180,45 @@ public class SearchService extends Service {
 		
 		NGrammer nGrammer = new NGrammer(wikipedia.getConfig().getSentenceDetector(), wikipedia.getConfig().getTokenizer()) ;
 
-		for (NGramSpan span:nGrammer.ngramPosDetect(query)) {
 		
-			String origNgram = span.getNgram(query) ;
+		//spans that can't be interrupted or intersected
+		ArrayList<Span> contiguousSpans = new ArrayList<Span>() ;
+		
+		//spans that have already been disambiguated
+		HashMap<Long, Integer> topicIdsBySpan = new HashMap<Long, Integer>() ;
+		
+		
+		String cleanedQuery = cleanTopicMarkup(query, contiguousSpans, topicIdsBySpan) ;
+		cleanedQuery = cleanQuoteMarkup(cleanedQuery, contiguousSpans) ;
+		Collections.sort(contiguousSpans) ;
+		
+		//System.out.println("Cleaned query: " + cleanedQuery) ;
+		for (NGramSpan span:nGrammer.ngramPosDetect(cleanedQuery)) {
 			
-			String trimmedNgram = origNgram.replaceAll("^[\\W]*", "") ;
-			trimmedNgram = trimmedNgram.replaceAll("[\\W]*$", "") ;
+			//System.out.println("  ngram: " + span.getCoveredText(cleanedQuery) + " " + span.getStart() + ", " + span.getEnd()) ;
 			
-			if (trimmedNgram.indexOf('\"') > 0)
+			if (!isSpanValid(span, contiguousSpans)) {
+				//System.out.println("   invalid") ;
 				continue ;
+			}
 			
-			Position pos = new Position(span.getStart(), span.getEnd()) ;
-			QueryLabel ql = new QueryLabel(trimmedNgram, origNgram, pos, wikipedia) ;
+			Integer topicId = topicIdsBySpan.get(getKey(span)) ;
+			//TODO: something with topic id
+			//if (topicId != null)
+			//	System.out.println("   topic: " + topicId) ;
+			
+			org.wikipedia.miner.model.Label lbl = wikipedia.getLabel(span, cleanedQuery) ;
+			QueryLabel ql = new QueryLabel(lbl, wikipedia.getConfig().isStopword(span.getNgram(cleanedQuery)), span) ;
 
 			queryLabels.add(ql) ;
+			//System.out.println("   lp: " + label.getLinkProbability()) ;
 		}
 		
 		return queryLabels ;		
 	}
 
+	
+	
 	private ArrayList<QueryLabel> resolveCollisions(ArrayList<QueryLabel> queryLabels) {
 
 		for (int i=0 ; i<queryLabels.size(); i++) {
@@ -237,18 +230,19 @@ public class SearchService extends Service {
 			if (lbl1.isStopword)
 				qtWeight = 0 ;
 			else
-				qtWeight = lbl1.getLinkProbability() ;
+				qtWeight = lbl1.getLabel().getLinkProbability() ;
 
 			double overlapWeight = 0 ;
 
 			for (int j=i+1 ; j<queryLabels.size(); j++){
 				QueryLabel lbl2 = queryLabels.get(j) ;
 
-				if (lbl1.overlaps(lbl2)) {
+				//TODO: contains might not be right
+				if (lbl1.getSpan().intersects(lbl2.getSpan())) {
 					overlappingTopics.add(lbl2) ;	
 
 					if (!lbl2.isStopword)
-						overlapWeight = overlapWeight + lbl2.getLinkProbability() ;
+						overlapWeight = overlapWeight + lbl2.getLabel().getLinkProbability() ;
 				} else {
 					break ;
 				}
@@ -272,7 +266,73 @@ public class SearchService extends Service {
 		return queryLabels ;
 	}
 
-
+	private Long getKey(Span s) {
+		long key = s.getStart() + (s.getEnd() << 30) ;
+		return key ;
+	}
+	
+	private boolean isSpanValid(Span span, ArrayList<Span> contiguousSpans) {
+		
+		for (Span s:contiguousSpans) {
+			
+			if (s.equals(span))
+				return true ;
+			
+			if (s.intersects(span) || s.crosses(span) || s.contains(span) || span.contains(s))
+				return false ;
+			
+			if (s.getStart() > span.getEnd())
+				break ;
+		}
+		
+		return true ;
+		
+	}
+	
+	private String cleanTopicMarkup(String query, ArrayList<Span> contiguousSpans, HashMap<Long, Integer> topicIdsBySpan) {
+		
+		StringBuffer sb = new StringBuffer() ;
+		
+		int lastCopyPoint = 0;
+		Matcher m = topicPattern.matcher(query)  ;
+			
+		while (m.find()) {
+			sb.append(query.substring(lastCopyPoint, m.start())) ;
+			
+			Span span = new Span(sb.length(), sb.length() + m.group(2).length()) ;
+				
+			contiguousSpans.add(span) ;
+			topicIdsBySpan.put(getKey(span), Integer.parseInt(m.group(1))) ;
+			
+			sb.append(m.group(2)) ;
+			lastCopyPoint = m.end();
+		}
+		
+		sb.append(query.substring(lastCopyPoint)) ;
+		return sb.toString() ;	
+	}
+	
+	private String cleanQuoteMarkup(String query, ArrayList<Span> contiguousSpans) {
+		StringBuffer sb = new StringBuffer() ;
+		
+		int lastCopyPoint = 0;
+		Matcher m = quotePattern.matcher(query)  ;
+			
+		while (m.find()) {
+			sb.append(query.substring(lastCopyPoint, m.start())) ;
+			
+			Span span = new Span(sb.length(), sb.length() + m.group(1).length()) ;
+				
+			contiguousSpans.add(span) ;
+			
+			sb.append(m.group(1)) ;
+			lastCopyPoint = m.end();
+		}
+		
+		sb.append(query.substring(lastCopyPoint)) ;
+		return sb.toString() ;	
+	}
+	
 	
 	
 	
@@ -284,8 +344,8 @@ public class SearchService extends Service {
 		ArrayList<QueryLabel> queryTerms ;
 		RelatednessCache rc ;
 
-		Label.Sense currCombo[] ;
-		Label.Sense bestCombo[] ;
+		org.wikipedia.miner.model.Label.Sense currCombo[] ;
+		org.wikipedia.miner.model.Label.Sense bestCombo[] ;
 		float bestComboWeight ;
 
 		private TIntFloatHashMap bestSenseWeights ;
@@ -300,7 +360,7 @@ public class SearchService extends Service {
 
 			this.queryTerms = queryTerms ;
 
-			this.currCombo = new Label.Sense[queryTerms.size()] ;
+			this.currCombo = new org.wikipedia.miner.model.Label.Sense[queryTerms.size()] ;
 
 			this.bestCombo = null ;
 			this.bestComboWeight = 0 ;
@@ -327,11 +387,11 @@ public class SearchService extends Service {
 				// this is not a complete combination of senses, so continue recursion 
 				QueryLabel qt = queryTerms.get(termIndex) ;
 
-				if (qt.isStopword || qt.getSenses().length == 0) {
+				if (qt.isStopword || qt.getLabel().getSenses().length == 0) {
 					checkSenses(termIndex + 1, minPriorProb) ;
 				} else {
 
-					for(Label.Sense s:qt.getSenses()) {
+					for(org.wikipedia.miner.model.Label.Sense s:qt.getLabel().getSenses()) {
 						
 						if (s.getPriorProbability() < minPriorProb)
 							break ;
@@ -349,14 +409,14 @@ public class SearchService extends Service {
 			float relatedness = 0 ;
 			int comparisons = 0 ;
 
-			for (Label.Sense s1:currCombo) {
+			for (org.wikipedia.miner.model.Label.Sense s1:currCombo) {
 
 				if (s1 != null) {
 					commoness += s1.getPriorProbability() ;
 
 					//weight = weight + s1.getProbability() ;
 
-					for (Label.Sense s2:currCombo) {
+					for (org.wikipedia.miner.model.Label.Sense s2:currCombo) {
 						if (s2 != null && s1.getId() != s2.getId()) { 
 							relatedness += rc.getRelatedness(s1, s2) ;
 							comparisons++ ;
@@ -382,7 +442,7 @@ public class SearchService extends Service {
 			}
 
 			//check if this is best weight for each individual sense
-			for (Label.Sense s:currCombo) {
+			for (org.wikipedia.miner.model.Label.Sense s:currCombo) {
 				if (s != null) {
 					double sWeight = bestSenseWeights.get(s.getId()) ;
 					if (sWeight < weight)
@@ -393,60 +453,70 @@ public class SearchService extends Service {
 	}
 
 
-	private class QueryLabel extends Label {
+	private class QueryLabel {
 
-		private Position position ;
+		private org.wikipedia.miner.model.Label label ;
+		private Span span ;
 		private boolean isStopword ;
 
-		public QueryLabel(String trimmedNgram, String origNgram, Position pos, Wikipedia wikipedia) {
+		public QueryLabel(org.wikipedia.miner.model.Label label, boolean isStopword, Span span) {
 
-			super(wikipedia.getEnvironment(), trimmedNgram, wikipedia.getConfig().getDefaultTextProcessor()) ;
-
-			isStopword = wikipedia.getConfig().isStopword(trimmedNgram) ;
-			position = pos ; 
+			this.label = label ;
+			this.isStopword = isStopword ;
+			this.span = span ; 
 		}
 
 		/**
 		 * @param tr the topic reference to check for overlap
 		 * @return true if this overlaps the given reference, otherwise false.
 		 */
-		public boolean overlaps(QueryLabel qt) {
-			return position.overlaps(qt.getPosition()) ;
-		}
+		//public boolean overlaps(QueryLabel qt) {
+		//	return position.overlaps(qt.getPosition()) ;
+		//}
 
+		public org.wikipedia.miner.model.Label getLabel() {
+			return label ;
+		}
+		
+		
 		/**
 		 * @return the position (start and end character locations) in the document where this reference was found.
 		 */
-		public Position getPosition() {
-			return position ;
+		public Span getSpan() {
+			return span ;
 		}
 
-
+		/*
+		@Override
 		public int compareTo(QueryLabel qt) {
 
 			//starts first, then goes first
-			int c = new Integer(position.getStart()).compareTo(qt.getPosition().getStart()) ;
+			int c = new Integer(span.getStart()).compareTo(qt.getSpan().getStart()) ;
 			if (c != 0) return c ;
 
 			//starts at same time, so longest one goes first
-			c = new Integer(qt.getPosition().getEnd()).compareTo(position.getEnd()) ;
+			c = new Integer(qt.getSpan().getEnd()).compareTo(span.getEnd()) ;
 			return c ;
-		}
+		}*/
 	}
 
-	private static class Response extends Service.Response {
+	private static class Message extends Service.Message {
 		
 		@Expose
 		@ElementList(entry="label", inline=true)
-		private ArrayList<ResponseLabel> labels = new ArrayList<ResponseLabel>() ;
+		private ArrayList<Label> labels = new ArrayList<Label>() ;
 		
-		public void addLabel(ResponseLabel lbl) {
+		public Message(HttpServletRequest request) {
+			super(request) ;
+		}
+		
+		public void addLabel(Label lbl) {
 			labels.add(lbl) ;
 		}
 		
 	}
 
-	private static class ResponseLabel {
+	public static class Label {
 		
 		@Expose
 		@Attribute
@@ -476,19 +546,19 @@ public class SearchService extends Service {
 		@Attribute(required = false)
 		private Boolean isStopword ;
 		
-		@Expose
-		@Attribute(required = false)
-		private Integer start ;
+		//@Expose
+		//@Attribute(required = false)
+		//private Integer start ;
 		
-		@Expose
-		@Attribute(required = false)
-		private Integer end ;	
+		//@Expose
+		//@Attribute(required = false)
+		//private Integer end ;	
 		
 		@Expose
 		@ElementList(entry="sense")
-		private ArrayList<ResponseSense> senses ;
+		private ArrayList<Sense> senses ;
 		
-		public ResponseLabel(Label lbl) {
+		private Label(org.wikipedia.miner.model.Label lbl) {
 			
 			text = lbl.getText() ;
 			linkDocCount = lbl.getLinkDocCount() ;
@@ -497,35 +567,35 @@ public class SearchService extends Service {
 			occCount = lbl.getOccCount() ;
 			linkProbability = lbl.getLinkProbability() ;
 			
-			senses = new ArrayList<ResponseSense>() ;
+			senses = new ArrayList<Sense>() ;
 		}
 		
-		public ResponseLabel(QueryLabel lbl) {
+		private Label(QueryLabel lbl) {
 			
-			text = lbl.getText() ;
-			linkDocCount = lbl.getLinkDocCount() ;
-			linkOccCount = lbl.getLinkOccCount() ;
-			docCount = lbl.getDocCount() ;
-			occCount = lbl.getOccCount() ;
-			linkProbability = lbl.getLinkProbability() ;
+			text = lbl.getLabel().getText() ;
+			linkDocCount = lbl.getLabel().getLinkDocCount() ;
+			linkOccCount = lbl.getLabel().getLinkOccCount() ;
+			docCount = lbl.getLabel().getDocCount() ;
+			occCount = lbl.getLabel().getOccCount() ;
+			linkProbability = lbl.getLabel().getLinkProbability() ;
 			
 			this.isStopword = lbl.isStopword ;
-			this.start = lbl.position.getStart() ;
-			this.end = lbl.position.getEnd() ;
+			//this.start = lbl.position.getStart() ;
+			//this.end = lbl.position.getEnd() ;
 			
-			senses = new ArrayList<ResponseSense>() ;
+			senses = new ArrayList<Sense>() ;
 		}
 		
-		public void addSense(ResponseSense s) {
+		private void addSense(Sense s) {
 			senses.add(s) ;
 		}
 		
-		public void sortSensesByWeight() {
+		private void sortSensesByWeight() {
 			
-			Collections.sort(senses, new Comparator<ResponseSense>() {
+			Collections.sort(senses, new Comparator<Sense>() {
 
 				@Override
-				public int compare(ResponseSense s1, ResponseSense s2) {
+				public int compare(Sense s1, Sense s2) {
 					
 					int cmp = 0 ;
 					
@@ -542,12 +612,43 @@ public class SearchService extends Service {
 				}
 				
 			}) ;
-			
+		}
+
+		public String getText() {
+			return text;
+		}
+
+		public long getLinkDocCount() {
+			return linkDocCount;
+		}
+
+		public long getLinkOccCount() {
+			return linkOccCount;
+		}
+
+		public long getDocCount() {
+			return docCount;
+		}
+
+		public long getOccCount() {
+			return occCount;
+		}
+
+		public double getLinkProbability() {
+			return linkProbability;
+		}
+
+		public Boolean getIsStopword() {
+			return isStopword;
+		}
+
+		public ArrayList<Sense> getSenses() {
+			return senses;
 		}
 	}
 
 
-	private static class ResponseSense {
+	public static class Sense {
 		
 		@Expose
 		@Attribute
@@ -571,17 +672,17 @@ public class SearchService extends Service {
 		
 		@Expose
 		@Attribute
-		boolean fromTitle ;
+		private boolean fromTitle ;
 		
 		@Expose
 		@Attribute
-		boolean fromRedirect ;
+		private boolean fromRedirect ;
 		
 		@Expose
 		@Attribute(required=false) 
-		Double weight ;
+		private Double weight ;
 		
-		public ResponseSense(Label.Sense sense) {
+		private Sense(org.wikipedia.miner.model.Label.Sense sense) {
 		
 			id = sense.getId() ;
 			title = sense.getTitle() ;
@@ -592,9 +693,40 @@ public class SearchService extends Service {
 			fromRedirect = sense.isFromTitle() ;
 		}
 		
-		public void setWeight(double weight) {
+		private void setWeight(double weight) {
 			this.weight = weight ;
 		}
-		
+
+		public Integer getId() {
+			return id;
+		}
+
+		public String getTitle() {
+			return title;
+		}
+
+		public long getLinkDocCount() {
+			return linkDocCount;
+		}
+
+		public long getLinkOccCount() {
+			return linkOccCount;
+		}
+
+		public Double getPriorProbability() {
+			return priorProbability;
+		}
+
+		public boolean isFromTitle() {
+			return fromTitle;
+		}
+
+		public boolean isFromRedirect() {
+			return fromRedirect;
+		}
+
+		public Double getWeight() {
+			return weight;
+		}
 	}
 }

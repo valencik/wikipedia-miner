@@ -1,6 +1,8 @@
 package org.wikipedia.miner.service;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -18,27 +20,35 @@ public class ListWikipediasService extends Service{
 	}
 
 	@Override
-	public Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
-		Response response = new Response() ;
+		Message msg = new Message(request) ;
 		
 		for (String wikiName: getHub().getWikipediaNames()) {
 			String desc = getHub().getWikipediaDescription(wikiName) ;
 			boolean isDefault = wikiName.equals(getHub().getDefaultWikipediaName()) ;
-			response.addWikipedia(new Wikipedia(wikiName, desc, isDefault)) ;
+			msg.addWikipedia(new Wikipedia(wikiName, desc, isDefault)) ;
 		}
 		
-		return response ;
+		return msg ;
 	}
 
-	public static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@ElementList(inline=true)
 		private ArrayList<Wikipedia> wikipedias = new ArrayList<Wikipedia>() ;
 		
-		public void addWikipedia(Wikipedia w) {
+		private Message(HttpServletRequest request) {
+			super(request) ;
+		}
+		
+		private void addWikipedia(Wikipedia w) {
 			wikipedias.add(w) ;
+		}
+
+		public List<Wikipedia> getWikipedias() {
+			return Collections.unmodifiableList(wikipedias);
 		}
 	}
 	
@@ -56,10 +66,22 @@ public class ListWikipediasService extends Service{
 		@Attribute
 		private boolean isDefault ;
 		
-		public Wikipedia(String name, String description, boolean isDefault) {
+		private Wikipedia(String name, String description, boolean isDefault) {
 			this.name = name ;
 			this.description = description ;
 			this.isDefault = isDefault ;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public String getDescription() {
+			return description;
+		}
+
+		public boolean isDefault() {
+			return isDefault;
 		}
 	}
 }

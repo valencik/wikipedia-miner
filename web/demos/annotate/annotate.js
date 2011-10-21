@@ -90,7 +90,7 @@ function checkProgress() {
 		{responseFormat:'JSON'},
 		function(data) {
 			
-			var progress = data.response.progress ;
+			var progress = data.progress ;
 
 			if (progress >= 1) {
 				ready() ;
@@ -155,13 +155,13 @@ function hideOptions() {
 
 function processAnnotationResponse(data) {
 	
-	var wikifiedDoc = data.response.wikifiedDocument ;
+	var wikifiedDoc = data.wikifiedDocument ;
 	
-	var sourceMode = data.response.sourceMode ;
+	var sourceMode = data.sourceMode ;
 	
 	var topicsByTitle = new Array() ;  
 	
-	var sortedTopics = data.response.detectedTopics.sort(function(a,b) {
+	var sortedTopics = data.detectedTopics.sort(function(a,b) {
 		var valA = a.title ;
 		var valB = b.title ;
 		
