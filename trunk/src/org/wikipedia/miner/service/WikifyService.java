@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +32,7 @@ import org.wikipedia.miner.annotation.tagging.DocumentTagger.RepeatMode;
 import org.wikipedia.miner.annotation.weighting.LinkDetector;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.service.param.*;
+import org.wikipedia.miner.service.UtilityMessages.*;
 
 import com.google.gson.annotations.Expose;
 
@@ -45,6 +48,9 @@ public class WikifyService extends Service {
 	private EnumParameter<RepeatMode> prmRepeatMode ;
 	private StringParameter prmLinkStyle ;
 	private BooleanParameter prmTooltips ;
+	
+	private BooleanParameter prmTopics ;
+	private BooleanParameter prmReferences ;
 	
 	private HashMap<String, TopicDetector> topicDetectors = new HashMap<String, TopicDetector>();
 	private HashMap<String, LinkDetector> linkDetectors = new HashMap<String, LinkDetector>();
@@ -88,6 +94,12 @@ public class WikifyService extends Service {
 		
 		prmTooltips = new BooleanParameter("tooltips", "<b>true</b> if javascript for adding tooltips should be included, otherwise <b>false</b>. This is only valid if processing a URL.", false) ;
 		addGlobalParameter(prmTooltips) ;
+		
+		prmTopics = new BooleanParameter("topics", "<b>true</b> if to return a list of topics, otherwise <b>false</b> ", true) ;
+		addGlobalParameter(prmTopics) ;
+		
+		prmReferences = new BooleanParameter("references", "<b>true</b> to return details of where each topic was found within text, otherwise <b>false</b>", false) ;
+		addGlobalParameter(prmReferences) ;
 		
 		for (String wikiName:getHub().getWikipediaNames()) {
 			
@@ -134,36 +146,43 @@ public class WikifyService extends Service {
 	}
 	
 	
-	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Service.Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		String source = prmSource.getValue(request) ;
 		if (source == null || source.trim().length() == 0)
-			return new ParameterMissingResponse() ;
+			return new ParameterMissingMessage(request) ;
 		
 		SourceMode sourceMode = prmSourceMode.getValue(request) ;
 		if (sourceMode == SourceMode.AUTO)
 			sourceMode = resolveSourceMode(source) ;
 		
-		ArrayList<Topic> detectedTopics = new ArrayList<Topic>() ;
+		
+		
+		ArrayList<org.wikipedia.miner.annotation.Topic> detectedTopics = new ArrayList<org.wikipedia.miner.annotation.Topic>() ;
 		String wikifiedDoc = wikifyAndGatherTopics(request, detectedTopics, wikipedia) ;
 		
 		double docScore = 0 ;
-		for (Topic t:detectedTopics)
+		for (org.wikipedia.miner.annotation.Topic t:detectedTopics)
 			docScore = docScore + t.getRelatednessToOtherTopics() ;
 		
-		Response response = new Response(wikifiedDoc, sourceMode, docScore) ;
+		Message msg = new Message(request, wikifiedDoc, sourceMode, docScore) ;
 		
 		float minProb = prmMinProb.getValue(request) ;
-		for (Topic dt:detectedTopics) {
-			
-			if (dt.getWeight() < minProb) break ;
-			
-			response.addTopic(dt) ;
+		boolean showTopics = prmTopics.getValue(request) ;
+		boolean showReferences = prmReferences.getValue(request) ;
+		
+		if (showTopics) {
+			for (org.wikipedia.miner.annotation.Topic dt:detectedTopics) {
+				
+				if (dt.getWeight() < minProb) break ;
+				
+				msg.addTopic(dt, showReferences) ;
+			}
 		}
 		
-		return response;
+		return msg;
 	}
 	
 	public void buildUnwrappedResponse(HttpServletRequest request, HttpServletResponse response) throws Exception{
@@ -174,7 +193,7 @@ public class WikifyService extends Service {
 		response.setHeader("Cache-Control", "no-cache"); 
 		response.setCharacterEncoding("UTF8") ;
 		
-		ArrayList<Topic> detectedTopics = new ArrayList<Topic>() ;
+		ArrayList<org.wikipedia.miner.annotation.Topic> detectedTopics = new ArrayList<org.wikipedia.miner.annotation.Topic>() ;
 		String wikifiedDoc = wikifyAndGatherTopics(request, detectedTopics, wikipedia) ;
 		
 		response.getWriter().append(wikifiedDoc) ;
@@ -184,7 +203,7 @@ public class WikifyService extends Service {
 	
 
 	
-	private String wikifyAndGatherTopics(HttpServletRequest request, ArrayList<Topic> detectedTopics, Wikipedia wikipedia) throws IOException, Exception {
+	private String wikifyAndGatherTopics(HttpServletRequest request, ArrayList<org.wikipedia.miner.annotation.Topic> detectedTopics, Wikipedia wikipedia) throws IOException, Exception {
 		
 		String wikiName = getWikipediaName(request) ;
 		
@@ -247,11 +266,11 @@ public class WikifyService extends Service {
 		//TODO: find smarter way to resolve this hack, which stops wikifier from detecting "Space (punctuation)" ;
 		doc.banTopic(143856) ;
 		
-		ArrayList<Topic> allTopics = linkDetector.getWeightedTopics(topicDetector.getTopics(doc, null)) ;
-		ArrayList<Topic> bestTopics = new ArrayList<Topic>() ;
+		ArrayList<org.wikipedia.miner.annotation.Topic> allTopics = linkDetector.getWeightedTopics(topicDetector.getTopics(doc, null)) ;
+		ArrayList<org.wikipedia.miner.annotation.Topic> bestTopics = new ArrayList<org.wikipedia.miner.annotation.Topic>() ;
 		float minProb = prmMinProb.getValue(request) ;
 		
-		for (Topic t:allTopics) {
+		for (org.wikipedia.miner.annotation.Topic t:allTopics) {
 			if (t.getWeight() >= minProb)
 				bestTopics.add(t) ;
 			
@@ -360,7 +379,7 @@ public class WikifyService extends Service {
 			this.wikipedia = wikipedia ;
 		}
 				
-		public String getTag(String anchor, Topic topic) {
+		public String getTag(String anchor, org.wikipedia.miner.annotation.Topic topic) {
 			
 			StringBuffer tag = new StringBuffer("<a") ;
 			tag.append(" href=\"http://www." + wikipedia.getConfig().getLangCode() + ".wikipedia.org/wiki/" + topic.getTitle() + "\"") ;
@@ -394,7 +413,7 @@ public class WikifyService extends Service {
 			this.linkFormat = linkFormat ;
 		}
 		
-		public String getTag(String anchor, Topic topic) {
+		public String getTag(String anchor, org.wikipedia.miner.annotation.Topic topic) {
 			
 			StringBuffer tag = new StringBuffer("[[") ;
 			
@@ -425,58 +444,133 @@ public class WikifyService extends Service {
 		}
 	}
 	
-	public static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@Element(data=true)	
-		public String wikifiedDocument ;
+		private String wikifiedDocument ;
 
 		@Expose
 		@Attribute
-		public SourceMode sourceMode ;
+		private SourceMode sourceMode ;
 		
 		@Expose
 		@Attribute
-		public double documentScore ;
+		private double documentScore ;
 		
 		@Expose
 		@ElementList(entry="detectedTopic")
-		public ArrayList<ResponseTopic> detectedTopics = new ArrayList<ResponseTopic>();
+		private ArrayList<Topic> detectedTopics ;
 		
-		public Response(String wikifiedDoc, SourceMode sourceMode, double documentScore) {
+		private Message(HttpServletRequest request, String wikifiedDoc, SourceMode sourceMode, double documentScore) {
+			
+			super(request) ;
 			
 			this.wikifiedDocument = wikifiedDoc ;
 			this.sourceMode = sourceMode ;
 			this.documentScore = documentScore ;
 			
-			this.detectedTopics = new ArrayList<ResponseTopic>() ;
+			this.detectedTopics = new ArrayList<Topic>() ;
 		}
 		
-		public void addTopic(Topic t) {
-			this.detectedTopics.add(new ResponseTopic(t)) ;
+		private void addTopic(org.wikipedia.miner.annotation.Topic t, boolean includePositions) {
+			
+			if (this.detectedTopics == null) 
+				this.detectedTopics = new ArrayList<Topic>() ;
+			
+			this.detectedTopics.add(new Topic(t, includePositions)) ;
 		}
 
+		public String getWikifiedDocument() {
+			return wikifiedDocument;
+		}
+
+		public SourceMode getSourceMode() {
+			return sourceMode;
+		}
+
+		public double getDocumentScore() {
+			return documentScore;
+		}
+
+		public List<Topic> getDetectedTopics() {
+			return Collections.unmodifiableList(detectedTopics);
+		}
 	}
 	
-	public static class ResponseTopic {
+	public static class Topic {
 		
 		@Expose
 		@Attribute
-		public int id ;
+		private int id ;
 		
 		@Expose
 		@Attribute
-		public String title ;
+		private String title ;
 		
 		@Expose
 		@Attribute
-		public double weight ;
+		private double weight ;
 		
-		public ResponseTopic(Topic t) {
+		@Expose
+		@ElementList(entry="reference", required=false) 
+		private ArrayList<Reference> references ;
+		
+		private Topic(org.wikipedia.miner.annotation.Topic t, boolean includeReferences) {
 			
 			this.id = t.getId();
 			this.title = t.getTitle() ;
 			this.weight = t.getWeight();
+
+			
+			if (includeReferences) {
+				references = new ArrayList<Reference>() ;
+				
+				for (org.wikipedia.miner.util.Position p: t.getPositions()) {
+					references.add(new Reference(p.getStart(), p.getEnd())) ;
+				}
+			}
+		}
+
+		public int getId() {
+			return id;
+		}
+
+		public String getTitle() {
+			return title;
+		}
+
+		public double getWeight() {
+			return weight;
+		}
+
+		public List<Reference> getReferences() {
+			return Collections.unmodifiableList(references);
+		}
+		
+	}
+	
+	public static class Reference {
+		
+		@Expose
+		@Attribute
+		private int start ;
+		
+		@Expose
+		@Attribute
+		private int end ;
+		
+		private Reference(int start, int end) {
+			this.start = start ;
+			this.end = end ;
+		}
+
+		public int getStart() {
+			return start;
+		}
+
+		public int getEnd() {
+			return end;
 		}
 	}
 	

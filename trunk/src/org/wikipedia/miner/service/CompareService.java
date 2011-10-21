@@ -3,7 +3,10 @@ package org.wikipedia.miner.service;
 import gnu.trove.TLongHashSet;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,6 +34,7 @@ import org.wikipedia.miner.service.param.IntListParameter;
 import org.wikipedia.miner.service.param.IntParameter;
 import org.wikipedia.miner.service.param.ParameterGroup;
 import org.wikipedia.miner.service.param.StringParameter;
+import org.wikipedia.miner.service.UtilityMessages.*;
 import org.wikipedia.miner.util.RelatednessCache;
 import org.wikipedia.miner.util.text.TextProcessor;
 
@@ -188,7 +192,7 @@ public class CompareService extends Service{
 	
 	
 	@Override
-	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Service.Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		TextProcessor tp = wikipedia.getEnvironment().getConfiguration().getDefaultTextProcessor() ;
@@ -196,9 +200,9 @@ public class CompareService extends Service{
 		ParameterGroup grp = getSpecifiedParameterGroup(request) ;
 		
 		if (grp == null) 
-			return new ParameterMissingResponse() ;
+			return new ParameterMissingMessage(request) ;
 		
-		Response response = null ;
+		Message msg = null ;
 		
 		switch(GroupName.valueOf(grp.getName())) {
 		
@@ -206,7 +210,7 @@ public class CompareService extends Service{
 			
 			LabelComparer lblComparer = getHub().getLabelComparer(getWikipediaName(request)) ;
 			if (lblComparer == null) 
-				return new ErrorResponse("term comparisons are not available with this wikipedia instance") ;	
+				return new ErrorMessage(request, "term comparisons are not available with this wikipedia instance") ;	
 			
 			String term1 = prmTerm1.getValue(request).trim() ;
 			String term2 = prmTerm2.getValue(request).trim() ;
@@ -215,58 +219,58 @@ public class CompareService extends Service{
 			Label.Sense[] senses1 = label1.getSenses() ; 
 
 			if (senses1.length == 0) 
-				return new UnknownTermResponse(term1) ; 
+				return new UnknownTermMessage(request, term1) ; 
 			
 			Label label2 = new Label(wikipedia.getEnvironment(), term2, tp) ;
 			Label.Sense[] senses2 = label2.getSenses() ; 
 
 			if (senses2.length == 0) 
-				return new UnknownTermResponse(term2) ; 
+				return new UnknownTermMessage(request, term2) ; 
 			
 			LabelComparer.ComparisonDetails details = lblComparer.compare(label1, label2) ;
 			
-			response = new Response(details.getLabelRelatedness()) ;
+			msg = new Message(request, details.getLabelRelatedness()) ;
 			
 			if (!prmDisambiguation.getValue(request)) 
-				response.addDisambiguationDetails(details) ;
+				msg.addDisambiguationDetails(details) ;
 			
 			LabelComparer.SensePair bestInterpretation = details.getBestInterpretation() ;
 			if (bestInterpretation != null) 
-				response = addMutualLinksOrSnippets(response, bestInterpretation.getSenseA(), bestInterpretation.getSenseB(), request, wikipedia) ;
+				msg = addMutualLinksOrSnippets(msg, bestInterpretation.getSenseA(), bestInterpretation.getSenseB(), request, wikipedia) ;
 			//else 
 			//	this.buildWarningResponse("Could not identify plausable senses for the given terms", xmlResponse) ;
 			
-			return response ;
+			return msg ;
 			
 		case idPair:
 			
 			ArticleComparer artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
 			if (artComparer == null) 
-				return new ErrorResponse("article comparisons are not available with this wikipedia instance") ;
+				return new ErrorMessage(request, "article comparisons are not available with this wikipedia instance") ;
 			
 			Article art1 = new Article(wikipedia.getEnvironment(), prmId1.getValue(request)) ;
 			if (!(art1.getType() == PageType.article || art1.getType() == PageType.disambiguation)) 
-				return new InvalidIdResponse(prmId1.getValue(request)) ; 
+				return new InvalidIdMessage(request, prmId1.getValue(request)) ; 
 
 			Article art2 = new Article(wikipedia.getEnvironment(), prmId2.getValue(request)) ;
 			if (!(art2.getType() == PageType.article || art2.getType() == PageType.disambiguation)) 
-				return new InvalidIdResponse(prmId2.getValue(request)) ; 
+				return new InvalidIdMessage(request, prmId2.getValue(request)) ; 
 			
 			
-			response = new Response(artComparer.getRelatedness(art1, art2)) ;
+			msg = new Message(request, artComparer.getRelatedness(art1, art2)) ;
 			
 			if (prmTitles.getValue(request)) 
-				response.setTitles(art1.getTitle(), art2.getTitle()) ;
+				msg.setTitles(art1.getTitle(), art2.getTitle()) ;
 			
-			response = addMutualLinksOrSnippets(response, art1, art2, request, wikipedia) ;
+			msg = addMutualLinksOrSnippets(msg, art1, art2, request, wikipedia) ;
 			break ;
 		case idLists :
 			
 			artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
 			if (artComparer == null) 
-				return new ErrorResponse("article comparisons are not available with this wikipedia instance") ;
+				return new ErrorMessage(request, "article comparisons are not available with this wikipedia instance") ;
 			
-			response = new Response() ;
+			msg = new Message(request) ;
 			
 			//gather articles from ids1 ;
 			TreeSet<Article> articles1 = new TreeSet<Article>() ;
@@ -275,7 +279,7 @@ public class CompareService extends Service{
 					Article art = (Article)wikipedia.getPageById(id) ;
 					articles1.add(art) ;
 				} catch (Exception e) {
-					response.addInvalidId(id) ;
+					msg.addInvalidId(id) ;
 				}
 			}
 			
@@ -286,7 +290,7 @@ public class CompareService extends Service{
 					Article art = (Article)wikipedia.getPageById(id) ;
 					articles2.add(art) ;
 				} catch (Exception e) {
-					response.addInvalidId(id) ;
+					msg.addInvalidId(id) ;
 				}
 			}
 			
@@ -327,7 +331,7 @@ public class CompareService extends Service{
 					double relatedness = artComparer.getRelatedness(a1, a2)  ;
 					
 					if (relatedness >= minRelatedness) 
-						response.addComparison(new Comparison(min, max, relatedness, showTitles)) ;
+						msg.addComparison(new Comparison(min, max, relatedness, showTitles)) ;
 					
 					doneKeys.add(key) ;
 				}
@@ -335,19 +339,19 @@ public class CompareService extends Service{
 			break ;
 		}
 		
-		if (response == null) 
-			return new ErrorResponse("nothing to do") ;
+		if (msg == null) 
+			return new ErrorMessage(request, "nothing to do") ;
 		else		
-			return response ;
+			return msg ;
 	}
 	
-	private Response addMutualLinksOrSnippets(Response response, Article art1, Article art2, HttpServletRequest request, Wikipedia wikipedia) throws Exception {
+	private Message addMutualLinksOrSnippets(Message msg, Article art1, Article art2, HttpServletRequest request, Wikipedia wikipedia) throws Exception {
 
 		boolean getConnections = prmConnections.getValue(request) ;
 		boolean getSnippets = prmSnippets.getValue(request) ;
 		
 		if (!getConnections && !getSnippets)
-			return response;
+			return msg;
 		
 		
 		//Build a list of pages that link to both art1 and art2, ordered by average relatedness to them
@@ -398,7 +402,7 @@ public class CompareService extends Service{
 
 			for (Article connection:connections) {
 				if (c++ >= maxConsReturned) break ;
-				response.addConnection(new Connection(connection, rc.getRelatedness(connection, art1), rc.getRelatedness(connection, art2))) ;
+				msg.addConnection(new Connection(connection, rc.getRelatedness(connection, art1), rc.getRelatedness(connection, art2))) ;
 			}
 		}
 
@@ -459,12 +463,12 @@ public class CompareService extends Service{
 				formattedMarkup = emphasizePatternMatches(formattedMarkup, labelPattern) ;
 				formattedMarkup = getHub().getFormatter().format(formattedMarkup, request, wikipedia) ;
 				
-				response.addSnippet(new Snippet(snippet, formattedMarkup)) ;
+				msg.addSnippet(new Snippet(snippet, formattedMarkup)) ;
 				snippetsCollected ++ ;
 			}
 		}
 
-		return response ;
+		return msg ;
 	}
 	
 	private String emphasizePatternMatches(String sentence, Pattern pattern) {
@@ -513,30 +517,7 @@ public class CompareService extends Service{
 		return Pattern.compile(labelRegex.toString(), Pattern.CASE_INSENSITIVE) ;
 	}
 	
-	
-	protected static class UnknownTermResponse extends Service.Response {
-		
-		@Expose
-		@Attribute
-		String unknownTerm ;
-		
-		public UnknownTermResponse(String term) {
-			unknownTerm = term ;
-		}
-	}
-	
-	protected static class InvalidIdResponse extends Service.Response {
-		
-		@Expose
-		@Attribute
-		int invalidId ;
-		
-		public InvalidIdResponse(int id) {
-			invalidId = id ;
-		}
-	}
-
-	private static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@Attribute(required=false)
@@ -570,53 +551,87 @@ public class CompareService extends Service{
 		@ElementList(required=false, entry="invalidId")
 		private TreeSet<Integer> invalidIds ;
 		
-		public Response() {
+		private Message(HttpServletRequest request) {
+			super(request) ;
 			this.relatedness = null ;
 		}
 		
-		public Response(double relatedness) {
+		private Message(HttpServletRequest request, double relatedness) {
+			super(request) ;
 			this.relatedness = relatedness ;
 		}
 		
-		public void setTitles(String title1, String title2) {
+		private void setTitles(String title1, String title2) {
 			this.title1 = title1 ;
 			this.title2 = title2 ;
 		}
 		
-		public void addDisambiguationDetails(LabelComparer.ComparisonDetails details) {
+		private void addDisambiguationDetails(LabelComparer.ComparisonDetails details) {
 			disambiguationDetails = new DisambiguationDetails(details) ;			
 		}
 		
-		public void addConnection(Connection c) {
+		private void addConnection(Connection c) {
 			if (connections == null)
 				connections = new ArrayList<Connection>() ;
 			
 			connections.add(c) ;
 		}
 		
-		public void addSnippet(Snippet s) {
+		private void addSnippet(Snippet s) {
 			if (snippets == null)
 				snippets = new ArrayList<Snippet>() ;
 			
 			snippets.add(s) ;
 		}
 		
-		public void addComparison(Comparison c) {
+		private void addComparison(Comparison c) {
 			if (comparisons == null)
 				comparisons = new ArrayList<Comparison>() ;
 			
 			comparisons.add(c) ;
 		}
 		
-		public void addInvalidId(Integer id) {
+		private void addInvalidId(Integer id) {
 			if (invalidIds == null)
 				invalidIds = new TreeSet<Integer>() ;
 			
 			invalidIds.add(id) ;
 		}
+
+		public Double getRelatedness() {
+			return relatedness;
+		}
+
+		public String getTitle1() {
+			return title1;
+		}
+
+		public String getTitle2() {
+			return title2;
+		}
+
+		public DisambiguationDetails getDisambiguationDetails() {
+			return disambiguationDetails;
+		}
+
+		public List<Connection> getConnections() {
+			return Collections.unmodifiableList(connections);
+		}
+
+		public List<Snippet> getSnippets() {
+			return Collections.unmodifiableList(snippets);
+		}
+
+		public List<Comparison> getComparisons() {
+			return Collections.unmodifiableList(comparisons);
+		}
+
+		public SortedSet<Integer> getInvalidIds() {
+			return Collections.unmodifiableSortedSet(invalidIds);
+		}
 	}
 	
-	private static class DisambiguationDetails  {
+	public static class DisambiguationDetails  {
 		
 		@Expose
 		@Attribute
@@ -628,9 +643,9 @@ public class CompareService extends Service{
 		
 		@Expose
 		@ElementList(inline=true) 
-		ArrayList<Interpretation> interpretations ;
+		private ArrayList<Interpretation> interpretations ;
 		
-		public DisambiguationDetails(LabelComparer.ComparisonDetails details) {
+		private DisambiguationDetails(LabelComparer.ComparisonDetails details) {
 			
 			term1Candidates = details.getLabelA().getSenses().length ;
 			term2Candidates = details.getLabelB().getSenses().length ;
@@ -640,10 +655,21 @@ public class CompareService extends Service{
 				interpretations.add(new Interpretation(sp)) ;
 			}
 		}
-		
+
+		public int getTerm1Candidates() {
+			return term1Candidates;
+		}
+
+		public int getTerm2Candidates() {
+			return term2Candidates;
+		}
+
+		public List<Interpretation> getInterpretations() {
+			return Collections.unmodifiableList(interpretations);
+		}
 	}
 	
-	private static class Interpretation {
+	public static class Interpretation {
 		
 		@Expose
 		@Attribute
@@ -669,7 +695,7 @@ public class CompareService extends Service{
 		@Attribute
 		private double disambiguationConfidence ;
 		
-		public Interpretation(LabelComparer.SensePair sensePair) {
+		private Interpretation(LabelComparer.SensePair sensePair) {
 			id1 = sensePair.getSenseA().getId() ;
 			title1 = sensePair.getSenseA().getTitle() ;
 			
@@ -679,9 +705,33 @@ public class CompareService extends Service{
 			relatedness=sensePair.getSenseRelatedness() ;
 			disambiguationConfidence=sensePair.getDisambiguationConfidence() ;
 		}
+
+		public int getId1() {
+			return id1;
+		}
+
+		public int getId2() {
+			return id2;
+		}
+
+		public String getTitle1() {
+			return title1;
+		}
+
+		public String getTitle2() {
+			return title2;
+		}
+
+		public double getRelatedness() {
+			return relatedness;
+		}
+
+		public double getDisambiguationConfidence() {
+			return disambiguationConfidence;
+		}
 	}
 	
-	private static class Comparison {
+	public static class Comparison {
 		
 		@Expose
 		@Attribute
@@ -703,7 +753,7 @@ public class CompareService extends Service{
 		@Attribute
 		private double relatedness ;
 		
-		public Comparison(Article lowArt, Article highArt, double relatedness, boolean showTitles) {
+		private Comparison(Article lowArt, Article highArt, double relatedness, boolean showTitles) {
 			this.lowId = lowArt.getId() ;
 			this.highId = highArt.getId() ;
 			
@@ -714,9 +764,29 @@ public class CompareService extends Service{
 			
 			this.relatedness = relatedness ;
 		}
+
+		public int getLowId() {
+			return lowId;
+		}
+
+		public String getLowTitle() {
+			return lowTitle;
+		}
+
+		public int getHighId() {
+			return highId;
+		}
+
+		public String getHighTitle() {
+			return highTitle;
+		}
+
+		public double getRelatedness() {
+			return relatedness;
+		}
 	}
 	
-	private static class Snippet {
+	public static class Snippet {
 		
 		@Expose
 		@Attribute
@@ -738,7 +808,7 @@ public class CompareService extends Service{
 		@Attribute
 		private int sentenceIndex ;
 		
-		public Snippet(ConnectionSnippet cs, String markup) {
+		private Snippet(ConnectionSnippet cs, String markup) {
 			this.sourceId = cs.getSource().getId();
 			this.sourceTitle = cs.getSource().getTitle();
 			this.weight = cs.getWeight() ;
@@ -746,9 +816,29 @@ public class CompareService extends Service{
 			
 			this.markup = markup ;
 		}
+
+		public int getSourceId() {
+			return sourceId;
+		}
+
+		public String getSourceTitle() {
+			return sourceTitle;
+		}
+
+		public String getMarkup() {
+			return markup;
+		}
+
+		public double getWeight() {
+			return weight;
+		}
+
+		public int getSentenceIndex() {
+			return sentenceIndex;
+		}
 	}
 	
-	private static class Connection {
+	public static class Connection {
 		
 		@Expose
 		@Attribute
@@ -766,12 +856,28 @@ public class CompareService extends Service{
 		@Attribute
 		private double relatedness2 ;
 		
-		public Connection(Article art, double relatedness1, double relatedness2) {
+		private Connection(Article art, double relatedness1, double relatedness2) {
 			this.id = art.getId() ;
 			this.title = art.getTitle() ;
 			
 			this.relatedness1 = relatedness1 ;
 			this.relatedness2 = relatedness2 ;
+		}
+
+		public int getId() {
+			return id;
+		}
+
+		public String getTitle() {
+			return title;
+		}
+
+		public double getRelatedness1() {
+			return relatedness1;
+		}
+
+		public double getRelatedness2() {
+			return relatedness2;
 		}
 	}
 }

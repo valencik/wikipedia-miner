@@ -55,7 +55,7 @@ function processServiceListResponse(data) {
 		serviceList.append("<li><a href='.'>introduction</a></li>") ;
 	}
 
-	$.each(data.response.serviceGroups, function() {
+	$.each(data.serviceGroups, function() {
 				
 		serviceList.append("<li class='header'><em>" + this.name + "</em> services</li>") ;
 		
@@ -97,16 +97,16 @@ function requestServiceDetails(serviceName) {
 			responseFormat:'JSON'
 		},
 		function(data){
-			processServiceDetailsResponse(data);
+			processServiceDetailsResponse(data, serviceName);
 		}
 	);
 }
 
-function processServiceDetailsResponse(data) {
+function processServiceDetailsResponse(data, serviceName) {
 	
-	var desc = data.response.serviceDescription ;
+	var desc = data.serviceDescription ;
 	
-	$("#serviceDetails").append("<h2><em>" + desc.name + "</em> service</h2>") ;
+	$("#serviceDetails").append("<h2><em>" + serviceName + "</em> service</h2>") ;
 	
 	$("#serviceDetails").append(desc.details) ;
 	

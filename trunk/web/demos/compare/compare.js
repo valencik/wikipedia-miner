@@ -70,7 +70,7 @@ function checkProgress() {
 		{responseFormat:'JSON'},
 		function(data) {
 			
-			var progress = data.response.progress ;
+			var progress = data.progress ;
 
 			if (progress >= 1) {
 				ready() ;
@@ -134,7 +134,7 @@ function processRelatednessResponse(data) {
 	$('#loadingSpacer').hide() ;
 	
 	
-	var unknownTerm = data.response.unknownTerm ;
+	var unknownTerm = data.unknownTerm ;
 	
 	if (unknownTerm != undefined) {
 
@@ -151,7 +151,7 @@ function processRelatednessResponse(data) {
 	
 	
 	
-	$('#relationWeight').html(Math.round(data.response.relatedness*100) + "% related") ;
+	$('#relationWeight').html(Math.round(data.relatedness*100) + "% related") ;
 	
 	var term1 = urlParams["term1"] ;
 	var term2 = urlParams["term2"] ;
@@ -159,7 +159,7 @@ function processRelatednessResponse(data) {
 	$('#byTerm1').html(term1) ;
 	$('#byTerm2').html(term2) ;
 	
-	var interpretation = data.response.disambiguationDetails.interpretations[0] ;
+	var interpretation = data.disambiguationDetails.interpretations[0] ;
 	
 	if (interpretation != undefined) {
 	
@@ -173,8 +173,8 @@ function processRelatednessResponse(data) {
 		$('#noSenses').show() ;
 	}
 	
-	var candidates1 = Number(data.response.disambiguationDetails.term1Candidates) ;
-	var candidates2 = Number(data.response.disambiguationDetails.term2Candidates) ;
+	var candidates1 = Number(data.disambiguationDetails.term1Candidates) ;
+	var candidates2 = Number(data.disambiguationDetails.term2Candidates) ;
 	
 	if (candidates1 == 2)
 		$('#alternatives1').html("there is <a href='../search/?query=" + term1 + "'>1 other sense</a> for this term.") ;
@@ -192,7 +192,7 @@ function processRelatednessResponse(data) {
 		
 		
 	
-	var sortedConnections = data.response.connections.sort(function(a,b) {
+	var sortedConnections = data.connections.sort(function(a,b) {
 		var valA = a.title ;
 		var valB = b.title ;
 		
@@ -217,7 +217,7 @@ function processRelatednessResponse(data) {
 		$('#noConnections').show() ;
 	}
 	
-	var snippets = data.response.snippets ;
+	var snippets = data.snippets ;
 	
 	if (snippets.length > 0) {
 		

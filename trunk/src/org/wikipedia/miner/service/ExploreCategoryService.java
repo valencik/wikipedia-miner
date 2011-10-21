@@ -1,6 +1,8 @@
 package org.wikipedia.miner.service;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -11,17 +13,13 @@ import org.simpleframework.xml.ElementList;
 import org.w3c.dom.Element;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Category;
-import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.ExploreArticleService.ResponseImage;
-import org.wikipedia.miner.service.ExploreArticleService.ResponseLabel;
-import org.wikipedia.miner.service.ExploreArticleService.ResponsePage;
-import org.wikipedia.miner.service.ExploreArticleService.ResponseTranslation;
-import org.wikipedia.miner.service.Service.ParameterMissingResponse;
+import org.wikipedia.miner.service.ExploreArticleService.Page;
 import org.wikipedia.miner.service.param.BooleanParameter;
 import org.wikipedia.miner.service.param.IntParameter;
 import org.wikipedia.miner.service.param.ParameterGroup;
 import org.wikipedia.miner.service.param.StringParameter;
+import org.wikipedia.miner.service.UtilityMessages.*;
 
 import com.google.gson.annotations.Expose;
 
@@ -92,15 +90,14 @@ public class ExploreCategoryService extends Service{
 		
 	}
 	
-	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
-		
+	public Service.Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		ParameterGroup grp = getSpecifiedParameterGroup(request) ;
 		
 		if (grp == null) 
-			return new ParameterMissingResponse() ;
+			return new ParameterMissingMessage(request) ;
 		
 		Category cat = null ;
 		
@@ -109,16 +106,16 @@ public class ExploreCategoryService extends Service{
 		case id :
 			Integer id = prmId.getValue(request) ;
 			
-			Page page = wikipedia.getPageById(id) ;
+			org.wikipedia.miner.model.Page page = wikipedia.getPageById(id) ;
 			if (page==null) 
-				return new InvalidIdResponse(id) ;
+				return new InvalidIdMessage(request, id) ;
 			
 			switch(page.getType()) {
 				case category:
 					cat = (Category)page ;
 					break ;
 				default:
-					return new InvalidIdResponse(id) ;
+					return new InvalidIdMessage(request, id) ;
 			}
 			break ;
 		case title :
@@ -126,20 +123,20 @@ public class ExploreCategoryService extends Service{
 			cat = wikipedia.getCategoryByTitle(title) ;
 			
 			if (cat == null)
-				return new InvalidTitleResponse(title) ;
+				return new InvalidTitleMessage(request, title) ;
 			break ;
 		}
 		
-		Response response = new Response(cat) ;
+		Message msg = new Message(request, cat) ;
 		
 		if (prmParentCategories.getValue(request)) {
 			
 			Category[] parents = cat.getParentCategories() ;
 			
-			response.setTotalParentCategories(parents.length) ;
+			msg.setTotalParentCategories(parents.length) ;
 
 			for (Category parent:parents) 
-				response.addParentCategory(new ResponsePage(parent)) ;
+				msg.addParentCategory(new Page(parent)) ;
 		}
 		
 		if (prmChildCategories.getValue(request)) {
@@ -153,9 +150,9 @@ public class ExploreCategoryService extends Service{
 		
 			Category[] children = cat.getChildCategories() ;
 			
-			response.setTotalChildCategories(children.length) ;
+			msg.setTotalChildCategories(children.length) ;
 			for (int i=start ; i < max && i < children.length ; i++) 
-				response.addChildCategory(new ResponsePage(children[i])) ;
+				msg.addChildCategory(new Page(children[i])) ;
 		}
 		
 		if (prmChildArticles.getValue(request)) {
@@ -169,52 +166,27 @@ public class ExploreCategoryService extends Service{
 			
 			Article[] children = cat.getChildArticles() ;
 			
-			response.setTotalChildArticles(children.length) ;
+			msg.setTotalChildArticles(children.length) ;
 			for (int i=start ; i < max && i < children.length ; i++) 
-				response.addChildArticle(new ResponsePage(children[i])) ;
+				msg.addChildArticle(new Page(children[i])) ;
 		}
 
-		return response ;
-	}
-
-	
-	public class InvalidIdResponse extends Service.ErrorResponse {
-
-		@Expose 
-		@Attribute
-		private Integer invalidId ;
-
-		public InvalidIdResponse(Integer id) {
-			super("'" + id + "' is not a valid article id") ;	
-			invalidId = id ;
-		}
-	}
-
-	public class InvalidTitleResponse extends Service.ErrorResponse {
-
-		@Expose 
-		@Attribute
-		private String invalidTitle ;
-
-		public InvalidTitleResponse(String title) {
-			super("'" + title + "' is not a valid article title") ;	
-			invalidTitle = title ;
-		}
+		return msg ;
 	}
 	
-	public static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 
 		@Expose
 		@Attribute
-		int id ;
+		private int id ;
 
 		@Expose
 		@Attribute
-		String title ;
+		private String title ;
 
 		@Expose
 		@ElementList(required=false, entry="parentCategory") 
-		ArrayList<ResponsePage> parentCategories = null ;
+		private ArrayList<Page> parentCategories = null ;
 
 		@Expose
 		@Attribute(required=false)
@@ -222,7 +194,7 @@ public class ExploreCategoryService extends Service{
 		
 		@Expose
 		@ElementList(required=false, entry="childCategory") 
-		ArrayList<ResponsePage> childCategories = null ;
+		private ArrayList<Page> childCategories = null ;
 
 		@Expose
 		@Attribute(required=false)
@@ -230,53 +202,82 @@ public class ExploreCategoryService extends Service{
 		
 		@Expose
 		@ElementList(required=false, entry="childArticle") 
-		ArrayList<ResponsePage> childArticles = null ;
+		private ArrayList<Page> childArticles = null ;
 
 		@Expose
 		@Attribute(required=false)
 		private Integer totalChildArticles ;
 
-	
-
-		public Response(Category cat) {	
+		private Message(HttpServletRequest request, Category cat) {	
+			super(request) ;
 			this.id = cat.getId();
 			this.title = cat.getTitle();
 		}
 
-		public void addParentCategory(ResponsePage p) {
+		private void addParentCategory(Page p) {
 			if (parentCategories == null)
-				parentCategories = new ArrayList<ResponsePage>() ;
+				parentCategories = new ArrayList<Page>() ;
 
 			parentCategories.add(p) ;
 		}
 
-		public void setTotalParentCategories(int total) {
+		private void setTotalParentCategories(int total) {
 			totalParentCategories = total ;
 		}
 
-		public void addChildCategory(ResponsePage p) {
+		private void addChildCategory(Page p) {
 			if (childCategories == null)
-				childCategories = new ArrayList<ResponsePage>() ;
+				childCategories = new ArrayList<Page>() ;
 
 			childCategories.add(p) ;
 		}
 
-		public void setTotalChildCategories(int total) {
+		private void setTotalChildCategories(int total) {
 			totalChildCategories = total ;
 		}
 
-		public void addChildArticle(ResponsePage p) {
+		private void addChildArticle(Page p) {
 			if (childArticles == null)
-				childArticles = new ArrayList<ResponsePage>() ;
+				childArticles = new ArrayList<Page>() ;
 
 			childArticles.add(p) ;
 		}
 
-		public void setTotalChildArticles(int total) {
+		private void setTotalChildArticles(int total) {
 			totalChildArticles = total ;
 		}
 
+		public int getId() {
+			return id;
+		}
 
+		public String getTitle() {
+			return title;
+		}
+
+		public List<Page> getParentCategories() {
+			return Collections.unmodifiableList(parentCategories);
+		}
+
+		public Integer getTotalParentCategories() {
+			return totalParentCategories;
+		}
+
+		public List<Page> getChildCategories() {
+			return Collections.unmodifiableList(childCategories);
+		}
+
+		public Integer getTotalChildCategories() {
+			return totalChildCategories;
+		}
+
+		public List<Page> getChildArticles() {
+			return Collections.unmodifiableList(childArticles);
+		}
+
+		public Integer getTotalChildArticles() {
+			return totalChildArticles;
+		}
 	}
 	
 }

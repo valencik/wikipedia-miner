@@ -54,7 +54,9 @@
 			       		function(response){							
 							parent.results.document.write(response) ;
 							
-							parent.results.$.ready() ;
+							//hacky, but delay this for 1 second
+							$.delay(1000).parent.results.$.ready() ;
+							//wm_addDefinitionTooltipsToAllLinks(parent.results.body) ;
 						}
 					);
 				}

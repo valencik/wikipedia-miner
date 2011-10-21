@@ -1,10 +1,8 @@
 package org.wikipedia.miner.service;
 
-import java.text.DecimalFormat;
-
 import javax.servlet.http.HttpServletRequest;
 
-import org.simpleframework.xml.*;
+import org.simpleframework.xml.Attribute;
 import org.wikipedia.miner.model.Wikipedia;
 
 import com.google.gson.annotations.Expose;
@@ -16,9 +14,6 @@ public class ProgressService extends Service {
 	 */
 	private static final long serialVersionUID = -1217650265475115103L;
 	
-	private DecimalFormat df = new DecimalFormat("#.00") ;
-	
-	
 	public ProgressService() {
 		super("meta","Monitors progress of service initialization",
 				"<p>Wikipedia Miner can take a while to get started. This service allows polling to see how much progress has been made loading up a particular edition of Wikipedia</p>",
@@ -28,13 +23,13 @@ public class ProgressService extends Service {
 	}
 	
 	@Override
-	public Response buildWrappedResponse(HttpServletRequest request) {
+	public Message buildWrappedResponse(HttpServletRequest request) {
 		
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
 		double progress = wikipedia.getEnvironment().getProgress() ;
 		
-		return new Response(progress) ;
+		return new Message(request, progress) ;
 	}
 	
 	@Override
@@ -47,14 +42,19 @@ public class ProgressService extends Service {
 		return 0 ;
 	}
 	
-	public static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@Attribute
-		double progress ;
+		private double progress ;
 		
-		public Response(double progress) {
+		private Message(HttpServletRequest request, double progress) {
+			super(request) ;
 			this.progress = progress ;
+		}
+
+		public double getProgress() {
+			return progress;
 		}
 	}
 

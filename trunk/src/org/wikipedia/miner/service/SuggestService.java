@@ -19,15 +19,15 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.ElementList;
-import org.w3c.dom.Element;
 import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.db.struct.DbLinkLocation;
 import org.wikipedia.miner.db.struct.DbLinkLocationList;
 import org.wikipedia.miner.model.Article;
-import org.wikipedia.miner.model.Category;
 import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Page.PageType;
+import org.wikipedia.miner.service.UtilityMessages.ErrorMessage;
+import org.wikipedia.miner.service.UtilityMessages.ParameterMissingMessage;
 import org.wikipedia.miner.service.param.FloatParameter;
 import org.wikipedia.miner.service.param.IntListParameter;
 import org.wikipedia.miner.service.param.IntParameter;
@@ -85,15 +85,15 @@ public class SuggestService extends Service {
 		) ;
 	}
 
-	public Service.Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Service.Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
 		Integer[] queryTopicIds = prmQueryTopics.getValue(request) ;
 		
 		if (queryTopicIds == null || queryTopicIds.length == 0) 
-			return new ParameterMissingResponse() ;
+			return new ParameterMissingMessage(request) ;
 		
 		Wikipedia wikipedia = this.getWikipedia(request) ;
-		Response response = new Response() ;
+		Message msg = new Message(request) ;
 		
 		//identify query topics
 		HashMap<Integer,Article> queryTopics = new HashMap<Integer,Article>() ;
@@ -104,7 +104,7 @@ public class SuggestService extends Service {
 		}
 		
 		if (queryTopics.isEmpty()) 
-			return new ErrorResponse("no valid query topic ids specified") ;
+			return new ErrorMessage(request, "no valid query topic ids specified") ;
 			
 		//gather roughly weighted suggestions
 		TreeSet<Article> roughSuggestions = getRoughSuggestions(queryTopics, wikipedia) ;
@@ -121,11 +121,11 @@ public class SuggestService extends Service {
 		
 		//build xml response
 		for (SuggestionCategory cat: refinedCategories) 
-			response.addCategory(cat) ;
+			msg.addCategory(cat) ;
 		
-		response.setUncategorizedSuggestions(refinedSuggestions, categorizedIds) ;
+		msg.setUncategorizedSuggestions(refinedSuggestions, categorizedIds) ;
 		
-		return response;
+		return msg;
 	}
 	
 	
@@ -244,7 +244,7 @@ public class SuggestService extends Service {
 		TIntObjectHashMap<SuggestionCategory> categoriesById = new TIntObjectHashMap<SuggestionCategory>() ;
 
 		for (Article suggestion:suggestions) {
-			for (Category cat : suggestion.getParentCategories()) {
+			for (org.wikipedia.miner.model.Category cat : suggestion.getParentCategories()) {
 
 				SuggestionCategory category = categoriesById.get(cat.getId()) ;
 
@@ -321,12 +321,12 @@ public class SuggestService extends Service {
 	}
 	
 	
-	private class SuggestionCategory extends Category {
+	private class SuggestionCategory extends org.wikipedia.miner.model.Category {
 
 		private ArrayList<Article> suggestions ;
 		private TIntHashSet idsToIgnore ;
 
-		public SuggestionCategory(Category cat) {
+		public SuggestionCategory(org.wikipedia.miner.model.Category cat) {
 			super(cat.getEnvironment(), cat.getId()) ;
 
 			suggestions = new ArrayList<Article>() ;
@@ -376,32 +376,42 @@ public class SuggestService extends Service {
 	
 	
 	
-	private static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@ElementList(entry="suggestionCategory")
-		ArrayList<ResponseCategory> suggestionCategories = new ArrayList<ResponseCategory>() ;
+		private ArrayList<Category> suggestionCategories = new ArrayList<Category>() ;
 		
 		@Expose
 		@ElementList(entry="suggestion")
-		ArrayList<ResponseSuggestion> uncategorizedSuggestions = new ArrayList<ResponseSuggestion>();
+		private ArrayList<Suggestion> uncategorizedSuggestions = new ArrayList<Suggestion>();
 		
-		
-		public void addCategory(SuggestionCategory cat) {
-			
-			suggestionCategories.add(new ResponseCategory(cat)) ;
+		private Message(HttpServletRequest request) {
+			super(request) ;
 		}
 		
-		public void setUncategorizedSuggestions(List<Article>allSuggestions, TIntHashSet categorizedIds) {
+		private void addCategory(SuggestionCategory cat) {
+			suggestionCategories.add(new Category(cat)) ;
+		}
+		
+		private void setUncategorizedSuggestions(List<Article>allSuggestions, TIntHashSet categorizedIds) {
 			
 			for (Article art:allSuggestions) {
 				if (!categorizedIds.contains(art.getId())) 
-					uncategorizedSuggestions.add(new ResponseSuggestion(art)) ;
+					uncategorizedSuggestions.add(new Suggestion(art)) ;
 			}	
+		}
+
+		public List<Category> getSuggestionCategories() {
+			return Collections.unmodifiableList(suggestionCategories);
+		}
+
+		public List<Suggestion> getUncategorizedSuggestions() {
+			return Collections.unmodifiableList(uncategorizedSuggestions);
 		}
 	}
 	
-	private static class ResponseCategory {
+	public static class Category {
 	
 		@Expose
 		@Attribute
@@ -417,43 +427,69 @@ public class SuggestService extends Service {
 		
 		@Expose
 		@ElementList(entry="suggestion", inline=true)
-		private ArrayList<ResponseSuggestion> suggestions ;
+		private ArrayList<Suggestion> suggestions ;
 				
-		public ResponseCategory(SuggestionCategory cat) {
+		private Category(SuggestionCategory cat) {
 			
 			id = cat.getId() ;
 			title = cat.getTitle() ;
 			weight = cat.getWeight() ;
 			
-			suggestions = new ArrayList<ResponseSuggestion>() ;
+			suggestions = new ArrayList<Suggestion>() ;
 			for (Article art:cat.getSuggestions()) {
-				suggestions.add(new ResponseSuggestion(art)) ;
+				suggestions.add(new Suggestion(art)) ;
 			}
 		}
-		
-		
+
+		public int getId() {
+			return id;
+		}
+
+		public String getTitle() {
+			return title;
+		}
+
+		public double getWeight() {
+			return weight;
+		}
+
+		public List<Suggestion> getSuggestions() {
+			return Collections.unmodifiableList(suggestions);
+		}
 	}
 	
-	private static class ResponseSuggestion {
+	public static class Suggestion {
 		
 
 		@Expose
 		@Attribute
-		int id ;
+		private int id ;
 
 		@Expose
 		@Attribute
-		String title ;
+		private String title ;
 
 		@Expose
 		@Attribute
-		double weight ;
+		private double weight ;
 		
-		public ResponseSuggestion(Article art) {
+		private Suggestion(Article art) {
 			
 			id = art.getId() ;
 			title = art.getTitle() ;
 			weight = art.getWeight() ;
+		}
+
+		public int getId() {
+			return id;
+		}
+
+		public String getTitle() {
+			return title;
+		}
+
+		public double getWeight() {
+			return weight;
 		}
 	}	
 }

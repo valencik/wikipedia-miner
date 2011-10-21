@@ -25,9 +25,9 @@ public class UsageService extends Service{
 	}
 
 	@Override
-	public Response buildWrappedResponse(HttpServletRequest request) throws Exception {
+	public Message buildWrappedResponse(HttpServletRequest request) throws Exception {
 		
-		return new Response(getHub().identifyClient(request)) ;
+		return new Message(request, getHub().identifyClient(request)) ;
 	}
 
 	@Override 
@@ -35,14 +35,19 @@ public class UsageService extends Service{
 		return 0 ;
 	}
 	
-	public static class Response extends Service.Response {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@Element
 		private Client client ;
 		
-		public Response(Client c) {
+		private Message(HttpServletRequest request, Client c) {
+			super(request) ;
 			client = c ;
+		}
+
+		public Client getClient() {
+			return client;
 		}
 	}
 }

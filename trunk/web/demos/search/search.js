@@ -45,6 +45,22 @@ function doTooltipBindings() {
 	      content: "<p>Pages that link to this article. Some of these represent related topics, others are fairly random.</p> <p>The toolkit provides relatedness measures&mdash;indicated here by the brightness of each link&mdash;to help separate them.</p>",
 		  style: { name: 'wmstyle' }
     }) ;
+	
+	$('#parentCatHelp').qtip({
+	      content: "Categories to which this category belongs. These represent broader topics or ways of organizing this one.",
+		  style: { name: 'wmstyle' }
+    }) ;
+	
+	$('#childCatHelp').qtip({
+	      content: "Categories which belong to this category. These represent narrower topics.",
+		  style: { name: 'wmstyle' }
+    }) ;
+	
+	$('#childArtHelp').qtip({
+	      content: "Articles which belong to this category. These represent narrower topics.",
+		  style: { name: 'wmstyle' }
+    }) ;
+	
 }
 
 
@@ -67,7 +83,7 @@ function checkProgress() {
 		"../../services/getProgress",
 		{responseFormat:'json'},
 		function(data) {
-			var progress = data.response.progress ;
+			var progress = data.progress ;
 
 			if (progress >= 1) {
 				ready() ;
@@ -129,7 +145,30 @@ function ready() {
 				responseFormat:'json'
 			},
 			function(data){
-				processArticleResponse(data.response) ;
+				processArticleResponse(data) ;
+			}
+		);
+		
+		return ;
+	}
+	
+	if (catId != undefined) {
+		
+		$('#instructions').hide() ;
+		$('#loading').show() ;
+		
+		$.get(
+			"../../services/exploreCategory", 
+			{
+				id: catId,
+				parentCategories:true,
+				childCategories: true,
+				childArticles: true,
+				childArticleLimit: 100,
+				responseFormat:'json'
+			},
+			function(data){
+				processCategoryResponse(data) ;
 			}
 		);
 		
@@ -151,22 +190,20 @@ function ready() {
 				responseFormat:'json'
 			},
 			function(data){
-				processSearchResponse(data.response) ;
+				processSearchResponse(data) ;
 			}
 		);
-		
-		
 	}
 	
 }
 
 
-function processSearchResponse(response) {
+function processSearchResponse(data) {
 	
 	$('#loading').hide() ;
 	
 	
-	var label = response.labels[0] ;
+	var label = data.labels[0] ;
 	var senses = label.senses ;	
 	
 	if (senses.length > 1) {
@@ -205,7 +242,7 @@ function processSearchResponse(response) {
 				function(data){
 					
 					var id = data.request.id ;
-					var definition = data.response.definition ;
+					var definition = data.definition ;
 					
 					var senseBox = $('#senseBox_' + id)
 					
@@ -244,7 +281,7 @@ function processSearchResponse(response) {
 				responseFormat:'JSON'
 			},
 			function(data){
-				processArticleResponse(data.response) ;
+				processArticleResponse(data) ;
 			}
 		);
 		
@@ -260,16 +297,16 @@ function processSearchResponse(response) {
 }
 
 
-function processArticleResponse(response) {
+function processArticleResponse(data) {
 	
 	$('#loading').hide() ;
 	$('#articleDetails').show() ;
 	
 
 	
-	$('#artTitle').html(response.title) ;
+	$('#artTitle').html(data.title) ;
 	
-	var origDefinition = response.definition ;
+	var origDefinition = data.definition ;
 	
 	if (origDefinition == undefined || origDefinition.length == 0)
 		origDefinition = "No definition avaialble" ;
@@ -297,7 +334,7 @@ function processArticleResponse(response) {
 	wm_addDefinitionTooltipsToAllLinks($('#artDefinition')) ;
 	
 	
-	var sortedLabels = response.labels.sort(function(a,b) {
+	var sortedLabels = data.labels.sort(function(a,b) {
 		var valA = a.text ;
 		var valB = b.text ;
 		
@@ -339,7 +376,7 @@ function processArticleResponse(response) {
 		$('#noLabels').show() ;
 	}
 	
-	var sortedTranslations = response.translations.sort(function(a,b) {
+	var sortedTranslations = data.translations.sort(function(a,b) {
 		var valA = a.lang ;
 		var valB = b.lang ;
 		
@@ -355,7 +392,7 @@ function processArticleResponse(response) {
 		$('#noTranslations').show() ;
 	}
 	
-	var sortedCategories = response.parentCategories.sort(function(a,b) {
+	var sortedCategories = data.parentCategories.sort(function(a,b) {
 		var valA = a.title ;
 		var valB = b.title ;
 		
@@ -377,7 +414,7 @@ function processArticleResponse(response) {
 		$('#noCategories').show() ;
 	}
 	
-	var sortedOutLinks = response.outLinks.sort(function(a,b) {
+	var sortedOutLinks = data.outLinks.sort(function(a,b) {
 		var valA = a.title ;
 		var valB = b.title ;
 		
@@ -418,7 +455,7 @@ function processArticleResponse(response) {
 	}
 	
 	
-	var sortedInLinks = response.inLinks.sort(function(a,b) {
+	var sortedInLinks = data.inLinks.sort(function(a,b) {
 		var valA = a.title ;
 		var valB = b.title ;
 		
@@ -457,5 +494,78 @@ function processArticleResponse(response) {
 	
 }
 
+function processCategoryResponse(data) {
+	
+	$('#loading').hide() ;
+	$('#categoryDetails').show() ;
+	
+	$('#catTitle').html(data.title) ;
+	
+	if (data.parentCategories == undefined) {
+		$('#parentCats').hide();
+		$('#noParentCats').show();
+	} else {
+		var sortedParentCats = data.parentCategories.sort(function(a,b) {
+			var valA = a.title ;
+			var valB = b.title ;
+			
+			return valA < valB ? -1 : valA == valB? 0 : 1 ;
+		}) ;
+		
+		$.each(sortedParentCats, function() {
+			var category = $("<a href='?catId=" + this.id + "'>" + this.title + "</a>") ;
+			
+			var li = $("<li></li>") ;
+			li.append(category) ;
+
+			$('#parentCats').append(li) ;
+		}) ;
+	}
+	
+	if (data.childCategories == undefined) {
+		$('#childCats').hide() ;
+		$('#noChildCats').show() ;
+	} else {
+		var sortedChildCats = data.childCategories.sort(function(a,b) {
+			var valA = a.title ;
+			var valB = b.title ;
+			
+			return valA < valB ? -1 : valA == valB? 0 : 1 ;
+		}) ;
+	
+		$.each(sortedChildCats, function() {
+			var category = $("<a href='?catId=" + this.id + "'>" + this.title + "</a>") ;
+			
+			var li = $("<li></li>") ;
+			li.append(category) ;
+
+			$('#childCats').append(li) ;
+		}) ;
+	}
+	
+	if (data.childArticles == undefined) {
+		$('#childArts').hide() ;
+		$('#noChildArts').show() ;
+	} else {
+		var sortedChildArts = data.childArticles.sort(function(a,b) {
+			var valA = a.title ;
+			var valB = b.title ;
+			
+			return valA < valB ? -1 : valA == valB? 0 : 1 ;
+		}) ;
+
+		$.each(sortedChildArts, function() {
+			var link = $("<a pageId='" + this.id + "' href='./?artId=" + this.id + "'>" + this.title + "</a>") ;
+			
+			var li = $("<li></li>") ;
+			li.append(link) ;
+
+			$('#childArts').append(li) ;
+		}) ;
+	}
+	
+	wm_addDefinitionTooltipsToAllLinks($('#childArts')) ;
+	
+}
 
 
