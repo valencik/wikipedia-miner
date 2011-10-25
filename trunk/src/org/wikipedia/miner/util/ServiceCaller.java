@@ -25,10 +25,8 @@ public class ServiceCaller {
 	
 	//TODO: use hub config to specify how to get around a proxy
 	
-	public URL _wmServer ;
-	public Gson _gson = new Gson() ;
-
-	
+	private URL _wmServer ;
+	private Gson _gson = new Gson() ;
 	
 	/**
 	 * 
@@ -99,7 +97,6 @@ public class ServiceCaller {
 	    wr.write(paramData.toString());
 	    wr.flush();
 		
-	    
 	    //read response
 	    StringBuffer response = new StringBuffer() ;
 	    BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getInputStream()));
@@ -112,11 +109,8 @@ public class ServiceCaller {
 	    rd.close();
 		
 		return response.toString() ;
-		
 	}
-	
-	
-	
+
 	@SuppressWarnings("serial")
 	public class ServiceException extends Exception {
 		
