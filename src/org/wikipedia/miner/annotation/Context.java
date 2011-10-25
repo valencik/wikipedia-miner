@@ -43,7 +43,7 @@ public class Context {
 	 * @param relatednessCache a cache in which relatedness measures will be saved so they aren't repeatedly calculated.
 	 * @param maxSize the maximum number of anchors that will be used (the more there are, the longer disambiguation takes, but the more accurate it is likely to be).
 	 * @throws Exception 
-	 */ 
+	 */ /*
 	public Context(Collection<Label> unambigLabels, RelatednessCache relatednessCache, int maxSize) throws Exception {
 		
 		this.relatednessCache = relatednessCache ;
@@ -83,12 +83,12 @@ public class Context {
 			if (c++ > maxSize)
 				break ;
 			
-			System.out.println(" - cntxt art:" + art + ", w: " + art.getWeight()) ;
+			//System.out.println(" - cntxt art:" + art + ", w: " + art.getWeight()) ;
 			
 			totalWeight += art.getWeight() ;
 			contextArticles.add(art) ;			
 		}		
-	}
+	}*/
 	
 	
 	/**
@@ -100,54 +100,77 @@ public class Context {
 	 * @param minSenseLimit the minimum prior probability of an anchors sense that will be used as context.  
 	 * @throws Exception 
 	 */
-	public Context(Collection<Label> ambigAnchors, RelatednessCache relatednessCache, double maxSize, double minSenseLimit) throws Exception {
+	public Context(Collection<Label> labels, RelatednessCache relatednessCache, int maxSize, double minSenseLimit) throws Exception {
 		
 		this.relatednessCache = relatednessCache ;
+				
+		int maxCandidates = maxSize*5 ;
 		
-		HashSet<Integer> doneIds = new HashSet<Integer>() ;		
-		Vector<Label.Sense> senses = new Vector<Label.Sense>() ;
-		for (Label label: ambigAnchors) {
+		//first gather senses and sort them according to (label.linkProb * sense.priorProb) 
+		//only maintain a set of maxSize*5 so we don't bother adding all candidates
+		ArrayList<Article> articles = new ArrayList<Article>() ;
+		for (Label label:labels) {
+			
+			double lp = label.getLinkProbability() ;
 			
 			for (Label.Sense sense:label.getSenses()) {
+			
+				double sp = sense.getPriorProbability() ;
 				
-				double pp = sense.getPriorProbability() ;
+				//if below sp threshold, skip
+				if (sp < minSenseLimit) break ;
 				
-				if (pp < minSenseLimit) break ;
+				//if this is a date, skip
+				if (isDate(sense)) continue ;
 				
-				if (!isDate(sense) && !doneIds.contains(sense.getId())) {
-					sense.setWeight(label.getLinkProbability() * pp) ;
-					senses.add(sense) ;
-					doneIds.add(sense.getId()) ;
-				}
-			}
+				sense.setWeight((lp + sp)/2) ;	
+				//sense.setWeight(sp) ;
+				int index = Collections.binarySearch(articles, sense) ;
+					
+				//if already in list, skip
+				if (index >= 0) continue ;
+				
+				index = (-1*index) -1 ;
+				
+				//if belongs at end of too large a set, skip
+				if (index >= maxCandidates) continue ;
+				
+				articles.add(index, sense) ;
+				
+				if (articles.size() > maxCandidates)
+					articles.remove(maxCandidates-1) ;
+			}	
 		}
 		
-		TreeSet<Article> sortedContextArticles = new TreeSet<Article>() ;
-		for (Label.Sense s:senses) {
-			double linkProb = s.getWeight() ;
+		//now weight candidates by their relatedness to each other
+		for (Article art:articles) {
 			
 			double avgRelatedness = 0 ;
 			
-			for (Label.Sense s2: senses) 
-				avgRelatedness += this.relatednessCache.getRelatedness(s, s2) ; 
-				
-			avgRelatedness = avgRelatedness / (senses.size()) ;
+			for (Article art2:articles) {
+				if (art.getId() != art2.getId()) {
+					avgRelatedness += relatednessCache.getRelatedness(art, art2) ;
+				}
+			}
 			
-			double weight = (linkProb + avgRelatedness + avgRelatedness)/3 ;
+			avgRelatedness = avgRelatedness / (articles.size() - 1) ;
 			
-			s.setWeight(weight) ;
-			sortedContextArticles.add(s) ;
+			art.setWeight((art.getWeight() + (4*avgRelatedness)) /5) ;
 		}
+		
+		Collections.sort(articles) ;
 		
 		contextArticles = new Vector<Article>() ; 
 		int c = 0 ;
-		for (Article art: sortedContextArticles) {
+		for (Article art: articles) {
 			if (c++ > maxSize)
 				break ;
 			
+			//System.out.println("context: " + art + " " + art.getWeight()) ;
+			
 			totalWeight += art.getWeight() ;
 			contextArticles.add(art) ;			
-		}	
+		}
 	}
 
 	/**

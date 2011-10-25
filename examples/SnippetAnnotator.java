@@ -9,6 +9,7 @@ import java.util.Collection;
 import org.wikipedia.miner.annotation.Disambiguator;
 import org.wikipedia.miner.annotation.Topic;
 import org.wikipedia.miner.annotation.TopicDetector;
+import org.wikipedia.miner.annotation.TopicDetector.DisambiguationPolicy;
 import org.wikipedia.miner.annotation.preprocessing.DocumentPreprocessor;
 import org.wikipedia.miner.annotation.preprocessing.PreprocessedDocument;
 import org.wikipedia.miner.annotation.preprocessing.WikiPreprocessor;
@@ -36,7 +37,7 @@ public class SnippetAnnotator {
 	public SnippetAnnotator(Wikipedia wikipedia) throws Exception {
 		_preprocessor = new WikiPreprocessor(wikipedia) ;
 		_disambiguator = new Disambiguator(wikipedia) ;
-		_topicDetector = new TopicDetector(wikipedia, _disambiguator, true, false) ;
+		_topicDetector = new TopicDetector(wikipedia, _disambiguator) ;
 		_linkDetector = new LinkDetector(wikipedia) ;
 		_tagger = new WikiTagger() ;
 	}
@@ -65,19 +66,19 @@ public class SnippetAnnotator {
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[0])) ;
 		conf.clearDatabasesToCache() ;
-		//conf.setTopicDisambiguationModel(new File("temp/disambig.model")) ;
-		//conf.setLinkDetectionModel(new File("temp/detect.model")) ;
+		conf.setTopicDisambiguationModel(new File("temp/disambig.model")) ;
+		conf.setLinkDetectionModel(new File("temp/detect.model")) ;
 		
 		Wikipedia wikipedia = new Wikipedia(conf, false) ;
 		
 		
-		String testText = "Martial artists competing in Pride parade around the ring during the tournament's opening ceremony" ;		
+		String testText = "Mixed martial artists competing in Pride parade around the ring during the tournament's opening ceremony" ;		
 		
 		SnippetAnnotator annotator = new SnippetAnnotator(wikipedia) ;
 		
 		annotator.annotate(testText) ;
 		
-		/*
+		
 		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in)) ;
 		
 		while (true) {
@@ -88,6 +89,6 @@ public class SnippetAnnotator {
 				break ;
 			
 			annotator.annotate(line) ;
-		} */
+		} 
 	}
 }

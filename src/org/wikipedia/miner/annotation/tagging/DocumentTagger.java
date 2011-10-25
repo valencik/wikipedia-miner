@@ -164,7 +164,7 @@ public abstract class DocumentTagger {
 				}
 			}
 
-			if (maxInnerWeight > outerWeight) {
+			if ((maxInnerWeight*0.8) > outerWeight) {
 				// want to keep the inner references
 				references.remove(i) ;
 				i = i-1 ;				

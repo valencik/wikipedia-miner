@@ -45,12 +45,14 @@ import org.wikipedia.miner.annotation.preprocessing.*;
  */
 public class TopicDetector {
 	
+	public enum DisambiguationPolicy {STRICT, LOOSE} ;
+	
 	private Wikipedia wikipedia ;
 	private Disambiguator disambiguator ;
 	
 	
-	private boolean strictDisambiguation ;
-	private boolean allowDisambiguations ;
+	private DisambiguationPolicy disambigPolicy = DisambiguationPolicy.STRICT;
+	private boolean allowDisambiguations = false ;
 	
 	private int maxTopicsForRelatedness = 25 ;
 	
@@ -67,31 +69,37 @@ public class TopicDetector {
 	 * @param allowDisambiguations 
 	 * @throws IOException 
 	 */
-	public TopicDetector(Wikipedia wikipedia, Disambiguator disambiguator, boolean strictDisambiguation, boolean allowDisambiguations) throws IOException {
+	public TopicDetector(Wikipedia wikipedia, Disambiguator disambiguator) throws IOException {
 		this.wikipedia = wikipedia ;
 		this.disambiguator = disambiguator ;
 		
 		this.nGrammer = new NGrammer(wikipedia.getConfig().getSentenceDetector(), wikipedia.getConfig().getTokenizer()) ;
 		this.nGrammer.setMaxN(disambiguator.getMaxLabelLength()) ;
 		
-		this.strictDisambiguation = strictDisambiguation ;
-		this.allowDisambiguations = allowDisambiguations ;
-		
-		/*
-		this.stopwords = new HashSet<String>() ;
-		if (stopwordFile != null) {
-			BufferedReader input = new BufferedReader(new FileReader(stopwordFile)) ;
-			String line ;
-			while ((line=input.readLine()) != null) 
-				stopwords.add(line.trim()) ;			
-		}*/
-		
 		//TODO:Check caching 
 		/*
 		if (!wikipedia.getEnvironment().isGeneralityCached()) 
 			System.err.println("TopicDetector | Warning: generality has not been cached, so this will run significantly slower than it needs to.") ;
 		*/	
-			
+		
+		
+		
+	}
+	
+	public DisambiguationPolicy getDisambiguationPolicy() {
+		return disambigPolicy ;
+	}
+	
+	public void setDisambiguationPolicy(DisambiguationPolicy dp) {
+		disambigPolicy = dp ;
+	}
+	
+	public boolean areDisambiguationsAllowed() {
+		return allowDisambiguations ;
+	}
+	
+	public void allowDisambiguations(boolean val) {
+		allowDisambiguations = val ;
 	}
 	
 	/**
@@ -206,7 +214,7 @@ public class TopicDetector {
 			//	continue ;
 			
 			
-			System.out.println("adding ref: " + label.getText()) ;
+			//System.out.println("adding ref: " + label.getText()) ;
 			TopicReference ref = new TopicReference(label, new Position(span.getStart(), span.getEnd())) ;
 			references.add(ref) ;
 		}
@@ -216,6 +224,7 @@ public class TopicDetector {
 	private HashMap<Integer,Topic> getTopics(Vector<TopicReference> references, String contextText, int docLength, RelatednessCache cache) throws Exception{
 		HashMap<Integer,Topic> chosenTopics = new HashMap<Integer,Topic>() ;
 	
+		/*
 		// get context articles from unambiguous Labels
 		Vector<Label> unambigLabels = new Vector<Label>() ;
 		for (TopicReference ref:references) {
@@ -229,7 +238,6 @@ public class TopicDetector {
 		}
 		
 		//get context articles from additional context text
-		//Vector<String> contextSentences = ss.getSentences(, SentenceSplitter.MULTIPLE_NEWLINES) ; 
 		for (TopicReference ref:getReferences(contextText)){
 			Label label = ref.getLabel() ;
 			Label.Sense[] senses = label.getSenses() ;
@@ -239,14 +247,37 @@ public class TopicDetector {
 				}
 			}
 		}
+		*/
+		
+		HashSet<String> detectedLabels = new HashSet<String>() ;
+		Vector<Label> labels = new Vector<Label>() ;
+		for (TopicReference ref:references) {
+			if (detectedLabels.contains(ref.getLabel().getText())) 
+				continue ;
+			
+			labels.add(ref.getLabel()) ;
+			detectedLabels.add(ref.getLabel().getText()) ;		
+		}
+		
+		//get context articles from additional context text
+		for (TopicReference ref:getReferences(contextText)){
+			if (detectedLabels.contains(ref.getLabel().getText())) 
+				continue ;
+			
+			labels.add(ref.getLabel()) ;
+			detectedLabels.add(ref.getLabel().getText()) ;	
+		}
+		
+		
+		
 		
 		Context context ;
 		if (cache == null)
-			context = new Context(unambigLabels, new RelatednessCache(disambiguator.getArticleComparer()), disambiguator.getMaxContextSize()) ;
+			context = new Context(labels, new RelatednessCache(disambiguator.getArticleComparer()), disambiguator.getMaxContextSize(), disambiguator.getMinSenseProbability() * 5) ;
 		else 
-			context = new Context(unambigLabels, cache, disambiguator.getMaxContextSize()) ;	
+			context = new Context(labels, cache, disambiguator.getMaxContextSize(), disambiguator.getMinSenseProbability()) ;	
 		
-		unambigLabels = null ;
+		labels = null ;
 
 		//now disambiguate all references
 		//unambig references are still processed here, because we need to calculate relatedness to context anyway.
@@ -255,7 +286,7 @@ public class TopicDetector {
 		HashMap<String, ArrayList<CachedSense>> disambigCache = new HashMap<String, ArrayList<CachedSense>>() ;
 
 		for (TopicReference ref:references) {
-			System.out.println("disambiguating ref: " + ref.getLabel().getText()) ;
+			//System.out.println("disambiguating ref: " + ref.getLabel().getText()) ;
 
 			ArrayList<CachedSense> validSenses = disambigCache.get(ref.getLabel().getText()) ;
 
@@ -275,7 +306,7 @@ public class TopicDetector {
 
 					double disambigProb = disambiguator.getProbabilityOfSense(commonness, relatedness, context) ;
 
-					System.out.println(" - sense " + sense + ", " + disambigProb) ;
+					//System.out.println(" - sense " + sense + ", " + disambigProb) ;
 					
 					if (disambigProb > 0.1) {
 						// there is at least a chance that this is a valid sense for the link (there may be more than one)
@@ -290,7 +321,7 @@ public class TopicDetector {
 				disambigCache.put(ref.getLabel().getText(), validSenses) ;
 			}
 
-			if (strictDisambiguation) {
+			if (disambigPolicy == DisambiguationPolicy.STRICT) {
 				//just get top sense
 				if (!validSenses.isEmpty()) {
 					CachedSense sense = validSenses.get(0) ;

@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import org.wikipedia.miner.annotation.Disambiguator;
 import org.wikipedia.miner.annotation.TopicDetector;
 import org.wikipedia.miner.annotation.ArticleCleaner.SnippetLength;
+import org.wikipedia.miner.annotation.TopicDetector.DisambiguationPolicy;
 import org.wikipedia.miner.annotation.weighting.LinkDetector;
 import org.wikipedia.miner.db.WDatabase.DatabaseType;
 import org.wikipedia.miner.model.Wikipedia;
@@ -45,7 +46,7 @@ public class AnnotationWorkbench {
 		_wikipedia = wikipedia ;
 		
 		_disambiguator = new Disambiguator(_wikipedia) ;
-		_topicDetector = new TopicDetector(_wikipedia, _disambiguator, false, false) ;
+		_topicDetector = new TopicDetector(_wikipedia, _disambiguator) ;
 		_linkDetector = new LinkDetector(_wikipedia) ;
 		
 		_artsTrain = new File(_dataDir.getPath() + "/articlesTrain.csv") ;
@@ -147,8 +148,8 @@ public class AnnotationWorkbench {
 		File dataDir = new File(args[0]) ;
 		
 		WikipediaConfiguration conf = new WikipediaConfiguration(new File(args[1])) ;
-		conf.addDatabaseToCache(DatabaseType.label) ;
-		conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences) ;
+		//conf.addDatabaseToCache(DatabaseType.label) ;
+		//conf.addDatabaseToCache(DatabaseType.pageLinksInNoSentences) ;
 		
 		Wikipedia wikipedia = new Wikipedia(conf, false) ;
 		
