@@ -716,7 +716,7 @@ public class AnnotationExperiments {
 
 		String fileNameChunk = getFileNameChunk(point.lang, point.dependencies) ;
 
-		TopicDetector td = new TopicDetector(wikipedia, d, false, false) ;
+		TopicDetector td = new TopicDetector(wikipedia, d) ;
 
 		LinkDetector ld = new LinkDetector(wikipedia) ;
 

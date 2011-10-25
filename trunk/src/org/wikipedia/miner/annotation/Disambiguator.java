@@ -529,14 +529,17 @@ public class Disambiguator {
 
 	private Context getContext(Article article, SnippetLength snippetLength, RelatednessCache rc) throws Exception{
 		
-		Vector<Label> unambigLabels = new Vector<Label>() ;
+		//Vector<Label> unambigLabels = new Vector<Label>() ;
 		
 		String content = cleaner.getMarkupLinksOnly(article, snippetLength) ;
+		
+		HashSet<String> detectedLabels = new HashSet<String>() ;
+		Vector<Label> labels = new Vector<Label>() ;
 		for (NGramSpan span:nGrammer.ngramPosDetect(content)) {
 			
 			Label label = wikipedia.getLabel(span, content) ;
 			
-			System.out.println("potential context: " + label.getText()) ;
+			//System.out.println("potential context: " + label.getText()) ;
 			
 			if (!label.exists())
 				continue ;
@@ -546,17 +549,24 @@ public class Disambiguator {
 			
 			if (label.getLinkDocCount() < wikipedia.getConfig().getMinLinksIn())
 				continue ;
+			
+			if (detectedLabels.contains(label.getText())) 
+				continue ;
+				
+			labels.add(label) ;
+			//detectedLabels.add(ref.getLabel().getText()) ;		
+			//}
 
-			Label.Sense[] senses = label.getSenses() ;
-			if (senses.length == 1 || senses[0].getPriorProbability() >= (1-minSenseProbability)) {
-				unambigLabels.add(label) ;
-			}
+			//Label.Sense[] senses = label.getSenses() ;
+			//if (senses.length == 1 || senses[0].getPriorProbability() >= (1-minSenseProbability)) {
+			//	unambigLabels.add(label) ;
+			//}
 		}
 
 		if (rc == null) 
-			return new Context(unambigLabels, new RelatednessCache(comparer), maxContextSize) ;
+			return new Context(labels, new RelatednessCache(comparer), maxContextSize, getMinSenseProbability()) ;
 		else
-			return new Context(unambigLabels, rc, maxContextSize) ;
+			return new Context(labels, rc, maxContextSize, getMinSenseProbability()) ;
 	}
 
 	/**

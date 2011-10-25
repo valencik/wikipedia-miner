@@ -21,6 +21,7 @@ import org.simpleframework.xml.ElementList;
 import org.wikipedia.miner.annotation.Disambiguator;
 import org.wikipedia.miner.annotation.Topic;
 import org.wikipedia.miner.annotation.TopicDetector;
+import org.wikipedia.miner.annotation.TopicDetector.DisambiguationPolicy;
 import org.wikipedia.miner.annotation.preprocessing.DocumentPreprocessor;
 import org.wikipedia.miner.annotation.preprocessing.HtmlPreprocessor;
 import org.wikipedia.miner.annotation.preprocessing.PreprocessedDocument;
@@ -51,6 +52,7 @@ public class WikifyService extends Service {
 	
 	private BooleanParameter prmTopics ;
 	private BooleanParameter prmReferences ;
+	private EnumParameter<DisambiguationPolicy> prmDisambigPolicy ;
 	
 	private HashMap<String, TopicDetector> topicDetectors = new HashMap<String, TopicDetector>();
 	private HashMap<String, LinkDetector> linkDetectors = new HashMap<String, LinkDetector>();
@@ -101,6 +103,10 @@ public class WikifyService extends Service {
 		prmReferences = new BooleanParameter("references", "<b>true</b> to return details of where each topic was found within text, otherwise <b>false</b>", false) ;
 		addGlobalParameter(prmReferences) ;
 		
+		String[] descDisambigPolicy = {"only one interpretation allowed each term", "multiple interpretations allowed"} ;
+		prmDisambigPolicy = new EnumParameter<DisambiguationPolicy>("disambiguationPolicy", "wheither each term should be disambiguated to a single interpretation, or to multiple ones", DisambiguationPolicy.STRICT, DisambiguationPolicy.values(), descDisambigPolicy) ;
+		addGlobalParameter(prmDisambigPolicy) ;
+		
 		for (String wikiName:getHub().getWikipediaNames()) {
 			
 			Wikipedia w = getHub().getWikipedia(wikiName) ;
@@ -109,7 +115,7 @@ public class WikifyService extends Service {
 				Disambiguator d = new Disambiguator(w) ;
 				d.loadClassifier(w.getConfig().getTopicDisambiguationModel()) ;
 				
-				TopicDetector td = new TopicDetector(w, d, false, false) ;
+				TopicDetector td = new TopicDetector(w, d) ;
 							
 				LinkDetector ld = new LinkDetector(w) ;
 				ld.loadClassifier(w.getConfig().getLinkDetectionModel()) ;
@@ -209,6 +215,8 @@ public class WikifyService extends Service {
 		
 		TopicDetector topicDetector = topicDetectors.get(wikiName) ;
 		LinkDetector linkDetector = linkDetectors.get(wikiName) ;
+		
+		topicDetector.setDisambiguationPolicy(prmDisambigPolicy.getValue(request)) ;
 		
 		String source = prmSource.getValue(request) ;
 		
@@ -545,6 +553,9 @@ public class WikifyService extends Service {
 		}
 
 		public List<Reference> getReferences() {
+			
+			if (references == null) return Collections.unmodifiableList(new ArrayList<Reference>()) ;
+			
 			return Collections.unmodifiableList(references);
 		}
 		

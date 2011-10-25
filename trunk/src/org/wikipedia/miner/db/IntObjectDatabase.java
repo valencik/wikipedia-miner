@@ -70,6 +70,8 @@ public abstract class IntObjectDatabase<V> extends WDatabase<Integer,V> {
 	@Override
 	protected void initializeCache() {
 		
+		System.out.println("Initializing cache for " + this.getName() + ": " + getCachePriority()) ;
+		
 		if (getCachePriority() == CachePriority.speed)
 			fastCache = new TIntObjectHashMap<V>() ;
 		else

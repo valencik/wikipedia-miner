@@ -295,7 +295,7 @@ public class Wikipedia {
 			
 			Label label = getLabel(new String(tmpNgram)) ;
 			
-			System.out.println(label.getText()) ;
+			//System.out.println(label.getText()) ;
 			
 			if (label.exists() && (!bestLabel.exists() || label.getLinkOccCount() > bestLabel.getLinkOccCount())) {
 				bestLabel = label ;
