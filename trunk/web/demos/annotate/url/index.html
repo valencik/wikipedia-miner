@@ -32,11 +32,30 @@
 					color = Number(urlParams["linkColor"]) ;
 					
 				
-				var controlUrl = 'controls.html?source=' + source + '&linkDensity=' + density + '&linkColor=' + color ;
+				var controlUrl = 'controls.html?' + $.param({
+					source: source,
+					linkDensity: density,
+					linkColor: color
+				}) ;
 				parent.controls.location.href = controlUrl;
 				
 				var linkColor = getColor(color) ;
+
 				
+				if (source != "") {
+					var resultUrl = '../../../services/wikify?' + $.param({
+						source: source,
+						tooltips: true,
+						minProbability: (1-density),
+						linkStyle: "color:" + linkColor,
+						sourceMode: "URL",
+						responseFormat: "DIRECT"
+					}) ;
+					
+					parent.results.location.href = resultUrl ;
+				}
+				
+				/*
 				if (source != "") {
 					
 					parent.results.location.href = "loading.html" ;
@@ -53,13 +72,16 @@
 			       		}, 
 			       		function(response){							
 							parent.results.document.write(response) ;
-							
+							$(parent.results).load(function() {
+								alert("Adding tooltips") ;
+								wm_addDefinitionTooltipsToAllLinks() ;
+							})
 							//hacky, but delay this for 1 second
-							$.delay(1000).parent.results.$.ready() ;
-							//wm_addDefinitionTooltipsToAllLinks(parent.results.body) ;
+							//$.delay(1000).parent.results.$.ready() ;
+							//
 						}
 					);
-				}
+				}*/
 				
 				
 				
