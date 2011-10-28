@@ -69,6 +69,17 @@ function setOptionValues() {
 
 function doTooltipBindings() {
 
+	$('#markupHelp').qtip({
+	      content: "What format is the source text?"
+    }) ;
+	
+	$('#repeatHelp').qtip({
+	      content: "What should happen when the same topic is mentioned multiple times?"
+    }) ;
+	
+	$('#densityHelp').qtip({
+	      content: "How strict should we be when deciding which topics to link to?"
+    }) ;
 }
 
 

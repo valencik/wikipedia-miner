@@ -90,6 +90,8 @@
 }
 
 
-#noLabels, #noTranslations, #noCategories, #noLinksIn, #noLinksOut {
+#noLabels, #noTranslations, #noCategories, #noLinksIn, #noLinksOut, #noParentCats, #noChildCats, #noChildArts {
 	display: none ;
 }
+
+
