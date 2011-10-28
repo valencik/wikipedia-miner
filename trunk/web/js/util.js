@@ -1,18 +1,5 @@
 //default tooltip style
-$.fn.qtip.styles.wmstyle = { // Last part is the name of the style
-   color: 'white',
-   background: '#373737' ,
-   fontSize: '14px',
-   border: {
-   	 width: 5,
-     radius: 10,
-	 color: '#373737'
-   },
-   padding: 3 , 
-   textAlign: 'left',
-   tip: true, 
-   name: 'cream'
-}
+
 
 //gathering url params
 

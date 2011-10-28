@@ -8,6 +8,7 @@
 		<link rel="stylesheet" href="../../css/wm.css" type="text/css">
 		<link rel="stylesheet" href="annotate.css" type="text/css">
 		<link rel="stylesheet" href="../demos.css" type="text/css">
+		<link rel="stylesheet" href="../../css/jquery.qtip.min.css" type="text/css">
 		<link rel="stylesheet" href="../../css/tooltips.css" type="text/css">
 		<link rel="stylesheet" href="../../css/tagcloud.css" type="text/css">
 		<link type="text/css" href="../../css/jquery-ui/jquery-ui-1.8.14.custom.css" rel="stylesheet" />
@@ -15,7 +16,7 @@
 		
 		<script type="text/javascript" src="../../js/jquery-1.5.1.min.js"></script> 
 		<script type="text/javascript" src="../../js/jquery-ui-1.8.14.custom.min.js"></script>
-		<script type="text/javascript" src="../../js/jquery.qtip-1.0.0-rc3.min.js"></script>
+		<script type="text/javascript" src="../../js/jquery.qtip.min.js"></script>
 		<script type="text/javascript" src="../../js/tooltips.js"></script> 
 		<script type="text/javascript" src="../../js/tagcloud.js"></script>
 		
@@ -111,20 +112,20 @@
 								</textarea>
 							
 								<div id='options'>
-									<fieldset title="What should happen when the same topic is mentioned multiple times?">
-										<legend>Markup</legend>
+									<fieldset>
+										<legend>Markup <span class='help' id='markupHelp'>?</span></legend>
 										<input id="sourceMode_html" name="sourceMode" type="radio" value="HTML"><label for="sourceMode_html">HTML</label>
 										<input id="sourceMode_wiki" name="sourceMode" type="radio" value="WIKI"><label for="sourceMode_wiki">MediaWiki</label>
 										<input id="sourceMode_auto" name="sourceMode" type="radio" value="AUTO"><label for="sourceMode_auto">detect automatically</label>
 									</fieldset>
-									<fieldset title="What should happen when the same topic is mentioned multiple times?">
-										<legend>Repeat occurences</legend>
+									<fieldset>
+										<legend>Repeat occurences <span class='help' id='repeatHelp'>?</span></legend>
 										<input id="repeatMode_all" name="repeatMode" type="radio" value="ALL"><label for="repeatMode_all">mark all</label>
 										<input id="repeatMode_first" name="repeatMode" type="radio" value="FIRST"><label for="repeatMode_first">mark first</label>
 										<input id="repeatMode_fis" name="repeatMode" type="radio" value="FIRST_IN_REGION"><label for="repeatMode_fis">mark first in each section</label>
 									</fieldset>
-									<fieldset title="How strict should we be when deciding which topics to link to?">
-										<legend>Link density</legend>
+									<fieldset>
+										<legend>Link density <span class='help' id='densityHelp'>?</span></legend>
 										<table>
 											<tr>
 												<td style="vertical-align:middle; padding-left:20px">few links</td>

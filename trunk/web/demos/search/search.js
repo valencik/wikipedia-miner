@@ -18,47 +18,38 @@ function doTooltipBindings() {
 	
 	$('#sensesHelp').qtip({
 	      content: "It looks like your query is ambiguous, because there are multiple articles that it could refer to. So, which one do you want?",
-		  style: { name: 'wmstyle' }
     }) ;
 	
 	$('#labelHelp').qtip({
 	      content: "Terms that are used to refer to this article. These are usually synonyms or alternative spellings.",
-		  style: { name: 'wmstyle' }
     }) ;
 	
 	$('#translationHelp').qtip({
 	      content: "Links to articles which describe the same concept in another language.",
-		  style: { name: 'wmstyle' }
     }) ;
 	
 	$('#categoryHelp').qtip({
 	      content: "Categories to which this article belongs. These represent broader topics or ways of organizing this one.",
-		  style: { name: 'wmstyle' }
     }) ;
     
     $('#linksOutHelp').qtip({
 	      content: "<p>Pages that this article links to. Some of these represent related topics, others are fairly random.</p> <p>The toolkit provides relatedness measures&mdash;indicated here by the brightness of each link&mdash;to help separate them.</p>",
-		  style: { name: 'wmstyle' }
     }) ;
     
     $('#linksInHelp').qtip({
 	      content: "<p>Pages that link to this article. Some of these represent related topics, others are fairly random.</p> <p>The toolkit provides relatedness measures&mdash;indicated here by the brightness of each link&mdash;to help separate them.</p>",
-		  style: { name: 'wmstyle' }
     }) ;
 	
 	$('#parentCatHelp').qtip({
 	      content: "Categories to which this category belongs. These represent broader topics or ways of organizing this one.",
-		  style: { name: 'wmstyle' }
     }) ;
 	
 	$('#childCatHelp').qtip({
 	      content: "Categories which belong to this category. These represent narrower topics.",
-		  style: { name: 'wmstyle' }
     }) ;
 	
 	$('#childArtHelp').qtip({
 	      content: "Articles which belong to this category. These represent narrower topics.",
-		  style: { name: 'wmstyle' }
     }) ;
 	
 }

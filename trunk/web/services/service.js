@@ -69,15 +69,10 @@ function processServiceListResponse(data) {
 				service.qtip(
 				{
 				      content: description,
-					  style: { name: 'wmstyle' },
 					  position: {
-					  	corner: {
-					  		target: 'rightMiddle',
-					  		tooltip: 'leftMiddle'
-					  	},
-					  	adjust: {
-					  		x:20
-					  	}
+					  	my: 'left center',
+					   	at: 'right center',
+						adjust: { x: 5 }
 					  }
 				 }) ;
 						
