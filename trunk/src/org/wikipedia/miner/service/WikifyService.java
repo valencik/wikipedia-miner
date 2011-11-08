@@ -19,7 +19,6 @@ import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.Element;
 import org.simpleframework.xml.ElementList;
 import org.wikipedia.miner.annotation.Disambiguator;
-import org.wikipedia.miner.annotation.Topic;
 import org.wikipedia.miner.annotation.TopicDetector;
 import org.wikipedia.miner.annotation.TopicDetector.DisambiguationPolicy;
 import org.wikipedia.miner.annotation.preprocessing.DocumentPreprocessor;
@@ -37,6 +36,7 @@ import org.wikipedia.miner.service.UtilityMessages.*;
 
 import com.google.gson.annotations.Expose;
 
+@SuppressWarnings("serial")
 public class WikifyService extends Service {
 
 	public enum SourceMode{AUTO, URL, HTML, WIKI} ;
@@ -58,6 +58,8 @@ public class WikifyService extends Service {
 	private HashMap<String, LinkDetector> linkDetectors = new HashMap<String, LinkDetector>();
 	
 	private String linkClassName = "wm_wikifiedLink" ;
+	
+	private int maxTokenCount = 10000 ;
 	
 	public WikifyService() {
 		super("core","Augments textual documents with links to the appropriate Wikipedia articles",
@@ -167,8 +169,15 @@ public class WikifyService extends Service {
 		
 		
 		ArrayList<org.wikipedia.miner.annotation.Topic> detectedTopics = new ArrayList<org.wikipedia.miner.annotation.Topic>() ;
-		String wikifiedDoc = wikifyAndGatherTopics(request, detectedTopics, wikipedia) ;
 		
+		String wikifiedDoc = null ;
+		try {
+			wikifiedDoc = wikifyAndGatherTopics(request, detectedTopics, wikipedia) ;
+		} catch (TooLongException e) {
+			return new TooLongMessage(request, e) ;
+		}
+			
+			
 		double docScore = 0 ;
 		for (org.wikipedia.miner.annotation.Topic t:detectedTopics)
 			docScore = docScore + t.getRelatednessToOtherTopics() ;
@@ -205,11 +214,9 @@ public class WikifyService extends Service {
 		response.getWriter().append(wikifiedDoc) ;
 		return ;
 	}
-	
-	
 
 	
-	private String wikifyAndGatherTopics(HttpServletRequest request, ArrayList<org.wikipedia.miner.annotation.Topic> detectedTopics, Wikipedia wikipedia) throws IOException, Exception {
+	private String wikifyAndGatherTopics(HttpServletRequest request, ArrayList<org.wikipedia.miner.annotation.Topic> detectedTopics, Wikipedia wikipedia) throws TooLongException, IOException, Exception {
 		
 		String wikiName = getWikipediaName(request) ;
 		
@@ -268,11 +275,10 @@ public class WikifyService extends Service {
 		
 		PreprocessedDocument doc = dp.preprocess(markup) ;
 		
-		//for (Article bt: bannedTopicList) 
-		//	doc.banTopic(bt.getId()) ;
+		String[] tokens = wikipedia.getConfig().getTokenizer().tokenize(doc.getPreprocessedText()) ;
+		if (tokens.length > maxTokenCount) 
+			throw new TooLongException(tokens.length, maxTokenCount) ;
 		
-		//TODO: find smarter way to resolve this hack, which stops wikifier from detecting "Space (punctuation)" ;
-		doc.banTopic(143856) ;
 		
 		ArrayList<org.wikipedia.miner.annotation.Topic> allTopics = linkDetector.getWeightedTopics(topicDetector.getTopics(doc, null)) ;
 		ArrayList<org.wikipedia.miner.annotation.Topic> bestTopics = new ArrayList<org.wikipedia.miner.annotation.Topic>() ;
@@ -342,6 +348,7 @@ public class WikifyService extends Service {
 			if (source.matches("(?i)^www\\.(.*)$"))
 				source = "http://" + source ;
 			
+			@SuppressWarnings("unused")
 			URL url = new URL(source) ;
 			return SourceMode.URL ;
 		} catch (MalformedURLException e) {	} ;
@@ -582,6 +589,55 @@ public class WikifyService extends Service {
 
 		public int getEnd() {
 			return end;
+		}
+	}
+	
+	public static class TooLongMessage extends ErrorMessage {
+
+		@Expose
+		@Attribute
+		private int tokenCount ;
+		
+		@Expose
+		@Attribute
+		private int maxTokenCount ;
+	
+		protected TooLongMessage(HttpServletRequest httpRequest, TooLongException e) {
+			super(httpRequest, e);
+			
+			this.tokenCount = e.getTokenCount() ;
+			this.maxTokenCount = e.getMaxTokenCount() ;
+		}
+
+		public int getTokenCount() {
+			return tokenCount;
+		}
+
+		public int getMaxTokenCount() {
+			return maxTokenCount;
+		}
+	}
+	
+	
+	public static class TooLongException extends Exception {
+		
+		private int tokenCount ;
+		private int maxTokenCount ;
+		
+		public TooLongException(int tokenCount, int maxTokenCount) {
+			
+			super("Input document is too long") ;
+			
+			this.tokenCount = tokenCount ;
+			this.maxTokenCount = maxTokenCount ;
+		}
+
+		public int getTokenCount() {
+			return tokenCount;
+		}
+
+		public int getMaxTokenCount() {
+			return maxTokenCount;
 		}
 	}
 	
