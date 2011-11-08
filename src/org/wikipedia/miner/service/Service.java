@@ -1,10 +1,6 @@
 package org.wikipedia.miner.service;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringReader;
-import java.io.StringWriter;
 import java.text.DecimalFormat;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -18,16 +14,24 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-
-import org.simpleframework.xml.*;
+import org.simpleframework.xml.Attribute;
+import org.simpleframework.xml.Element;
+import org.simpleframework.xml.ElementList;
+import org.simpleframework.xml.ElementMap;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.param.*;
-import org.wikipedia.miner.service.UtilityMessages.*;
+import org.wikipedia.miner.service.UtilityMessages.ErrorMessage;
+import org.wikipedia.miner.service.UtilityMessages.HelpMessage;
+import org.wikipedia.miner.service.param.BooleanParameter;
+import org.wikipedia.miner.service.param.EnumParameter;
+import org.wikipedia.miner.service.param.Parameter;
+import org.wikipedia.miner.service.param.ParameterGroup;
+import org.wikipedia.miner.service.param.StringArrayParameter;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
 
+@SuppressWarnings("serial")
 public abstract class Service extends HttpServlet {
 
 	public enum ResponseFormat {XML,JSON,DIRECT} ; 
@@ -43,6 +47,7 @@ public abstract class Service extends HttpServlet {
 	@Attribute (name="description")
 	private String shortDescription ;
 	
+	@SuppressWarnings("unused")
 	@Expose
 	@SerializedName(value="details")
 	@Element(name="details", data=true)
@@ -89,11 +94,6 @@ public abstract class Service extends HttpServlet {
 
 		this.wikipediaSpecific = wikipediaSpecific ;
 		this.supportsDirectResponse = supportsDirectResponse ;
-
-
-
-
-		
 	}
 
 	public void init(ServletConfig config) throws ServletException {
@@ -154,13 +154,27 @@ public abstract class Service extends HttpServlet {
 
 	public void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
 
+		ResponseFormat responseFormat = prmResponseFormat.getValue(request) ;
+		boolean requestingHelp = prmHelp.getValue(request) ;
 		
+		response.setCharacterEncoding("UTF8") ;
+		
+		switch(responseFormat) {
+		
+		case DIRECT:
+			response.setContentType("text/html") ;
+			break ;
+		case XML:
+			response.setContentType("application/xml") ;
+			break ;
+		case JSON: 
+			response.setContentType("application/json");
+			break ;
+		}
+		
+		Message msg ;
 		
 		try {
-			
-			ResponseFormat responseFormat = prmResponseFormat.getValue(request) ;
-			boolean requestingHelp = prmHelp.getValue(request) ;
-			
 			if (!requestingHelp) {
 				
 				if (wikipediaSpecific && requiresWikipedia()) {
@@ -177,30 +191,30 @@ public abstract class Service extends HttpServlet {
 			
 			if (responseFormat == ResponseFormat.DIRECT) {
 				buildUnwrappedResponse(request, response) ;
+				response.getWriter().flush() ;
+				return ;
 			} else {
-				
-				Message msg  ;
-				
+	
 				if (requestingHelp)
 					msg = new HelpMessage(request, this) ;
 				else 
 					msg = buildWrappedResponse(request) ;
-				
-				if (responseFormat == ResponseFormat.XML) {
-					response.setContentType("application/xml");
-					response.setHeader("Cache-Control", "no-cache"); 
-					response.setCharacterEncoding("UTF8") ;
-					
-					
-					getHub().getXmlSerializer().write(msg, System.out) ;
-					getHub().getXmlSerializer().write(msg, response.getWriter());
-				} else {
-					response.setContentType("application/json");
-					response.setHeader("Cache-Control", "no-cache"); 
-					response.setCharacterEncoding("UTF8") ;
-					
-					getHub().getJsonSerializer().toJson(msg, response.getWriter());
-				}
+			}
+			
+			
+		} catch (Exception e) {
+			if (responseFormat == ResponseFormat.DIRECT)
+				throw new ServletException(e) ;
+			else
+				msg = new ErrorMessage(request, e) ;
+		}
+		
+		try {
+			if (responseFormat == ResponseFormat.XML) {
+				getHub().getXmlSerializer().write(msg, System.out) ;
+				getHub().getXmlSerializer().write(msg, response.getWriter());
+			} else {
+				getHub().getJsonSerializer().toJson(msg, response.getWriter());
 			}
 			
 			response.getWriter().flush() ;
@@ -238,36 +252,10 @@ public abstract class Service extends HttpServlet {
 		return client.update(getUsageCost(request)) ; 
 	}
 	
-	/*
-	protected Element buildUsageResponse(HttpServletRequest request, Element xmlResponse) {
-		
-		Client client = getHub().identifyClient(request) ;
-		
-		
-		xmlResponse.appendChild(client.getXML(hub)) ;
-		return xmlResponse ;
-		
-	}*/
-
 	public boolean requiresWikipedia() {
 		return wikipediaSpecific ;
 	}
-
-	/*
-	public Element buildErrorResponse(String message, Element response) {
-
-		response.setAttribute("error", message) ;
-		return response ;
-	}
 	
-	public Element buildWarningResponse(String message, Element response) {
-
-		response.setAttribute("warning", message) ;
-		return response ;
-	}*/
-	
-	
-
 	public String getBasePath(HttpServletRequest request) {
 
 		StringBuffer path = new StringBuffer() ;
@@ -314,7 +302,7 @@ public abstract class Service extends HttpServlet {
 	}
 
 
-	private static class Example {
+	public static class Example {
 		
 		@Expose
 		@Element(data=true)
@@ -352,6 +340,18 @@ public abstract class Service extends HttpServlet {
 			
 			url = sb.toString() ;
 		}
+
+		public String getDescription() {
+			return description;
+		}
+
+		public Map<String, String> getParameters() {
+			return parameters;
+		}
+
+		public String getUrl() {
+			return url;
+		}
 	}
 	
 	public class ExampleBuilder {
@@ -375,16 +375,20 @@ public abstract class Service extends HttpServlet {
 	
 	}
 	
-	private class ProgressException extends Exception {
+	public class ProgressException extends Exception {
 		private double _progress ;
 		
 		public ProgressException(double progress) {
 			super("Wikipedia is not yet ready. Current progress is " + progressFormat.format(progress)) ;
 			_progress = progress ;
 		}
+
+		public double getProgress() {
+			return _progress;
+		}
 	}
 	
-	private class UsageLimitException extends Exception {
+	public static class UsageLimitException extends Exception {
 		public UsageLimitException() {
 			super("You have exceeded your usage limits") ;
 		}
@@ -394,19 +398,28 @@ public abstract class Service extends HttpServlet {
 		
 		@Expose
 		@Attribute
-		public String service ;
+		private String service ;
 		
 		@Expose
 		@ElementMap(attribute=true, entry="param", key="name")
-		public HashMap<String, String> request = new HashMap<String,String>();
+		private HashMap<String, String> request = new HashMap<String,String>();
 		
 		public Message(HttpServletRequest httpRequest) {
 			this.service = httpRequest.getServletPath() ;
 			
-			for (Enumeration<String> e = httpRequest.getParameterNames() ; e.hasMoreElements() ;) {
+			for (@SuppressWarnings("unchecked")
+			Enumeration<String> e = httpRequest.getParameterNames() ; e.hasMoreElements() ;) {
 				String paramName = e.nextElement() ;
 				request.put(paramName, httpRequest.getParameter(paramName)) ;
 			}
+		}
+
+		public String getServiceName() {
+			return service;
+		}
+
+		public HashMap<String, String> getRequest() {
+			return request;
 		}
 	}
 	
