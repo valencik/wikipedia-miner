@@ -321,7 +321,7 @@ public class SuggestService extends Service {
 	}
 	
 	
-	private class SuggestionCategory extends org.wikipedia.miner.model.Category {
+	public class SuggestionCategory extends org.wikipedia.miner.model.Category {
 
 		private ArrayList<Article> suggestions ;
 		private TIntHashSet idsToIgnore ;

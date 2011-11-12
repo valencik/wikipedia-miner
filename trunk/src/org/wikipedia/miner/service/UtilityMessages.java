@@ -21,7 +21,7 @@ public class UtilityMessages {
 		@Element(name="serviceDescription")
 		private Service service ;
 		
-		protected HelpMessage(HttpServletRequest httpRequest, Service service) {
+		public HelpMessage(HttpServletRequest httpRequest, Service service) {
 			super(httpRequest);
 			
 			this.service = service ;
@@ -44,12 +44,12 @@ public class UtilityMessages {
 		@Element (required=false)
 		private String trace = null ;
 		
-		protected ErrorMessage(HttpServletRequest httpRequest, String message) {
+		public ErrorMessage(HttpServletRequest httpRequest, String message) {
 			super(httpRequest) ;
 			error = message ;
 		}
 		
-		protected ErrorMessage(HttpServletRequest httpRequest, Exception e) {
+		public ErrorMessage(HttpServletRequest httpRequest, Exception e) {
 			super(httpRequest) ;
 			error = e.getMessage() ;
 					
@@ -84,8 +84,8 @@ public class UtilityMessages {
 		@Attribute
 		private Integer invalidId ;
 
-		protected InvalidIdMessage(HttpServletRequest request, Integer id) {
-			super(request, "'" + id + "' is not a valid category id") ;	
+		public InvalidIdMessage(HttpServletRequest request, Integer id) {
+			super(request, "'" + id + "' is not a valid id") ;	
 			invalidId = id ;
 		}
 
@@ -100,8 +100,8 @@ public class UtilityMessages {
 		@Attribute
 		private String invalidTitle ;
 
-		protected InvalidTitleMessage(HttpServletRequest request, String title) {
-			super(request, "'" + title + "' is not a valid article title") ;	
+		public InvalidTitleMessage(HttpServletRequest request, String title) {
+			super(request, "'" + title + "' is not a valid title") ;	
 			invalidTitle = title ;
 		}
 
@@ -117,7 +117,7 @@ public class UtilityMessages {
 		@Attribute
 		private String unknownTerm ;
 
-		protected UnknownTermMessage(HttpServletRequest request, String term) {
+		public UnknownTermMessage(HttpServletRequest request, String term) {
 			super(request, "'" + term + "' is not a known term") ;	
 			unknownTerm = term ;
 		}
