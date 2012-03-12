@@ -31,14 +31,15 @@ import org.xjsf.param.EnumParameter;
 import org.xjsf.param.IntParameter;
 import org.xjsf.param.ParameterGroup;
 import org.xjsf.param.StringParameter;
+import org.wikipedia.miner.service.WikifyService.Reference;
 
 import com.google.gson.annotations.Expose;
 
 @SuppressWarnings("serial")
 public class ExploreArticleService extends WMService{
 
-	//TODO:modify freebase image request to use article titles rather than ids
-	//TODO:if lang is not en, use languageLinks to translate article title to english.
+	//TODO: modify freebase image request to use article titles rather than ids
+	//TODO: if lang is not en, use languageLinks to translate article title to english.
 
 	private enum GroupName{id,title} ; 
 	public enum DefinitionLength{LONG, SHORT} ;
@@ -431,18 +432,30 @@ public class ExploreArticleService extends WMService{
 		}
 
 		public List<Image> getImages() {
+			
+			if (images == null) return Collections.unmodifiableList(new ArrayList<Image>()) ;
+			
 			return Collections.unmodifiableList(images);
 		}
 
 		public List<Label> getLabels() {
+			
+			if (labels == null) return Collections.unmodifiableList(new ArrayList<Label>()) ;
+			
 			return Collections.unmodifiableList(labels);
 		}
 
 		public List<Translation> getTranslations() {
+			
+			if (translations == null) return Collections.unmodifiableList(new ArrayList<Translation>()) ;
+			
 			return Collections.unmodifiableList(translations);
 		}
 
 		public List<Page> getParentCategories() {
+			
+			if (parentCategories == null) return Collections.unmodifiableList(new ArrayList<Page>()) ;
+			
 			return Collections.unmodifiableList(parentCategories);
 		}
 
@@ -451,6 +464,9 @@ public class ExploreArticleService extends WMService{
 		}
 
 		public List<Page> getInLinks() {
+			
+			if (inLinks == null) return Collections.unmodifiableList(new ArrayList<Page>()) ;
+			
 			return Collections.unmodifiableList(inLinks);
 		}
 
@@ -459,6 +475,9 @@ public class ExploreArticleService extends WMService{
 		}
 
 		public List<Page> getOutLinks() {
+			
+			if (outLinks == null) return Collections.unmodifiableList(new ArrayList<Page>()) ;
+			
 			return Collections.unmodifiableList(outLinks);
 		}
 
@@ -565,7 +584,7 @@ public class ExploreArticleService extends WMService{
 		}
 	}
 
-	protected static class Page {
+	public static class Page {
 
 		@Expose
 		@Attribute

@@ -4,6 +4,8 @@ import gnu.trove.TLongHashSet;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -626,6 +628,10 @@ public class CompareService extends WMService{
 		public SortedSet<Integer> getInvalidIds() {
 			return Collections.unmodifiableSortedSet(invalidIds);
 		}
+		
+		public RelatednessSet getRelatednessSet() {
+			return new RelatednessSet(this.comparisons) ;
+		}
 	}
 	
 	public static class DisambiguationDetails  {
@@ -875,6 +881,28 @@ public class CompareService extends WMService{
 
 		public double getRelatedness2() {
 			return relatedness2;
+		}
+	}
+	
+	public static class RelatednessSet {
+		
+		HashMap<Long, Double> measures = new HashMap<Long,Double>() ;
+		
+		private Long getKey(int id1, int id2) {
+			long min = Math.min(id1, id2) ;
+			long max = Math.max(id1, id2) ;
+			return min + (max << 30) ;
+		}
+		
+		public RelatednessSet(List<Comparison> comparisons) {
+			
+			for (Comparison c:comparisons) 
+				measures.put(getKey(c.getLowId(), c.getHighId()), c.getRelatedness()) ;
+			
+		}
+		
+		public Double getRelatedness(int id1, int id2) {
+			return measures.get(getKey(id1, id2)) ;
 		}
 	}
 }
