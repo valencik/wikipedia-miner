@@ -4,22 +4,17 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.simpleframework.xml.Attribute;
 import org.wikipedia.miner.model.Wikipedia;
+import org.xjsf.Service;
 
 import com.google.gson.annotations.Expose;
 
-public class ProgressService extends Service {
-
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -1217650265475115103L;
+@SuppressWarnings("serial")
+public class ProgressService extends WMService {
 	
 	public ProgressService() {
 		super("meta","Monitors progress of service initialization",
-				"<p>Wikipedia Miner can take a while to get started. This service allows polling to see how much progress has been made loading up a particular edition of Wikipedia</p>",
-				true, false
+				"<p>Wikipedia Miner can take a while to get started. This service allows polling to see how much progress has been made loading up a particular edition of Wikipedia</p>", false
 		);
-		// TODO Auto-generated constructor stub
 	}
 	
 	@Override
@@ -31,12 +26,7 @@ public class ProgressService extends Service {
 		
 		return new Message(request, progress) ;
 	}
-	
-	@Override
-	public boolean requiresWikipedia() {
-		return false ;
-	}
-	
+		
 	@Override
 	public int getUsageCost(HttpServletRequest request) {
 		return 0 ;

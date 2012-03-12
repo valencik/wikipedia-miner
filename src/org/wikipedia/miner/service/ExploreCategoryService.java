@@ -10,20 +10,21 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.ElementList;
-import org.w3c.dom.Element;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Category;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.service.ExploreArticleService.Page;
-import org.wikipedia.miner.service.param.BooleanParameter;
-import org.wikipedia.miner.service.param.IntParameter;
-import org.wikipedia.miner.service.param.ParameterGroup;
-import org.wikipedia.miner.service.param.StringParameter;
-import org.wikipedia.miner.service.UtilityMessages.*;
+import org.xjsf.Service;
+import org.xjsf.param.BooleanParameter;
+import org.xjsf.param.IntParameter;
+import org.xjsf.param.ParameterGroup;
+import org.xjsf.param.StringParameter;
+import org.xjsf.UtilityMessages.*;
 
 import com.google.gson.annotations.Expose;
 
-public class ExploreCategoryService extends Service{
+@SuppressWarnings("serial")
+public class ExploreCategoryService extends WMService{
 
 	private enum GroupName{id,title} ; 
 	
@@ -46,8 +47,7 @@ public class ExploreCategoryService extends Service{
 	public ExploreCategoryService() {
 		super("core","Provides details of individual categories",
 			
-			"<p></p>",
-			true, false
+			"<p></p>", false
 		);
 	}
 	

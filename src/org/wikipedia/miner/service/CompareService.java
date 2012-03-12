@@ -4,7 +4,6 @@ import gnu.trove.TLongHashSet;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -25,18 +24,18 @@ import org.wikipedia.miner.comparison.ConnectionSnippetWeighter;
 import org.wikipedia.miner.comparison.LabelComparer;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Label;
-import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Page.PageType;
-import org.wikipedia.miner.service.Service.ExampleBuilder;
-import org.wikipedia.miner.service.param.BooleanParameter;
-import org.wikipedia.miner.service.param.FloatParameter;
-import org.wikipedia.miner.service.param.IntListParameter;
-import org.wikipedia.miner.service.param.IntParameter;
-import org.wikipedia.miner.service.param.ParameterGroup;
-import org.wikipedia.miner.service.param.StringParameter;
-import org.wikipedia.miner.service.UtilityMessages.*;
+import org.wikipedia.miner.model.Wikipedia;
+import org.xjsf.UtilityMessages.*;
 import org.wikipedia.miner.util.RelatednessCache;
 import org.wikipedia.miner.util.text.TextProcessor;
+import org.xjsf.Service;
+import org.xjsf.param.BooleanParameter;
+import org.xjsf.param.FloatParameter;
+import org.xjsf.param.IntListParameter;
+import org.xjsf.param.IntParameter;
+import org.xjsf.param.ParameterGroup;
+import org.xjsf.param.StringParameter;
 
 import com.google.gson.annotations.Expose;
 
@@ -58,7 +57,7 @@ import com.google.gson.annotations.Expose;
  * 
  * @author David Milne
  */
-public class CompareService extends Service{
+public class CompareService extends WMService{
 
 	private static final long serialVersionUID = 537957588352023198L;
 	
@@ -99,7 +98,7 @@ public class CompareService extends Service{
 		super("core","Measures and explains the connections between Wikipedia articles ",
 				"<p>This service measures the semantic relatedness between pairs of terms, pairs of article ids, or sets of article ids.</p>" + 
 				"<p>The relatedness measures are calculated from the links going into and out of each page. Links that are common to both pages are used as evidence that they are related, while links that are unique to one or the other indicate the opposite.</p>",
-				true, true 
+				true
 		);
 	}
 	
@@ -153,8 +152,8 @@ public class CompareService extends Service{
 		prmTitles = new BooleanParameter("titles", "if <b>true</b>, then the corresponding titles for article ids will be returned. This parameter is ignored if comparing terms", false) ;
 		addGlobalParameter(prmTitles) ;
 		
-		addGlobalParameter(getHub().getFormatter().getEmphasisFormatParam()) ;
-		addGlobalParameter(getHub().getFormatter().getLinkFormatParam()) ;
+		addGlobalParameter(getWMHub().getFormatter().getEmphasisFormatParam()) ;
+		addGlobalParameter(getWMHub().getFormatter().getLinkFormatParam()) ;
 		
 		addExample(
 				new ExampleBuilder("To measure the relatedness between <i>kiwi</i> and <i>takahe</i>").
@@ -208,7 +207,7 @@ public class CompareService extends Service{
 		
 		case termPair :
 			
-			LabelComparer lblComparer = getHub().getLabelComparer(getWikipediaName(request)) ;
+			LabelComparer lblComparer = getWMHub().getLabelComparer(getWikipediaName(request)) ;
 			if (lblComparer == null) 
 				return new ErrorMessage(request, "term comparisons are not available with this wikipedia instance") ;	
 			
@@ -244,7 +243,7 @@ public class CompareService extends Service{
 			
 		case idPair:
 			
-			ArticleComparer artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
+			ArticleComparer artComparer = getWMHub().getArticleComparer(getWikipediaName(request)) ;
 			if (artComparer == null) 
 				return new ErrorMessage(request, "article comparisons are not available with this wikipedia instance") ;
 			
@@ -266,7 +265,7 @@ public class CompareService extends Service{
 			break ;
 		case idLists :
 			
-			artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
+			artComparer = getWMHub().getArticleComparer(getWikipediaName(request)) ;
 			if (artComparer == null) 
 				return new ErrorMessage(request, "article comparisons are not available with this wikipedia instance") ;
 			
@@ -356,7 +355,7 @@ public class CompareService extends Service{
 		
 		//Build a list of pages that link to both art1 and art2, ordered by average relatedness to them
 		TreeSet<Article> connections = new TreeSet<Article>() ;
-		RelatednessCache rc = new RelatednessCache(getHub().getArticleComparer(getWikipediaName(request))) ;
+		RelatednessCache rc = new RelatednessCache(getWMHub().getArticleComparer(getWikipediaName(request))) ;
 
 		Article[] links1 = art1.getLinksIn() ;
 		Article[] links2 = art2.getLinksIn() ;
@@ -408,11 +407,10 @@ public class CompareService extends Service{
 
 		if (getSnippets) {
 
-			int snippetsCollected=0 ;
 			int maxSnippetsConsidered = prmMaxSnippetsConsidered.getValue(request) ;
 						
 			//gather and weight snippets
-			ConnectionSnippetWeighter snippetWeighter = getHub().getConnectionSnippetWeighter(getWikipediaName(request)) ;
+			ConnectionSnippetWeighter snippetWeighter = getWMHub().getConnectionSnippetWeighter(getWikipediaName(request)) ;
 			
 			TreeSet<ConnectionSnippet> snippets = new TreeSet<ConnectionSnippet>() ;
 
@@ -461,10 +459,9 @@ public class CompareService extends Service{
 				
 				String formattedMarkup = snippet.getPlainText() ;
 				formattedMarkup = emphasizePatternMatches(formattedMarkup, labelPattern) ;
-				formattedMarkup = getHub().getFormatter().format(formattedMarkup, request, wikipedia) ;
+				formattedMarkup = getWMHub().getFormatter().format(formattedMarkup, request, wikipedia) ;
 				
 				msg.addSnippet(new Snippet(snippet, formattedMarkup)) ;
-				snippetsCollected ++ ;
 			}
 		}
 

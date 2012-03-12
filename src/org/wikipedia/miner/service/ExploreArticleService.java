@@ -20,18 +20,22 @@ import org.simpleframework.xml.Text;
 import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Category;
-import org.wikipedia.miner.model.Page;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.param.BooleanParameter;
-import org.wikipedia.miner.service.param.EnumParameter;
-import org.wikipedia.miner.service.param.IntParameter;
-import org.wikipedia.miner.service.param.ParameterGroup;
-import org.wikipedia.miner.service.param.StringParameter;
-import org.wikipedia.miner.service.UtilityMessages.*;
+import org.xjsf.Service;
+import org.xjsf.UtilityMessages.ErrorMessage;
+import org.xjsf.UtilityMessages.InvalidIdMessage;
+import org.xjsf.UtilityMessages.InvalidTitleMessage;
+import org.xjsf.UtilityMessages.ParameterMissingMessage;
+import org.xjsf.param.BooleanParameter;
+import org.xjsf.param.EnumParameter;
+import org.xjsf.param.IntParameter;
+import org.xjsf.param.ParameterGroup;
+import org.xjsf.param.StringParameter;
 
 import com.google.gson.annotations.Expose;
 
-public class ExploreArticleService extends Service{
+@SuppressWarnings("serial")
+public class ExploreArticleService extends WMService{
 
 	//TODO:modify freebase image request to use article titles rather than ids
 	//TODO:if lang is not en, use languageLinks to translate article title to english.
@@ -76,8 +80,7 @@ public class ExploreArticleService extends Service{
 
 		super("core","Provides details of individual articles",
 
-				"<p></p>",
-				true, false
+				"<p></p>", false
 		);
 	}
 
@@ -104,8 +107,8 @@ public class ExploreArticleService extends Service{
 		prmDefinitionLength = new EnumParameter<DefinitionLength>("definitionLength", "The required length of the definition", DefinitionLength.SHORT, DefinitionLength.values(), descLength) ;
 		addGlobalParameter(prmDefinitionLength) ;
 
-		addGlobalParameter(getHub().getFormatter().getEmphasisFormatParam()) ;
-		addGlobalParameter(getHub().getFormatter().getLinkFormatParam()) ;
+		addGlobalParameter(getWMHub().getFormatter().getEmphasisFormatParam()) ;
+		addGlobalParameter(getWMHub().getFormatter().getLinkFormatParam()) ;
 
 		prmLabels = new BooleanParameter("labels", "<b>true</b> if labels (synonyms, etc) for this topic are to be returned, otherwise <b>false</b>", false) ;
 		addGlobalParameter(prmLabels) ;
@@ -154,7 +157,7 @@ public class ExploreArticleService extends Service{
 
 		ArticleComparer artComparer = null ;
 		if (prmLinkRelatedness.getValue(request)) {
-			artComparer = getHub().getArticleComparer(this.getWikipediaName(request)) ;
+			artComparer = getWMHub().getArticleComparer(this.getWikipediaName(request)) ;
 			if (artComparer == null) 
 				return new ErrorMessage(request, "Relatedness measures are unavailable for this instance of wikipedia") ;
 		}
@@ -203,7 +206,7 @@ public class ExploreArticleService extends Service{
 			else
 				definition = art.getFirstParagraphMarkup() ; 
 
-			msg.setDefinition(getHub().getFormatter().format(definition, request, wikipedia)) ;
+			msg.setDefinition(getWMHub().getFormatter().format(definition, request, wikipedia)) ;
 		}
 
 		if (prmLabels.getValue(request)) {
@@ -233,7 +236,7 @@ public class ExploreArticleService extends Service{
 		if (prmImages.getValue(request)) {
 				URL freebaseRequest = new URL("http://www.freebase.com/api/service/mqlread?query={\"query\":{\"key\":[{\"namespace\":\"/wikipedia/en_id\",\"value\":\"" + art.getId() + "\"}], \"type\":\"/common/topic\", \"article\":[{\"id\":null}], \"image\":[{\"id\":null}]}}") ;
 	
-				String freebaseResponse = getHub().getRetriever().getWebContent(freebaseRequest) ;
+				String freebaseResponse = getWMHub().getRetriever().getWebContent(freebaseRequest) ;
 	
 				freebaseResponse = freebaseResponse.replaceAll("\\s", "") ;
 	

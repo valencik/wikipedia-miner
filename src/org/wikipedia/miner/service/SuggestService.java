@@ -24,18 +24,19 @@ import org.wikipedia.miner.db.struct.DbLinkLocation;
 import org.wikipedia.miner.db.struct.DbLinkLocationList;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Page;
-import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Page.PageType;
-import org.wikipedia.miner.service.UtilityMessages.ErrorMessage;
-import org.wikipedia.miner.service.UtilityMessages.ParameterMissingMessage;
-import org.wikipedia.miner.service.param.FloatParameter;
-import org.wikipedia.miner.service.param.IntListParameter;
-import org.wikipedia.miner.service.param.IntParameter;
+import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.util.RelatednessCache;
+import org.xjsf.Service;
+import org.xjsf.UtilityMessages.ErrorMessage;
+import org.xjsf.UtilityMessages.ParameterMissingMessage;
+import org.xjsf.param.FloatParameter;
+import org.xjsf.param.IntListParameter;
+import org.xjsf.param.IntParameter;
 
 import com.google.gson.annotations.Expose;
 
-public class SuggestService extends Service {
+public class SuggestService extends WMService {
 
 	private static final long serialVersionUID = 2890788121538938947L;
 
@@ -51,8 +52,7 @@ public class SuggestService extends Service {
 	public SuggestService() {
 		super("query","Suggests alternative topics that are related to a set of seed topics",
 				"<p>This service takes a set of seed topics, and suggests articles that relate to them. These suggestions are weighted by thier relatedness to the query, and organized by the categories they belong to.</p>" +
-				"<p>It is designed to be used in conjunction with the <a href='services.html?search'>search</a> service</p>",
-				true, false);
+				"<p>It is designed to be used in conjunction with the <a href='services.html?search'>search</a> service</p>", false);
 	}
 	
 	public void init(ServletConfig config) throws ServletException {
