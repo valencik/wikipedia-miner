@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -44,7 +45,7 @@ public class SearchService extends WMService {
 	private static final long serialVersionUID = 5011451347638265017L;
 
 	Pattern topicPattern = Pattern.compile("\\[\\[(\\d+)\\|(.*?)\\]\\]") ;
-	Pattern quotePattern = Pattern.compile("\".*?\"");
+	Pattern quotePattern = Pattern.compile("\"(.*?)\"");
 
 	private StringParameter prmQuery ;
 	private BooleanParameter prmComplex ;
@@ -157,20 +158,19 @@ public class SearchService extends WMService {
 				
 				Sense rSense = new Sense(sense);
 				rSense.setWeight(disambiguator.getSenseWeight(sense.getId())) ;
+				if (queryLabel.getSelectedSenseId() != null && queryLabel.getSelectedSenseId() == sense.getId())
+					rSense.setIsSelected(true) ;
+				
 				rLabel.addSense(rSense) ;
 			}
-			
-			rLabel.sortSensesByWeight() ;
-			
+			rLabel.sortSensesByWeight() ;	
 			msg.addLabel(rLabel) ;
 		}
-
 		return msg ;
 	}
 
 
-
-
+	
 
 
 
@@ -181,7 +181,6 @@ public class SearchService extends WMService {
 		
 		NGrammer nGrammer = new NGrammer(wikipedia.getConfig().getSentenceDetector(), wikipedia.getConfig().getTokenizer()) ;
 
-		
 		//spans that can't be interrupted or intersected
 		ArrayList<Span> contiguousSpans = new ArrayList<Span>() ;
 		
@@ -203,19 +202,16 @@ public class SearchService extends WMService {
 				continue ;
 			}
 			
-			//Integer topicId = topicIdsBySpan.get(getKey(span)) ;
-			//TODO: something with topic id
-			//if (topicId != null)
-			//	System.out.println("   topic: " + topicId) ;
+			Integer topicId = topicIdsBySpan.get(getKey(span)) ;
 			
 			org.wikipedia.miner.model.Label lbl = wikipedia.getLabel(span, cleanedQuery) ;
-			QueryLabel ql = new QueryLabel(lbl, wikipedia.getConfig().isStopword(span.getNgram(cleanedQuery)), span) ;
+			QueryLabel ql = new QueryLabel(lbl, wikipedia.getConfig().isStopword(span.getNgram(cleanedQuery)), span, topicId) ;
 
 			queryLabels.add(ql) ;
 			//System.out.println("   lp: " + label.getLinkProbability()) ;
 		}
 		
-		return queryLabels ;		
+		return queryLabels ;
 	}
 
 	
@@ -227,11 +223,7 @@ public class SearchService extends WMService {
 
 			Vector<QueryLabel> overlappingTopics = new Vector<QueryLabel>() ;
 
-			double qtWeight ;
-			if (lbl1.isStopword)
-				qtWeight = 0 ;
-			else
-				qtWeight = lbl1.getLabel().getLinkProbability() ;
+			double qtWeight = lbl1.getWeight();
 
 			double overlapWeight = 0 ;
 
@@ -243,7 +235,7 @@ public class SearchService extends WMService {
 					overlappingTopics.add(lbl2) ;	
 
 					if (!lbl2.isStopword)
-						overlapWeight = overlapWeight + lbl2.getLabel().getLinkProbability() ;
+						overlapWeight = overlapWeight + lbl2.getWeight() ;
 				} else {
 					break ;
 				}
@@ -338,13 +330,14 @@ public class SearchService extends WMService {
 	
 	
 
-	private class ExhaustiveDisambiguator {
+	public class ExhaustiveDisambiguator {
 
 		//TODO: make this use disambiguator in labelComparer instead.
 		
 		ArrayList<QueryLabel> queryTerms ;
 		RelatednessCache rc ;
 
+		Integer[] selectedSenses ;
 		org.wikipedia.miner.model.Label.Sense currCombo[] ;
 		//org.wikipedia.miner.model.Label.Sense bestCombo[] ;
 		float bestComboWeight ;
@@ -362,9 +355,14 @@ public class SearchService extends WMService {
 			this.queryTerms = queryTerms ;
 
 			this.currCombo = new org.wikipedia.miner.model.Label.Sense[queryTerms.size()] ;
-
+			
 			//this.bestCombo = null ;
 			this.bestComboWeight = 0 ;
+			
+			this.selectedSenses = new Integer[queryTerms.size()] ;
+			for (int i= 0 ; i<queryTerms.size() ; i++) 
+				this.selectedSenses[i] = queryTerms.get(i).selectedSenseId ;
+			
 
 			bestSenseWeights = new TIntFloatHashMap() ;
 
@@ -409,21 +407,25 @@ public class SearchService extends WMService {
 			float commoness = 0 ;
 			float relatedness = 0 ;
 			int comparisons = 0 ;
+			
+			for (int i=0 ; i<currCombo.length ; i++) {
+				
+				if (currCombo[i] != null) {
+				
+					commoness += currCombo[i].getPriorProbability() ;
 
-			for (org.wikipedia.miner.model.Label.Sense s1:currCombo) {
-
-				if (s1 != null) {
-					commoness += s1.getPriorProbability() ;
-
-					//weight = weight + s1.getProbability() ;
-
-					for (org.wikipedia.miner.model.Label.Sense s2:currCombo) {
-						if (s2 != null && s1.getId() != s2.getId()) { 
-							relatedness += rc.getRelatedness(s1, s2) ;
+					for (int j=0 ; j<currCombo.length ; j++) {
+						if (currCombo[j] != null && i != j) { 
+							
+							if (selectedSenses[j] == null || currCombo[j].getId() == selectedSenses[j])
+								relatedness += rc.getRelatedness(currCombo[i], currCombo[j]) ;
+							
 							comparisons++ ;
 						}
 					}
 				}
+				
+				i++ ;
 			}
 
 			//average commonness and relatedness
@@ -453,18 +455,19 @@ public class SearchService extends WMService {
 		}
 	}
 
-
-	private class QueryLabel {
+	public class QueryLabel {
 
 		private org.wikipedia.miner.model.Label label ;
 		private Span span ;
 		private boolean isStopword ;
+		private Integer selectedSenseId ;
 
-		public QueryLabel(org.wikipedia.miner.model.Label label, boolean isStopword, Span span) {
+		public QueryLabel(org.wikipedia.miner.model.Label label, boolean isStopword, Span span, Integer selectedSenseId) {
 
 			this.label = label ;
 			this.isStopword = isStopword ;
 			this.span = span ; 
+			this.selectedSenseId = selectedSenseId ;
 		}
 
 		/**
@@ -486,6 +489,22 @@ public class SearchService extends WMService {
 		public Span getSpan() {
 			return span ;
 		}
+		
+		
+		
+		public Integer getSelectedSenseId() {
+			return selectedSenseId ;
+		}
+		
+		public double getWeight() {
+			
+			if (isStopword)
+				return 0 ;
+			else if (selectedSenseId != null)
+				return 1 ;
+			else
+				return label.getLinkProbability() ;
+		}
 
 		/*
 		@Override
@@ -501,19 +520,25 @@ public class SearchService extends WMService {
 		}*/
 	}
 
-	private static class Message extends Service.Message {
+	public static class Message extends Service.Message {
 		
 		@Expose
 		@ElementList(entry="label", inline=true)
 		private ArrayList<Label> labels = new ArrayList<Label>() ;
 		
-		public Message(HttpServletRequest request) {
+		private Message(HttpServletRequest request) {
 			super(request) ;
 		}
 		
-		public void addLabel(Label lbl) {
+		private void addLabel(Label lbl) {
 			labels.add(lbl) ;
 		}
+
+		public List<Label> getLabels() {
+			return Collections.unmodifiableList(labels);
+		}
+		
+		
 		
 	}
 
@@ -680,6 +705,10 @@ public class SearchService extends WMService {
 		private boolean fromRedirect ;
 		
 		@Expose
+		@Attribute
+		private boolean isSelected ;
+		
+		@Expose
 		@Attribute(required=false) 
 		private Double weight ;
 		
@@ -692,6 +721,11 @@ public class SearchService extends WMService {
 			priorProbability = sense.getPriorProbability() ;
 			fromTitle = sense.isFromTitle() ;
 			fromRedirect = sense.isFromTitle() ;
+			isSelected = false ;
+		}
+		
+		private void setIsSelected(boolean val) {
+			isSelected = val ;
 		}
 		
 		private void setWeight(double weight) {
@@ -728,6 +762,10 @@ public class SearchService extends WMService {
 
 		public Double getWeight() {
 			return weight;
+		}
+		
+		public boolean isSelected() {
+			return isSelected ;
 		}
 	}
 }

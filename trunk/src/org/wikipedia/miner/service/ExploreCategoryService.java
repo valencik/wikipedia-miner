@@ -256,6 +256,8 @@ public class ExploreCategoryService extends WMService{
 		}
 
 		public List<Page> getParentCategories() {
+			if (parentCategories == null) return Collections.unmodifiableList(new ArrayList<Page>()) ;
+			
 			return Collections.unmodifiableList(parentCategories);
 		}
 
@@ -264,6 +266,8 @@ public class ExploreCategoryService extends WMService{
 		}
 
 		public List<Page> getChildCategories() {
+			if (childCategories == null) return Collections.unmodifiableList(new ArrayList<Page>()) ;
+			
 			return Collections.unmodifiableList(childCategories);
 		}
 
@@ -272,6 +276,8 @@ public class ExploreCategoryService extends WMService{
 		}
 
 		public List<Page> getChildArticles() {
+			if (childArticles == null) return Collections.unmodifiableList(new ArrayList<Page>()) ;
+			
 			return Collections.unmodifiableList(childArticles);
 		}
 
