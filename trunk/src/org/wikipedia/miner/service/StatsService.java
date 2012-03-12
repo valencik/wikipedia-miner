@@ -13,18 +13,19 @@ import javax.servlet.http.HttpServletRequest;
 import org.simpleframework.xml.*;
 import org.wikipedia.miner.db.WEnvironment.StatisticName;
 import org.wikipedia.miner.model.Wikipedia;
+import org.xjsf.Service;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
 
-public class StatsService extends Service{
+@SuppressWarnings("serial")
+public class StatsService extends WMService{
 	
 	DateFormat df ;
 
 	public StatsService() {
 		super("meta","Provides statistics of a specific wikipedia version",
-				"<p>Retrieves statistics (article counts, last edit date, etc.) for a wikipedia dump.</p>",
-				true, false
+				"<p>Retrieves statistics (article counts, last edit date, etc.) for a wikipedia dump.</p>", false
 				);
 		
 		TimeZone tz = TimeZone.getTimeZone("GMT:00");

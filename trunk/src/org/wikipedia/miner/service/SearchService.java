@@ -20,13 +20,15 @@ import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.ElementList;
 import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.param.BooleanParameter;
-import org.wikipedia.miner.service.param.FloatParameter;
-import org.wikipedia.miner.service.param.StringParameter;
-import org.wikipedia.miner.service.UtilityMessages.*;
 import org.wikipedia.miner.util.NGrammer;
-import org.wikipedia.miner.util.RelatednessCache;
 import org.wikipedia.miner.util.NGrammer.NGramSpan;
+import org.wikipedia.miner.util.RelatednessCache;
+import org.xjsf.Service;
+import org.xjsf.UtilityMessages.ErrorMessage;
+import org.xjsf.UtilityMessages.ParameterMissingMessage;
+import org.xjsf.param.BooleanParameter;
+import org.xjsf.param.FloatParameter;
+import org.xjsf.param.StringParameter;
 
 import com.google.gson.annotations.Expose;
 
@@ -36,7 +38,7 @@ import com.google.gson.annotations.Expose;
  * 
  * NOTE: this does not support {@link Service.ResponseFormat#DIRECT} 
  */
-public class SearchService extends Service {
+public class SearchService extends WMService {
 
 
 	private static final long serialVersionUID = 5011451347638265017L;
@@ -56,8 +58,7 @@ public class SearchService extends Service {
 				"<p>For each component term, the service will list the different articles (or concepts) that it could refer to, in order of prior probability " +
 				"so that the most obvious senses are listed first.</p>" +
 				"<p>For queries that contain multiple terms, the senses of each term will be compared against each other to disambiguate them. This " +
-				"provides the weight attribute, which is larger for senses that are likely to be the correct interpretation of the query.</p>",
-				true, false);
+				"provides the weight attribute, which is larger for senses that are likely to be the correct interpretation of the query.</p>", false);
 	}
 	
 	@Override
@@ -130,7 +131,7 @@ public class SearchService extends Service {
 
 		Wikipedia wikipedia = getWikipedia(request) ;
 		
-		ArticleComparer artComparer = getHub().getArticleComparer(getWikipediaName(request)) ;
+		ArticleComparer artComparer = getWMHub().getArticleComparer(getWikipediaName(request)) ;
 		if (artComparer == null)
 			return new ErrorMessage(request, "article comparisons are not available with this wikipedia instance") ;
 
@@ -202,7 +203,7 @@ public class SearchService extends Service {
 				continue ;
 			}
 			
-			Integer topicId = topicIdsBySpan.get(getKey(span)) ;
+			//Integer topicId = topicIdsBySpan.get(getKey(span)) ;
 			//TODO: something with topic id
 			//if (topicId != null)
 			//	System.out.println("   topic: " + topicId) ;
@@ -345,7 +346,7 @@ public class SearchService extends Service {
 		RelatednessCache rc ;
 
 		org.wikipedia.miner.model.Label.Sense currCombo[] ;
-		org.wikipedia.miner.model.Label.Sense bestCombo[] ;
+		//org.wikipedia.miner.model.Label.Sense bestCombo[] ;
 		float bestComboWeight ;
 
 		private TIntFloatHashMap bestSenseWeights ;
@@ -362,7 +363,7 @@ public class SearchService extends Service {
 
 			this.currCombo = new org.wikipedia.miner.model.Label.Sense[queryTerms.size()] ;
 
-			this.bestCombo = null ;
+			//this.bestCombo = null ;
 			this.bestComboWeight = 0 ;
 
 			bestSenseWeights = new TIntFloatHashMap() ;
@@ -438,7 +439,7 @@ public class SearchService extends Service {
 			//check if this is best overall combination			
 			if (weight > bestComboWeight) {
 				bestComboWeight = weight ;
-				bestCombo = currCombo.clone() ;
+				//bestCombo = currCombo.clone() ;
 			}
 
 			//check if this is best weight for each individual sense

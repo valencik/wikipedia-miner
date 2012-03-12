@@ -7,15 +7,16 @@ import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 
 import org.simpleframework.xml.*;
+import org.xjsf.Service;
 
 import com.google.gson.annotations.Expose;
 
-public class ListWikipediasService extends Service{
+@SuppressWarnings("serial")
+public class ListWikipediasService extends WMService{
 
 	public ListWikipediasService() {
 		super("meta","Lists available editions of Wikipedia", 
-				"<p>This service lists the different editions of Wikipedia that are available</p>",
-				false,false
+				"<p>This service lists the different editions of Wikipedia that are available</p>",false
 				);
 	}
 
@@ -24,9 +25,9 @@ public class ListWikipediasService extends Service{
 		
 		Message msg = new Message(request) ;
 		
-		for (String wikiName: getHub().getWikipediaNames()) {
-			String desc = getHub().getWikipediaDescription(wikiName) ;
-			boolean isDefault = wikiName.equals(getHub().getDefaultWikipediaName()) ;
+		for (String wikiName: getWMHub().getWikipediaNames()) {
+			String desc = getWMHub().getWikipediaDescription(wikiName) ;
+			boolean isDefault = wikiName.equals(getWMHub().getDefaultWikipediaName()) ;
 			msg.addWikipedia(new Wikipedia(wikiName, desc, isDefault)) ;
 		}
 		

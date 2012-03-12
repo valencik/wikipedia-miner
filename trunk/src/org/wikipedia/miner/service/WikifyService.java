@@ -31,13 +31,14 @@ import org.wikipedia.miner.annotation.tagging.WikiTagger;
 import org.wikipedia.miner.annotation.tagging.DocumentTagger.RepeatMode;
 import org.wikipedia.miner.annotation.weighting.LinkDetector;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.param.*;
-import org.wikipedia.miner.service.UtilityMessages.*;
+import org.xjsf.Service;
+import org.xjsf.param.*;
+import org.xjsf.UtilityMessages.*;
 
 import com.google.gson.annotations.Expose;
 
 @SuppressWarnings("serial")
-public class WikifyService extends Service {
+public class WikifyService extends WMService {
 
 	public enum SourceMode{AUTO, URL, HTML, WIKI} ;
 	public enum LinkFormat{AUTO,WIKI,WIKI_ID,WIKI_ID_WEIGHT,HTML,HTML_ID, HTML_ID_WEIGHT} ;
@@ -65,8 +66,7 @@ public class WikifyService extends Service {
 		super("core","Augments textual documents with links to the appropriate Wikipedia articles",
 				"<p>This service automatically detects the topics mentioned in the given document, and provides links to the appropriate Wikipedia articles. </p>" 
 				+ "<p> It doesn't just use Wikipedia as a source of information to link to, but also as training data for how best to do it. In other words, it has been trained to make the same decisions as the people who edit Wikipedia. </p>"
-				+ "<p> It may not work very well if the document does not fit the model of what it has been trained on. Documents should not be too short, and should be dedicated to a particular topic.</p>",
-				true, true
+				+ "<p> It may not work very well if the document does not fit the model of what it has been trained on. Documents should not be too short, and should be dedicated to a particular topic.</p>", true
 			);
 	}
 	
@@ -109,9 +109,9 @@ public class WikifyService extends Service {
 		prmDisambigPolicy = new EnumParameter<DisambiguationPolicy>("disambiguationPolicy", "wheither each term should be disambiguated to a single interpretation, or to multiple ones", DisambiguationPolicy.STRICT, DisambiguationPolicy.values(), descDisambigPolicy) ;
 		addGlobalParameter(prmDisambigPolicy) ;
 		
-		for (String wikiName:getHub().getWikipediaNames()) {
+		for (String wikiName:getWMHub().getWikipediaNames()) {
 			
-			Wikipedia w = getHub().getWikipedia(wikiName) ;
+			Wikipedia w = getWMHub().getWikipedia(wikiName) ;
 			
 			try {
 				Disambiguator d = new Disambiguator(w) ;
@@ -268,7 +268,7 @@ public class WikifyService extends Service {
 			
 			URL url = new URL(source) ;
 			
-			markup = getHub().getRetriever().getWebContent(url) ;
+			markup = getWMHub().getRetriever().getWebContent(url) ;
 		} else {
 			markup = source ;
 		}

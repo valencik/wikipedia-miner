@@ -8,9 +8,9 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Wikipedia;
-import org.wikipedia.miner.service.param.EnumParameter;
 import org.wikipedia.miner.util.EmphasisResolver;
 import org.wikipedia.miner.util.MarkupStripper;
+import org.xjsf.param.EnumParameter;
 
 import com.sleepycat.je.DatabaseException;
 

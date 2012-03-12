@@ -10,8 +10,6 @@ import java.net.PasswordAuthentication;
 import java.net.URL;
 import java.util.Properties;
 
-import javax.servlet.ServletContext;
-
 public class WebContentRetriever {
 
 	public WebContentRetriever(HubConfiguration config) {

@@ -9,17 +9,17 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.simpleframework.xml.Attribute;
 import org.simpleframework.xml.ElementList;
-
-import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.model.Label;
-import org.wikipedia.miner.service.param.IntParameter;
-import org.wikipedia.miner.service.param.StringParameter;
-import org.wikipedia.miner.service.UtilityMessages.*;
+import org.wikipedia.miner.model.Wikipedia;
+import org.xjsf.UtilityMessages.ParameterMissingMessage;
 import org.wikipedia.miner.util.text.TextProcessor;
+import org.xjsf.Service;
+import org.xjsf.param.IntParameter;
+import org.xjsf.param.StringParameter;
 
 import com.google.gson.annotations.Expose;
 
-public class CorrectService extends Service {
+public class CorrectService extends WMService {
 	
 	/**
 	 * 
@@ -32,8 +32,7 @@ public class CorrectService extends Service {
 
 	public CorrectService() {
 		super("query","Provides alternatives for misspelt words",
-				"<p></p>",
-				true, false);
+				"<p></p>", false);
 		
 		prmTerm = new StringParameter("term", "The term or phrase to find spelling corrections for", null) ;
 		addGlobalParameter(prmTerm) ;	
