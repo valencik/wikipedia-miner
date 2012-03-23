@@ -21,17 +21,16 @@ import org.wikipedia.miner.comparison.ArticleComparer;
 import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Category;
 import org.wikipedia.miner.model.Wikipedia;
+import org.wikipedia.miner.service.UtilityMessages.InvalidIdMessage;
+import org.wikipedia.miner.service.UtilityMessages.InvalidTitleMessage;
 import org.xjsf.Service;
 import org.xjsf.UtilityMessages.ErrorMessage;
-import org.xjsf.UtilityMessages.InvalidIdMessage;
-import org.xjsf.UtilityMessages.InvalidTitleMessage;
 import org.xjsf.UtilityMessages.ParameterMissingMessage;
 import org.xjsf.param.BooleanParameter;
 import org.xjsf.param.EnumParameter;
 import org.xjsf.param.IntParameter;
 import org.xjsf.param.ParameterGroup;
 import org.xjsf.param.StringParameter;
-import org.wikipedia.miner.service.WikifyService.Reference;
 
 import com.google.gson.annotations.Expose;
 

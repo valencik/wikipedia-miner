@@ -190,7 +190,7 @@
 
       </description>
       <servlet-class>
-        org.wikipedia.miner.service.UsageService
+        org.xjsf.UsageService
       </servlet-class>
       <load-on-startup>1</load-on-startup>
     </servlet>
@@ -224,7 +224,7 @@
 
       </description>
       <servlet-class>
-        org.wikipedia.miner.service.ListServicesService
+        org.xjsf.ListServicesService
       </servlet-class>
       <load-on-startup>1</load-on-startup>
     </servlet>

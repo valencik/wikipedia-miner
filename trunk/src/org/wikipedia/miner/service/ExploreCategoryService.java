@@ -14,6 +14,7 @@ import org.wikipedia.miner.model.Article;
 import org.wikipedia.miner.model.Category;
 import org.wikipedia.miner.model.Wikipedia;
 import org.wikipedia.miner.service.ExploreArticleService.Page;
+import org.wikipedia.miner.service.UtilityMessages.*;
 import org.xjsf.Service;
 import org.xjsf.param.BooleanParameter;
 import org.xjsf.param.IntParameter;
