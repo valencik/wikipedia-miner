@@ -5,6 +5,7 @@ import gnu.trove.TIntHash;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -19,6 +20,8 @@ import com.sleepycat.bind.tuple.IntegerBinding;
 import com.sleepycat.bind.tuple.StringBinding;
 import com.sleepycat.je.Database;
 import com.sleepycat.je.DatabaseEntry;
+
+import org.apache.tools.bzip2.* ;
 
 /**
  * A {@link WDatabase} for associating page ids with page markup. 
@@ -80,9 +83,16 @@ public class MarkupDatabase extends WDatabase<Integer, String> {
 		Integer currId = null ;
 		String currMarkup = null ;
 		StringBuffer characters = new StringBuffer() ;
+		
+		InputStream reader ;
+		
+		if (dataFile.getName().endsWith(".bz2"))
+			reader = new CBZip2InputStream(new FileInputStream(dataFile)) ;
+		else
+			reader = new FileInputStream(dataFile) ;
 
 		XMLInputFactory xmlStreamFactory = XMLInputFactory.newInstance() ;
-		CountingInputStream countingReader = new CountingInputStream(new FileInputStream(dataFile)) ;
+		CountingInputStream countingReader = new CountingInputStream(reader) ;
 		XMLStreamReader xmlStreamReader = xmlStreamFactory.createXMLStreamReader(countingReader, "UTF-8") ;
 
 		int pageTotal = 0 ;
