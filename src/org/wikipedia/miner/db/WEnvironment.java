@@ -799,7 +799,7 @@ public class WEnvironment  {
 		File[] files = dataDirectory.listFiles(new FilenameFilter() {
 			@Override
 			public boolean accept(File dir, String name) {
-				return name.endsWith("-pages-articles.xml") ;
+				return name.endsWith("-pages-articles.xml") || name.endsWith("-pages-articles.xml.bz2") ;
 			}
 		}) ;
 		
